@@ -143,9 +143,8 @@ def FeedSidebarItem(feed, count=""):
     """Create sidebar item for feed (adapted from MailSbLi)"""
     last_updated = human_time_diff(feed.get('last_updated'))
     
-    # Use regular links for both desktop and mobile
-    # Mobile: uk_toggle auto-closes sidebar
-    # Desktop: Full page load ensures proper filtering 
+    # Use pure HTML links with HTMX explicitly disabled
+    # uk_toggle handles mobile sidebar auto-close
     return Li(
         A(
             DivLAligned(
@@ -155,6 +154,7 @@ def FeedSidebarItem(feed, count=""):
             ),
             href=f"/?feed_id={feed['id']}",
             uk_toggle="target: #mobile-sidebar",  # Auto-close mobile sidebar when clicked
+            hx_disable="true",  # Explicitly disable HTMX for this element
             cls='hover:bg-secondary p-4'
         )
     )
@@ -164,8 +164,8 @@ def FeedsSidebar(session_id):
     feeds = FeedModel.get_user_feeds(session_id)
     folders = FolderModel.get_folders(session_id)
     
-    return NavContainer(
-        NavHeaderLi(H3("Feeds"), cls='p-3'),
+    return Ul(
+        Li(H3("Feeds"), cls='p-3'),
         Li(
             DivLAligned(
                 Input(
@@ -194,15 +194,17 @@ def FeedsSidebar(session_id):
                 ),
                 href="/",
                 uk_toggle="target: #mobile-sidebar",  # Auto-close mobile sidebar when clicked
+                hx_disable="true",  # Explicitly disable HTMX for this element
                 cls='hover:bg-secondary p-4'
             )
         ),
         Div(id="feeds-list")(*[FeedSidebarItem(feed) for feed in feeds]),
         Li(Hr()),
-        NavHeaderLi(H4("Folders"), cls='p-3'),
+        Li(H4("Folders"), cls='p-3'),
         *[Li(A(DivLAligned(Span(UkIcon('folder')), Span(folder['name'])), 
                href=f"/?folder_id={folder['id']}",
                uk_toggle="target: #mobile-sidebar",  # Auto-close mobile sidebar when clicked
+               hx_disable="true",  # Explicitly disable HTMX for this element
                cls='hover:bg-secondary p-4')) 
           for folder in folders],
         Li(
