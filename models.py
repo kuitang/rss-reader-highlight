@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from typing import Optional, List, Dict
 from contextlib import contextmanager
 
-DB_PATH = "data/rss.db"
+DB_PATH = os.environ.get("DATABASE_PATH", "data/rss.db")
 
 def init_db():
     """Initialize database with required tables"""

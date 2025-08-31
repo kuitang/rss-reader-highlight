@@ -259,11 +259,9 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1):
             H3(feed_name),
             TabContainer(
                 Li(A("All Posts", href=base_url, role='button'), 
-                   cls='uk-active' if not unread_only else '', 
-                   uk_filter_control="filter: .tag-read, .tag-unread"),
+                   cls='uk-active' if not unread_only else ''),
                 Li(A("Unread", href=f"{base_url}{'&' if url_params else '?'}unread=1" if base_url != "/" else "/?unread=1", role='button'),
-                   cls='uk-active' if unread_only else '',
-                   uk_filter_control="filter: .tag-unread"),
+                   cls='uk-active' if unread_only else ''),
                 alt=True, cls='ml-auto max-w-40'
             )
         ),
@@ -396,18 +394,23 @@ def show_item(item_id: int, request, unread_view: bool = False):
     # 2. Out-of-band swap: Update the list item appearance (remove blue indicator)
     if was_unread and item_after:
         if unread_view:
-            # In unread view: remove the item entirely
-            updated_item = Div(hx_swap_oob=f'outerHTML:#{f"feed-item-{item_id}"}')  # Empty div replaces item
-            responses.append(updated_item)
-        else:
-            # In all posts view: update item to show as read (no blue indicator)
-            updated_item = FeedItem(item_after, unread_view)
-            updated_item = Li(
-                *updated_item.children,  # Copy children
-                cls=updated_item.get('cls', ''),  # Copy classes
+            # In unread view: remove the item entirely using HTMX delete
+            removal_element = Div(
                 id=f"feed-item-{item_id}",
-                hx_swap_oob='outerHTML',  # Replace the entire list item
-                hx_get=f"/item/{item_after['id']}?unread_view={unread_view}",
+                hx_swap_oob="delete"
+            )
+            responses.append(removal_element)
+        else:
+            # In all posts view: update item to remove blue dot but keep visible
+            # Create updated item without blue dot
+            updated_item = FeedItem(item_after, unread_view=False)
+            # Set proper HTMX OOB attributes for replacement
+            updated_item = Li(
+                *updated_item.children,  # Copy the content
+                cls=updated_item.get('cls', ''),  # Copy classes (should not have blue dot now)
+                id=f"feed-item-{item_id}",
+                hx_swap_oob="true",  # Use true for replacement, not outerHTML
+                hx_get=f"/item/{item_after['id']}?unread_view=False",
                 hx_target="#item-detail",
                 hx_trigger="click"
             )
@@ -500,4 +503,5 @@ def add_folder(request):
     return FeedsSidebar(session_id)
 
 if __name__ == "__main__":
-    serve(port=5001, host="0.0.0.0")
+    port = int(os.environ.get("PORT", 5001))
+    serve(port=port, host="0.0.0.0")
