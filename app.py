@@ -143,6 +143,9 @@ def FeedSidebarItem(feed, count=""):
     """Create sidebar item for feed (adapted from MailSbLi)"""
     last_updated = human_time_diff(feed.get('last_updated'))
     
+    # Use regular links for both desktop and mobile
+    # Mobile: uk_toggle auto-closes sidebar
+    # Desktop: Full page load ensures proper filtering 
     return Li(
         A(
             DivLAligned(
@@ -151,9 +154,7 @@ def FeedSidebarItem(feed, count=""):
                 P(f"updated {last_updated}", cls=TextPresets.muted_sm)
             ),
             href=f"/?feed_id={feed['id']}",
-            hx_get=f"/?feed_id={feed['id']}",
-            hx_target="#main-content",
-            hx_push_url="true",
+            uk_toggle="target: #mobile-sidebar",  # Auto-close mobile sidebar when clicked
             cls='hover:bg-secondary p-4'
         )
     )
@@ -192,9 +193,7 @@ def FeedsSidebar(session_id):
                     P("", cls=TextPresets.muted_sm)
                 ),
                 href="/",
-                hx_get="/",
-                hx_target="#main-content",
-                hx_push_url="true",
+                uk_toggle="target: #mobile-sidebar",  # Auto-close mobile sidebar when clicked
                 cls='hover:bg-secondary p-4'
             )
         ),
@@ -203,9 +202,7 @@ def FeedsSidebar(session_id):
         NavHeaderLi(H4("Folders"), cls='p-3'),
         *[Li(A(DivLAligned(Span(UkIcon('folder')), Span(folder['name'])), 
                href=f"/?folder_id={folder['id']}",
-               hx_get=f"/?folder_id={folder['id']}",
-               hx_target="#main-content",
-               hx_push_url="true",
+               uk_toggle="target: #mobile-sidebar",  # Auto-close mobile sidebar when clicked
                cls='hover:bg-secondary p-4')) 
           for folder in folders],
         Li(

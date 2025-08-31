@@ -8,7 +8,7 @@ import sys
 from playwright.sync_api import sync_playwright, expect
 from contextlib import contextmanager
 
-TEST_PORT = 5001  # Use the main server port
+TEST_PORT = 8080  # Use the main server port
 TEST_URL = f"http://localhost:{TEST_PORT}"
 
 @contextmanager
@@ -112,6 +112,72 @@ class TestFormParameterBugFlow:
         # Verify app remains stable in mobile layout
         app_should_be_stable = page.get_by_role("heading", name="All Feeds")
         expect(app_should_be_stable).to_be_visible()
+
+    def test_mobile_sidebar_auto_close_on_feed_click(self, page):
+        """Test: Mobile sidebar should auto-close when feed link is clicked
+        
+        CRITICAL NOTE: ALWAYS use playwright mcp to determine the new selectors.
+        This test should FAIL initially, then we implement the fix.
+        """
+        # Set mobile viewport
+        page.set_viewport_size({"width": 375, "height": 667})
+        page.goto(TEST_URL)
+        page.wait_for_timeout(3000)
+        
+        # 1. Open mobile sidebar - EXACT SELECTOR from MCP
+        mobile_menu_button = page.locator('#mobile-header').get_by_role('button')
+        mobile_menu_button.click()
+        page.wait_for_timeout(500)
+        
+        # 2. Verify sidebar is open - EXACT SELECTOR from MCP discovery
+        mobile_sidebar = page.locator('#mobile-sidebar')
+        expect(mobile_sidebar).to_be_visible()
+        
+        # 3. Click on a feed link - EXACT SELECTOR from MCP
+        feed_link = page.locator('#mobile-sidebar a[href*="feed_id=11"]')
+        feed_link.click()
+        page.wait_for_timeout(1000)  # Wait for HTMX response
+        
+        # 4. EXPECTED BEHAVIOR: Sidebar should auto-close after feed click
+        # This assertion should FAIL initially (TDD)
+        expect(mobile_sidebar).not_to_be_visible()
+        
+        # 5. Verify feed filtering worked
+        expect(page).to_have_url("http://localhost:8080/?feed_id=11")
+        feed_heading = page.get_by_role("heading", name="BBC News")
+        expect(feed_heading).to_be_visible()
+
+    def test_desktop_feed_filtering_full_page_update(self, page):
+        """Test: Desktop feed click should trigger full page update with proper filtering
+        
+        CRITICAL NOTE: ALWAYS use playwright mcp to determine the new selectors.
+        This test should FAIL initially due to HTMX partial update issue.
+        """
+        # Set desktop viewport
+        page.set_viewport_size({"width": 1920, "height": 1080})
+        page.goto(TEST_URL)
+        page.wait_for_timeout(3000)
+        
+        # 1. Verify we start with "All Feeds" showing mixed content
+        all_feeds_heading = page.get_by_role("heading", name="All Feeds")
+        expect(all_feeds_heading).to_be_visible()
+        
+        # 2. Click on all subreddits feed link - EXACT SELECTOR from MCP
+        subreddits_link = page.locator('#sidebar a[href*="feed_id=2"]')
+        subreddits_link.click()
+        page.wait_for_timeout(2000)
+        
+        # 3. EXPECTED BEHAVIOR: Header should update to "all subreddits" (not stay "All Feeds")
+        # This assertion should FAIL initially due to HTMX partial update
+        subreddits_heading = page.get_by_role("heading", name="all subreddits")
+        expect(subreddits_heading).to_be_visible()
+        
+        # 4. Verify URL updated correctly
+        expect(page).to_have_url("http://localhost:8080/?feed_id=2")
+        
+        # 5. Verify sidebar shows active state
+        active_feed_link = page.locator('#sidebar a[href*="feed_id=2"][active]')
+        expect(active_feed_link).to_be_visible()
     
     def test_duplicate_feed_detection_via_form(self, page):
         """Test: Add existing feed → Should show 'Already subscribed' message

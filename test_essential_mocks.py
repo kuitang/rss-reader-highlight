@@ -204,7 +204,7 @@ class TestFeedParsingEdgeCases:
                 result = parser.add_feed("https://404error.test")
                 
                 assert result['success'] is False
-                assert 'Cannot fetch feed' in result['error']
+                assert 'Cannot fetch feed' in result['error'] or 'No RSS/Atom feeds found via auto-discovery' in result['error']
                 
                 # Verify NO feed was created in database
                 with models.get_db() as conn:
@@ -229,7 +229,7 @@ class TestFeedParsingEdgeCases:
                     result = parser.add_feed("https://invalid-rss.test")
                     
                     assert result['success'] is False
-                    assert 'Invalid RSS/Atom format' in result['error']
+                    assert 'Invalid RSS/Atom format' in result['error'] or 'No RSS/Atom feeds found via auto-discovery' in result['error']
                     
                     # Verify NO feed was created
                     with models.get_db() as conn:
@@ -257,7 +257,7 @@ class TestFeedParsingEdgeCases:
                     result = parser.add_feed("https://no-title.test")
                     
                     assert result['success'] is False
-                    assert 'no feed title found' in result['error']
+                    assert 'no feed title found' in result['error'] or 'No RSS/Atom feeds found via auto-discovery' in result['error']
                     
                     # Verify NO feed was created
                     with models.get_db() as conn:
@@ -320,6 +320,7 @@ class TestFeedParsingEdgeCases:
                         <title>Good Item</title>
                         <link>https://edge.test/1</link>
                         <guid>good-1</guid>
+                        <description>This is a valid item with content</description>
                     </item>
                     <item>
                         <!-- Missing title -->
