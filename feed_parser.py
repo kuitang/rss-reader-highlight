@@ -7,9 +7,11 @@ from typing import Dict, List, Optional
 from dateutil import parser as date_parser
 import logging
 import trafilatura
+from bs4 import BeautifulSoup
+import urllib.parse
 from models import FeedModel, FeedItemModel
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 class FeedParser:
@@ -43,6 +45,90 @@ class FeedParser:
             return parsed_date
         except:
             logger.warning(f"Could not parse date: {date_str}")
+            return None
+    
+    def discover_feeds_from_html(self, html_content: str, base_url: str) -> List[Dict]:
+        """Parse HTML to discover RSS/Atom feeds via link rel=alternate tags"""
+        try:
+            soup = BeautifulSoup(html_content, 'html.parser')
+            feeds = []
+            
+            # Look for RSS and Atom auto-discovery links
+            feed_links = soup.find_all('link', rel='alternate')
+            
+            for link in feed_links:
+                feed_type = link.get('type', '').lower()
+                
+                # Check for RSS or Atom MIME types
+                if feed_type in ['application/rss+xml', 'application/atom+xml']:
+                    href = link.get('href')
+                    title = link.get('title', 'RSS Feed')
+                    
+                    if href:
+                        # Resolve relative URLs to absolute
+                        absolute_url = urllib.parse.urljoin(base_url, href)
+                        feeds.append({
+                            'url': absolute_url,
+                            'title': title,
+                            'type': 'rss' if 'rss' in feed_type else 'atom'
+                        })
+            
+            return feeds
+            
+        except Exception as e:
+            logger.warning(f"Error parsing HTML for feed discovery: {str(e)}")
+            return []
+    
+    def discover_feeds(self, url: str) -> List[Dict]:
+        """Discover RSS/Atom feeds from a webpage URL"""
+        try:
+            response = self.client.get(url)
+            
+            if response.status_code != 200:
+                logger.warning(f"Failed to fetch page for feed discovery: {url} - HTTP {response.status_code}")
+                return []
+            
+            # Standard auto-discovery via HTML link tags
+            discovered = self.discover_feeds_from_html(response.text, url)
+            
+            # Reddit special case: if no feeds found and URL contains reddit.com
+            if not discovered and 'reddit.com' in url.lower():
+                reddit_feed_url = self._try_reddit_rss_suffix(url)
+                if reddit_feed_url:
+                    discovered.append({
+                        'url': reddit_feed_url,
+                        'title': 'Reddit RSS Feed',
+                        'type': 'rss'
+                    })
+            
+            return discovered
+            
+        except Exception as e:
+            logger.warning(f"Error discovering feeds from {url}: {str(e)}")
+            return []
+    
+    def _try_reddit_rss_suffix(self, url: str) -> Optional[str]:
+        """Try adding .rss suffix for Reddit URLs"""
+        try:
+            # Handle various Reddit URL formats
+            if url.endswith('/'):
+                test_url = url + '.rss'
+            else:
+                test_url = url + '/.rss'
+            
+            # Test if the RSS URL actually works
+            response = self.client.get(test_url)
+            if response.status_code == 200:
+                # Quick check if it's actually RSS content
+                if 'xml' in response.headers.get('content-type', '').lower() or \
+                   'rss' in response.text[:200].lower() or \
+                   '<?xml' in response.text[:100]:
+                    return test_url
+            
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Error testing Reddit RSS suffix for {url}: {str(e)}")
             return None
     
     def fetch_feed(self, url: str, etag: str = None, last_modified: str = None) -> Dict:
@@ -122,9 +208,22 @@ class FeedParser:
                     
                     if hasattr(entry, 'summary'):
                         # Convert HTML summary to clean Markdown
-                        description = trafilatura.extract(entry.summary, include_formatting=True, output_format='markdown')
-                        if not description:  # Fallback if trafilatura fails
-                            description = trafilatura.html_to_markdown(entry.summary) if entry.summary else None
+                        logger.debug(f"Processing summary for entry: {title[:50]}...")
+                        logger.debug(f"Summary content type: {type(entry.summary)}")
+                        logger.debug(f"Summary length: {len(entry.summary) if entry.summary else 0}")
+                        logger.debug(f"Summary preview: {entry.summary[:200] if entry.summary else 'None'}...")
+                        
+                        try:
+                            description = trafilatura.extract(entry.summary, include_formatting=True, output_format='markdown')
+                            if description:
+                                logger.debug(f"Trafilatura extraction successful: {len(description)} chars")
+                            else:
+                                logger.warning(f"Trafilatura extract returned None for {title[:50]} - SKIPPING ENTRY")
+                                logger.debug(f"Failed input: {entry.summary[:500] if entry.summary else 'None'}")
+                                continue  # Skip this entry entirely
+                        except Exception as e:
+                            logger.error(f"Trafilatura extract failed for {title[:50]}: {str(e)} - SKIPPING ENTRY")
+                            continue  # Skip this entry entirely
                     
                     if hasattr(entry, 'content') and entry.content:
                         # Take the first content entry
@@ -132,9 +231,22 @@ class FeedParser:
                         raw_content = content_entry.value if hasattr(content_entry, 'value') else str(content_entry)
                         
                         # Convert HTML content to clean Markdown
-                        content = trafilatura.extract(raw_content, include_formatting=True, output_format='markdown')
-                        if not content:  # Fallback if trafilatura fails
-                            content = trafilatura.html_to_markdown(raw_content) if raw_content else None
+                        logger.debug(f"Processing content for entry: {title[:50]}...")
+                        logger.debug(f"Content type: {type(raw_content)}")
+                        logger.debug(f"Content length: {len(raw_content) if raw_content else 0}")
+                        logger.debug(f"Content preview: {raw_content[:200] if raw_content else 'None'}...")
+                        
+                        try:
+                            content = trafilatura.extract(raw_content, include_formatting=True, output_format='markdown')
+                            if content:
+                                logger.debug(f"Trafilatura content extraction successful: {len(content)} chars")
+                            else:
+                                logger.warning(f"Trafilatura content extract returned None for {title[:50]} - SKIPPING ENTRY")
+                                logger.debug(f"Failed content input: {raw_content[:500] if raw_content else 'None'}")
+                                continue  # Skip this entry entirely
+                        except Exception as e:
+                            logger.error(f"Trafilatura content extract failed for {title[:50]}: {str(e)} - SKIPPING ENTRY")
+                            continue  # Skip this entry entirely
                     
                     # Parse published date
                     published = None
@@ -200,41 +312,82 @@ class FeedParser:
         return results
     
     def add_feed(self, url: str) -> Dict:
-        """Add new feed ONLY if it can be successfully parsed"""
+        """Add new feed with auto-discovery support"""
         try:
-            # FIRST: Try to fetch and parse the feed (don't create DB entry yet)
+            # FIRST: Try direct feed parsing
             fetch_result = self.fetch_feed(url)
+            
+            if fetch_result['updated'] and fetch_result['status'] == 200:
+                # Check if it's a valid feed
+                feed_data = fetch_result['data']
+                if hasattr(feed_data, 'feed') and hasattr(feed_data, 'entries'):
+                    feed_title = getattr(feed_data.feed, 'title', None)
+                    if feed_title:
+                        # Direct feed URL works - proceed normally
+                        feed_id = FeedModel.create_feed(url, feed_title)
+                        result = self.parse_and_store_feed(feed_id, url)
+                        
+                        if not result['updated']:
+                            return {
+                                'success': False,
+                                'error': 'Feed parsing failed after creation'
+                            }
+                        
+                        return {
+                            'success': True,
+                            'feed_id': feed_id,
+                            'feed_title': feed_title,
+                            **result
+                        }
+            
+            # SECOND: If direct parsing failed, try auto-discovery
+            logger.info(f"Direct feed parsing failed for {url}, trying auto-discovery...")
+            discovered_feeds = self.discover_feeds(url)
+            
+            if not discovered_feeds:
+                return {
+                    'success': False,
+                    'error': 'No RSS/Atom feeds found via auto-discovery'
+                }
+            
+            # THIRD: Try the first discovered feed
+            primary_feed = discovered_feeds[0]
+            feed_url = primary_feed['url']
+            
+            logger.info(f"Found feed via auto-discovery: {feed_url}")
+            
+            # Try to parse the discovered feed
+            fetch_result = self.fetch_feed(feed_url)
             
             if not fetch_result['updated'] or fetch_result['status'] != 200:
                 return {
                     'success': False,
-                    'error': f"Cannot fetch feed: HTTP {fetch_result['status']}"
+                    'error': f"Cannot fetch discovered feed: HTTP {fetch_result['status']}"
                 }
             
-            # SECOND: Verify it has parseable content
+            # Verify discovered feed has parseable content
             feed_data = fetch_result['data']
             if not hasattr(feed_data, 'feed') or not hasattr(feed_data, 'entries'):
                 return {
                     'success': False, 
-                    'error': 'Invalid RSS/Atom format - no feed data found'
+                    'error': 'Discovered feed has invalid RSS/Atom format'
                 }
             
             # Get feed metadata
-            feed_title = getattr(feed_data.feed, 'title', None)
+            feed_title = getattr(feed_data.feed, 'title', None) or primary_feed['title']
             if not feed_title:
                 return {
                     'success': False,
-                    'error': 'Invalid RSS/Atom format - no feed title found'
+                    'error': 'Discovered feed has no title'
                 }
             
-            # THIRD: Only create feed if parsing was successful
-            feed_id = FeedModel.create_feed(url, feed_title)
+            # Create feed with discovered URL
+            feed_id = FeedModel.create_feed(feed_url, feed_title)
             
-            # FOURTH: Store the articles we already parsed
-            result = self.parse_and_store_feed(feed_id, url)
+            # Store the articles
+            result = self.parse_and_store_feed(feed_id, feed_url)
             
             if not result['updated']:
-                # Parsing failed after DB creation - this shouldn't happen
                 return {
                     'success': False,
                     'error': 'Feed parsing failed after creation'
@@ -244,6 +397,8 @@ class FeedParser:
                 'success': True,
                 'feed_id': feed_id,
                 'feed_title': feed_title,
+                'discovered_from': url,
+                'feed_url': feed_url,
                 **result
             }
             

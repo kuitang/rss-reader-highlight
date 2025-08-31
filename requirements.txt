@@ -6,3 +6,7 @@ pytest
 pytest-httpx
 playwright
 python-dateutil
+trafilatura
+mistletoe
+beautifulsoup4
+lxml-html-clean
