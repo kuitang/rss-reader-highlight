@@ -12,15 +12,14 @@ from models import (
     init_db, get_db
 )
 from feed_parser import FeedParser, setup_default_feeds
+from background_worker import initialize_worker_system, shutdown_worker_system, queue_manager
 from dateutil.relativedelta import relativedelta
+import contextlib
 
 # Initialize database and setup default feeds if needed
 init_db()
 
-# Check if we need to add default feeds (first run)
-if not FeedModel.get_feeds_to_update(max_age_minutes=9999):
-    print("Setting up default feeds...")
-    setup_default_feeds()
+# Default feeds will be set up by background worker on first startup
 
 # Timing middleware for performance monitoring
 def timing_middleware(req, sess):
@@ -71,18 +70,45 @@ def before(req, sess):
     # Store in request scope for easy access
     req.scope['session_id'] = session_id
 
-# FastHTML app with session support and beforeware
+# Lifespan event handler for background worker
+@contextlib.asynccontextmanager
+async def lifespan(app):
+    """Handle app startup and shutdown with background worker"""
+    print("FastHTML app starting up...")
+    
+    # Startup: Initialize background worker
+    await initialize_worker_system()
+    print("Background worker system initialized")
+    
+    # Check if we need to add default feeds (first run)
+    if not FeedModel.get_feeds_to_update(max_age_minutes=9999):
+        print("Setting up default feeds via background worker...")
+        setup_default_feeds()  # This will be quick since worker handles the updates
+    
+    yield  # App is running
+    
+    # Shutdown: Clean up background worker
+    print("Shutting down background worker...")
+    await shutdown_worker_system()
+    print("FastHTML app shutdown complete")
+
+# FastHTML app with session support and lifespan
 app, rt = fast_app(
     hdrs=Theme.blue.headers() + [
         Script("""
         htmx.logAll();
         htmx.config.includeIndicatorStyles = false;
+        """),
+        Style("""
+        .htmx-indicator { display: none; }
+        .htmx-request .htmx-indicator { display: flex; }
         """)
     ],
     live=True,
     debug=True,
     before=[timing_middleware, before],
-    after=after_middleware
+    after=after_middleware,
+    lifespan=lifespan
 )
 
 def human_time_diff(dt):
@@ -238,10 +264,10 @@ def FeedItem(item, unread_view=False, for_desktop=False):
         ),
         # Summary (use full description, truncate only as fallback if too long)
         Div(
-            mistletoe.markdown(
+            NotStr(mistletoe.markdown(
                 item.get('description') if item.get('description') and len(item.get('description', '')) <= 300 
                 else (item.get('description', '')[:150] + '...' if item.get('description') else 'No summary available')
-            ), 
+            )), 
             cls=TextPresets.muted_sm + ' mt-2'
         ),
         # Optional folder label
@@ -321,30 +347,63 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
             )
         )
     
-    return Div(cls='flex flex-col', uk_filter="target: .js-filter")(
-        Div(cls='flex px-4 py-2')(
-            H3(feed_name),
-            TabContainer(
-                Li(A("All Posts", href=f"{base_url}{'&' if url_params else '?'}unread=0" if base_url != "/" else "/?unread=0", role='button'),
-                   cls='uk-active' if not unread_only else ''),
-                Li(A("Unread", href=base_url if base_url != "/" else "/", role='button'),
-                   cls='uk-active' if unread_only else ''),
-                alt=True, cls='ml-auto max-w-40'
-            )
-        ),
-        Div(cls='flex flex-1 flex-col')(
-            Div(cls='p-4')(
-                Div(cls='uk-inline w-full')(
-                    Span(cls='uk-form-icon text-muted-foreground')(UkIcon('search')),
-                    Input(placeholder='Search posts', uk_filter_control="")
+    # Different layouts for mobile vs desktop
+    if for_desktop:
+        # Desktop: sticky header + scrollable content
+        return Div(cls='flex flex-col h-full')(
+            # Sticky header section
+            Div(cls='sticky top-0 bg-background border-b z-10')(
+                Div(cls='flex px-4 py-3')(
+                    H3(feed_name),
+                    TabContainer(
+                        Li(A("All Posts", href=f"{base_url}{'&' if url_params else '?'}unread=0" if base_url != "/" else "/?unread=0", role='button'),
+                           cls='uk-active' if not unread_only else ''),
+                        Li(A("Unread", href=base_url if base_url != "/" else "/", role='button'),
+                           cls='uk-active' if unread_only else ''),
+                        alt=True, cls='ml-auto max-w-40'
+                    )
+                ),
+                Div(cls='px-4 pb-3')(
+                    Div(cls='uk-inline w-full')(
+                        Span(cls='uk-form-icon text-muted-foreground')(UkIcon('search')),
+                        Input(placeholder='Search posts', uk_filter_control="")
+                    )
                 )
             ),
-            Div(cls='flex-1 overflow-y-auto', id="feeds-list-container")(
-                FeedsList(paginated_items, unread_only, for_desktop) if paginated_items else Div(P("No posts available"), cls='p-4 text-center text-muted-foreground')
-            ),
-            pagination_footer()
+            # Scrollable content area
+            Div(cls='flex-1 overflow-y-auto', id="feeds-list-container", uk_filter="target: .js-filter")(
+                FeedsList(paginated_items, unread_only, for_desktop) if paginated_items else Div(P("No posts available"), cls='p-4 text-center text-muted-foreground'),
+                pagination_footer()
+            )
         )
-    )
+    else:
+        # Mobile: sticky header + scrollable content
+        return Div(cls='flex flex-col h-full')(
+            # Sticky header section (not affected by viewport scroll)
+            Div(cls='sticky top-0 bg-background border-b z-10')(
+                Div(cls='flex px-4 py-2')(
+                    H3(feed_name),
+                    TabContainer(
+                        Li(A("All Posts", href=f"{base_url}{'&' if url_params else '?'}unread=0" if base_url != "/" else "/?unread=0", role='button'),
+                           cls='uk-active' if not unread_only else ''),
+                        Li(A("Unread", href=base_url if base_url != "/" else "/", role='button'),
+                           cls='uk-active' if unread_only else ''),
+                        alt=True, cls='ml-auto max-w-40'
+                    )
+                ),
+                Div(cls='px-4 pb-2')(
+                    Div(cls='uk-inline w-full')(
+                        Span(cls='uk-form-icon text-muted-foreground')(UkIcon('search')),
+                        Input(placeholder='Search posts', uk_filter_control="")
+                    )
+                )
+            ),
+            # Scrollable content area
+            Div(cls='flex-1 overflow-y-auto', id="feeds-list-container", uk_filter="target: .js-filter")(
+                FeedsList(paginated_items, unread_only, for_desktop) if paginated_items else Div(P("No posts available"), cls='p-4 text-center text-muted-foreground'),
+                pagination_footer()
+            )
+        )
 
 def MobileSidebar(session_id):
     """Create mobile sidebar overlay"""
@@ -372,10 +431,10 @@ def MobileSidebar(session_id):
 def MobileHeader(session_id, show_back=False):
     """Create mobile header with hamburger menu and optional back button"""
     
-    # Loading spinner
+    # Loading spinner - hidden by default, shown during HTMX requests
     loading_spinner = Div(
         id="loading-spinner",
-        cls="fixed top-20 left-1/2 transform -translate-x-1/2 bg-background border rounded p-3 z-50 lg:hidden htmx-indicator"
+        cls="fixed top-20 left-1/2 transform -translate-x-1/2 bg-background border rounded p-3 z-50 lg:hidden htmx-indicator hidden"
     )(
         DivLAligned(
             UkIcon('loader', cls="animate-spin"),
@@ -479,9 +538,10 @@ def index(request, feed_id: int = None, unread: bool = True, folder_id: int = No
     items = FeedItemModel.get_items_for_user(session_id, feed_id, unread)
     print(f"DEBUG: Found {len(items)} items for user, page {page}")
     
-    # Update feeds that need refreshing (older than 1 minute)
-    parser = FeedParser()
-    parser.update_all_feeds(max_age_minutes=1)
+    # Queue user's feeds for background updating (non-blocking)
+    if queue_manager:
+        import asyncio
+        asyncio.create_task(queue_manager.queue_user_feeds(session_id))
     
     # This is now handled by MobileHeader function
     
@@ -496,21 +556,27 @@ def index(request, feed_id: int = None, unread: bool = True, folder_id: int = No
         Div(id="mobile-header")(MobileHeader(session_id, show_back=False)),
         MobileSidebar(session_id),
         # Desktop layout: sidebar + feeds + article detail
-        Div(cls="hidden lg:grid", id="desktop-layout")(
+        Div(cls="hidden lg:grid h-screen pt-4", id="desktop-layout")(
             Grid(
-                Div(id="sidebar")(FeedsSidebar(session_id), cls='col-span-1 h-screen'),
-                Div(cls='col-span-2 h-screen flex flex-col', id="desktop-feeds-content")(
-                    Div(cls='flex-1 overflow-y-auto')(FeedsContent(session_id, feed_id, unread, page, for_desktop=True))
+                Div(id="sidebar", cls='col-span-1 h-screen overflow-y-auto border-r px-2')(
+                    FeedsSidebar(session_id)
                 ),
-                Div(id="desktop-item-detail")(ItemDetailView(None), cls='col-span-2 h-screen'),
+                Div(cls='col-span-2 h-screen flex flex-col overflow-hidden border-r px-4', id="desktop-feeds-content")(
+                    FeedsContent(session_id, feed_id, unread, page, for_desktop=True)
+                ),
+                Div(id="desktop-item-detail", cls='col-span-2 h-screen overflow-y-auto px-6')(
+                    ItemDetailView(None)
+                ),
                 cols_lg=5, cols_xl=5,
-                gap=0, cls='h-screen'
+                gap=4, cls='h-screen gap-4'
             )
         ),
-        # Mobile layout: just feeds content (articles list) with top padding for fixed header
-        Div(cls="lg:hidden pt-20", id="main-content")(
+        # Mobile layout: full height with top padding for fixed header
+        Div(cls="lg:hidden pt-20 h-screen overflow-hidden", id="main-content")(
             FeedsContent(session_id, feed_id, unread, page)
         ),
+        # Global update status indicator
+        UpdateStatusIndicator(),
         cls=('min-h-screen', ContainerT.xl)
     )
 
@@ -599,10 +665,10 @@ def show_item(item_id: int, request, unread_view: bool = False):
                 ),
                 # Summary (use full description, truncate only as fallback if too long)
                 Div(
-                    mistletoe.markdown(
+                    NotStr(mistletoe.markdown(
                         item_after.get('description') if item_after.get('description') and len(item_after.get('description', '')) <= 300 
                         else (item_after.get('description', '')[:150] + '...' if item_after.get('description') else 'No summary available')
-                    ), 
+                    )), 
                     cls=TextPresets.muted_sm + ' mt-2'
                 ),
                 **updated_item_attrs
@@ -696,6 +762,40 @@ def add_folder(request):
     # Return updated sidebar
     return FeedsSidebar(session_id)
 
+@rt('/api/update-status')
+def update_status():
+    """Return current background worker status for UI"""
+    if queue_manager and hasattr(queue_manager, 'worker'):
+        status = queue_manager.worker.get_status()
+        return UpdateStatusContent(status)
+    
+    # Return empty content when worker not available
+    return ""
+
+def UpdateStatusIndicator():
+    """Global update status indicator"""
+    return Div(
+        id="update-status",
+        hx_get="/api/update-status",
+        hx_trigger="every 3s",
+        hx_swap="innerHTML",
+        cls="fixed bottom-4 right-4 z-50"
+    )
+
+def UpdateStatusContent(status):
+    """Render update status content"""
+    if status.get('is_updating', False):
+        return Div(
+            cls="bg-primary text-primary-foreground px-4 py-2 rounded-lg shadow-lg flex items-center gap-2"
+        )(
+            Span("⟳", cls="animate-spin"),
+            Span(f"Updating {status['queue_size']} feeds"),
+            Small(status['current_feed'] or "") if status.get('current_feed') else ""
+        )
+    return ""  # Hidden when not updating
+
 if __name__ == "__main__":
+    import uvicorn
     port = int(os.environ.get("PORT", 8080))
-    serve(port=port, host="0.0.0.0")
+    print(f"Starting server on 0.0.0.0:{port}")
+    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")

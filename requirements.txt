@@ -4,9 +4,12 @@ feedparser
 httpx
 pytest
 pytest-httpx
+pytest-asyncio
 playwright
 python-dateutil
 trafilatura
 mistletoe
 beautifulsoup4
 lxml-html-clean
+uvicorn
+aiolimiter

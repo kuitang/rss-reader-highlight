@@ -209,33 +209,39 @@ class FeedParser:
                     description = None
                     content = None
                     
-                    if hasattr(entry, 'summary'):
+                    if hasattr(entry, 'summary') and entry.summary:
                         # Convert HTML summary to clean Markdown
                         logger.debug(f"Processing summary for entry: {title[:50]}...")
                         logger.debug(f"Summary content type: {type(entry.summary)}")
                         logger.debug(f"Summary length: {len(entry.summary) if entry.summary else 0}")
                         logger.debug(f"Summary preview: {entry.summary[:200] if entry.summary else 'None'}...")
                         
-                        try:
-                            # Wrap fragment in complete HTML document for trafilatura
-                            wrapped_html = f"<html><body>{entry.summary}</body></html>"
-                            description = trafilatura.extract(wrapped_html, include_formatting=True, output_format='markdown')
-                            if description:
-                                logger.debug(f"Trafilatura extraction successful: {len(description)} chars")
-                            else:
-                                # Final fallback: use BeautifulSoup for simple text extraction
-                                from bs4 import BeautifulSoup
-                                soup = BeautifulSoup(entry.summary, 'html.parser')
-                                text_content = soup.get_text(strip=True)
-                                if text_content and len(text_content) > 10:  # Only use if meaningful content
-                                    description = text_content
-                                    logger.debug(f"Using BeautifulSoup fallback: {len(description)} chars")
-                                else:
-                                    logger.error(f"Trafilatura extract returned None for '{title}' - FULL XML ENTRY: {entry}")
-                                    continue  # Skip this entry entirely
-                        except Exception as e:
-                            logger.error(f"Trafilatura extract failed for '{title}': {str(e)} - FULL XML ENTRY: {entry}")
-                            continue  # Skip this entry entirely
+                        # Extract images first using BeautifulSoup
+                        from bs4 import BeautifulSoup
+                        soup = BeautifulSoup(entry.summary, 'html.parser')
+                        images = []
+                        for img in soup.find_all('img'):
+                            src = img.get('src')
+                            alt = img.get('alt', '')
+                            if src:
+                                # Create markdown image syntax: ![alt text](url)
+                                images.append(f"![{alt}]({src})")
+                        
+                        # Extract text content with trafilatura
+                        wrapped_html = f"<html><body>{entry.summary}</body></html>"
+                        description = trafilatura.extract(wrapped_html, include_formatting=True, output_format='markdown')
+                        
+                        # Combine images and text
+                        if images and description:
+                            # Add images at the beginning of the description
+                            description = '\n'.join(images) + '\n\n' + description
+                        elif images and not description:
+                            # If only images, use them as description
+                            description = '\n'.join(images)
+                        elif not description:
+                            # No text or images - skip this item
+                            logger.warning(f"Skipping '{title}' - trafilatura couldn't extract content from: {entry.summary[:200]}")
+                            continue
                     
                     if hasattr(entry, 'content') and entry.content:
                         # Take the first content entry
@@ -248,26 +254,40 @@ class FeedParser:
                         logger.debug(f"Content length: {len(raw_content) if raw_content else 0}")
                         logger.debug(f"Content preview: {raw_content[:200] if raw_content else 'None'}...")
                         
-                        try:
-                            # Wrap fragment in complete HTML document for trafilatura
-                            wrapped_content = f"<html><body>{raw_content}</body></html>"
-                            content = trafilatura.extract(wrapped_content, include_formatting=True, output_format='markdown')
-                            if content:
-                                logger.debug(f"Trafilatura content extraction successful: {len(content)} chars")
+                        # Extract images first using BeautifulSoup
+                        soup = BeautifulSoup(raw_content, 'html.parser')
+                        images = []
+                        for img in soup.find_all('img'):
+                            src = img.get('src')
+                            alt = img.get('alt', '')
+                            if src:
+                                # Create markdown image syntax: ![alt text](url)
+                                images.append(f"![{alt}]({src})")
+                        
+                        # Extract text content with trafilatura
+                        wrapped_content = f"<html><body>{raw_content}</body></html>"
+                        content = trafilatura.extract(wrapped_content, include_formatting=True, output_format='markdown')
+                        
+                        # Combine images and text
+                        if images and content:
+                            # Add images at appropriate position (after first paragraph if exists)
+                            paragraphs = content.split('\n\n')
+                            if len(paragraphs) > 1:
+                                # Insert images after first paragraph
+                                content = paragraphs[0] + '\n\n' + '\n'.join(images) + '\n\n' + '\n\n'.join(paragraphs[1:])
                             else:
-                                # Final fallback: use BeautifulSoup for simple text extraction
-                                from bs4 import BeautifulSoup
-                                soup = BeautifulSoup(raw_content, 'html.parser')
-                                text_content = soup.get_text(strip=True)
-                                if text_content and len(text_content) > 10:  # Only use if meaningful content
-                                    content = text_content
-                                    logger.debug(f"Using BeautifulSoup content fallback: {len(content)} chars")
-                                else:
-                                    logger.error(f"Trafilatura content extract returned None for '{title}' - FULL XML ENTRY: {entry}")
-                                    continue  # Skip this entry entirely
-                        except Exception as e:
-                            logger.error(f"Trafilatura content extract failed for '{title}': {str(e)} - FULL XML ENTRY: {entry}")
-                            continue  # Skip this entry entirely
+                                # Add images at the beginning
+                                content = '\n'.join(images) + '\n\n' + content
+                        elif images and not content:
+                            # If only images, use them as content
+                            content = '\n'.join(images)
+                        elif not content:
+                            # Log the failure - but if we have a description, continue with that
+                            logger.warning(f"Couldn't extract content for '{title}' - using description only")
+                            if not description:
+                                # No description either - skip this item entirely
+                                logger.error(f"Skipping '{title}' - no extractable content or description")
+                                continue
                     
                     # Parse published date
                     published = None
@@ -276,7 +296,8 @@ class FeedParser:
                     elif hasattr(entry, 'updated'):
                         published = self.parse_date(entry.updated)
                     
-                    if guid and title and link:
+                    # Only save items that have meaningful content
+                    if guid and title and link and (description or content):
                         FeedItemModel.create_item(
                             feed_id=feed_id,
                             guid=guid,
@@ -287,6 +308,8 @@ class FeedParser:
                             published=published
                         )
                         items_added += 1
+                    else:
+                        logger.warning(f"Skipping item '{title}' - missing required fields or content")
                     
                 except Exception as e:
                     logger.error(f"Error processing entry for feed {feed_id}: {str(e)}")
@@ -430,6 +453,68 @@ class FeedParser:
                 'error': str(e)
             }
     
+    def _extract_description_with_images(self, html_summary: str) -> str:
+        """Extract description with images from HTML summary"""
+        # Extract images first using BeautifulSoup
+        soup = BeautifulSoup(html_summary, 'html.parser')
+        images = []
+        for img in soup.find_all('img'):
+            src = img.get('src')
+            alt = img.get('alt', '')
+            if src:
+                # Create markdown image syntax: ![alt text](url)
+                images.append(f"![{alt}]({src})")
+        
+        # Extract text content with trafilatura
+        wrapped_html = f"<html><body>{html_summary}</body></html>"
+        description = trafilatura.extract(wrapped_html, include_formatting=True, output_format='markdown')
+        
+        # Combine images and text
+        if images and description:
+            # Add images at the beginning of the description
+            return '\n'.join(images) + '\n\n' + description
+        elif images and not description:
+            # If only images, use them as description
+            return '\n'.join(images)
+        elif description:
+            return description
+        else:
+            return None
+    
+    def _extract_content_with_images(self, raw_content: str) -> str:
+        """Extract content with images from HTML content"""
+        # Extract images first using BeautifulSoup
+        soup = BeautifulSoup(raw_content, 'html.parser')
+        images = []
+        for img in soup.find_all('img'):
+            src = img.get('src')
+            alt = img.get('alt', '')
+            if src:
+                # Create markdown image syntax: ![alt text](url)
+                images.append(f"![{alt}]({src})")
+        
+        # Extract text content with trafilatura
+        wrapped_content = f"<html><body>{raw_content}</body></html>"
+        content = trafilatura.extract(wrapped_content, include_formatting=True, output_format='markdown')
+        
+        # Combine images and text
+        if images and content:
+            # Add images at appropriate position (after first paragraph if exists)
+            paragraphs = content.split('\n\n')
+            if len(paragraphs) > 1:
+                # Insert images after first paragraph
+                return paragraphs[0] + '\n\n' + '\n'.join(images) + '\n\n' + '\n\n'.join(paragraphs[1:])
+            else:
+                # Add images at the beginning
+                return '\n'.join(images) + '\n\n' + content
+        elif images and not content:
+            # If only images, use them as content
+            return '\n'.join(images)
+        elif content:
+            return content
+        else:
+            return None
+
     def __del__(self):
         """Clean up HTTP client"""
         if hasattr(self, 'client'):
