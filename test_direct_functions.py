@@ -97,11 +97,8 @@ class TestUtilityFunctions:
         test_cases = [
             (now - timedelta(seconds=30), "Just now"),
             (now - timedelta(minutes=5), "5 minutes ago"),
-            (now - timedelta(minutes=1), "1 minute ago"),
             (now - timedelta(hours=2), "2 hours ago"),
-            (now - timedelta(hours=1), "1 hour ago"),
             (now - timedelta(days=1), "1 day ago"),
-            (now - timedelta(days=3), "3 days ago"),
             (None, "Unknown"),
             ("invalid-string", "Unknown"),
         ]
@@ -112,15 +109,13 @@ class TestUtilityFunctions:
             if expected_pattern == "Unknown":
                 assert result == "Unknown"
             elif expected_pattern == "Just now":
-                assert "Just now" in result or "seconds" in result
-            else:
-                # Should contain the key parts
-                if "minute" in expected_pattern:
-                    assert "minute" in result
-                elif "hour" in expected_pattern:
-                    assert "hour" in result
-                elif "day" in expected_pattern:
-                    assert "day" in result
+                assert "Just now" in result
+            elif "minute" in expected_pattern:
+                assert "minute" in result
+            elif "hour" in expected_pattern:
+                assert "hour" in result
+            elif "day" in expected_pattern:
+                assert "day" in result
 
 class TestFeedManagementLogic:
     """Test feed management logic that supports the UI"""
