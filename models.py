@@ -1,0 +1,289 @@
+"""Database models and operations for RSS Reader"""
+
+import sqlite3
+import os
+from datetime import datetime, timezone
+from typing import Optional, List, Dict
+from contextlib import contextmanager
+
+DB_PATH = "data/rss.db"
+
+def init_db():
+    """Initialize database with required tables"""
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.executescript("""
+        -- Global feeds table
+        CREATE TABLE IF NOT EXISTS feeds (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            url TEXT UNIQUE NOT NULL,
+            title TEXT,
+            description TEXT,
+            last_updated TIMESTAMP,
+            etag TEXT,
+            last_modified TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        
+        -- RSS/Atom feed items
+        CREATE TABLE IF NOT EXISTS feed_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            feed_id INTEGER NOT NULL,
+            guid TEXT NOT NULL,
+            title TEXT NOT NULL,
+            link TEXT NOT NULL,
+            description TEXT,
+            content TEXT,
+            published TIMESTAMP,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (feed_id) REFERENCES feeds (id) ON DELETE CASCADE,
+            UNIQUE (feed_id, guid)
+        );
+        
+        -- Browser sessions
+        CREATE TABLE IF NOT EXISTS sessions (
+            id TEXT PRIMARY KEY,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            last_accessed TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        
+        -- User's subscribed feeds (session-specific)
+        CREATE TABLE IF NOT EXISTS user_feeds (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            feed_id INTEGER NOT NULL,
+            added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE,
+            FOREIGN KEY (feed_id) REFERENCES feeds (id) ON DELETE CASCADE,
+            UNIQUE (session_id, feed_id)
+        );
+        
+        -- User folders
+        CREATE TABLE IF NOT EXISTS folders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE
+        );
+        
+        -- User item status (read/unread, starred, folder assignments)
+        CREATE TABLE IF NOT EXISTS user_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            session_id TEXT NOT NULL,
+            item_id INTEGER NOT NULL,
+            is_read BOOLEAN DEFAULT FALSE,
+            starred BOOLEAN DEFAULT FALSE,
+            folder_id INTEGER,
+            marked_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (session_id) REFERENCES sessions (id) ON DELETE CASCADE,
+            FOREIGN KEY (item_id) REFERENCES feed_items (id) ON DELETE CASCADE,
+            FOREIGN KEY (folder_id) REFERENCES folders (id) ON DELETE SET NULL,
+            UNIQUE (session_id, item_id)
+        );
+        
+        -- Indexes for performance
+        CREATE INDEX IF NOT EXISTS idx_feed_items_feed_id ON feed_items(feed_id);
+        CREATE INDEX IF NOT EXISTS idx_feed_items_published ON feed_items(published DESC);
+        CREATE INDEX IF NOT EXISTS idx_user_feeds_session ON user_feeds(session_id);
+        CREATE INDEX IF NOT EXISTS idx_user_items_session ON user_items(session_id);
+        CREATE INDEX IF NOT EXISTS idx_user_items_read ON user_items(is_read);
+        CREATE INDEX IF NOT EXISTS idx_feeds_last_updated ON feeds(last_updated);
+        """)
+
+@contextmanager
+def get_db():
+    """Context manager for database connections"""
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    try:
+        yield conn
+        conn.commit()  # Commit all changes
+    except Exception as e:
+        conn.rollback()  # Rollback on error
+        raise
+    finally:
+        conn.close()
+
+class FeedModel:
+    @staticmethod
+    def create_feed(url: str, title: str = None, description: str = None) -> int:
+        """Create or get existing feed"""
+        with get_db() as conn:
+            cursor = conn.execute(
+                "INSERT OR IGNORE INTO feeds (url, title, description) VALUES (?, ?, ?)",
+                (url, title, description)
+            )
+            if cursor.rowcount > 0:
+                return cursor.lastrowid
+            else:
+                return conn.execute("SELECT id FROM feeds WHERE url = ?", (url,)).fetchone()[0]
+    
+    @staticmethod
+    def update_feed(feed_id: int, title: str = None, description: str = None, 
+                   etag: str = None, last_modified: str = None):
+        """Update feed metadata"""
+        with get_db() as conn:
+            conn.execute("""
+                UPDATE feeds 
+                SET title = COALESCE(?, title),
+                    description = COALESCE(?, description),
+                    etag = ?, 
+                    last_modified = ?,
+                    last_updated = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (title, description, etag, last_modified, feed_id))
+    
+    @staticmethod
+    def get_feeds_to_update(max_age_minutes: int = 1) -> List[Dict]:
+        """Get feeds that need updating"""
+        with get_db() as conn:
+            return [dict(row) for row in conn.execute("""
+                SELECT * FROM feeds 
+                WHERE last_updated IS NULL 
+                   OR datetime(last_updated) < datetime('now', '-{} minutes')
+            """.format(max_age_minutes)).fetchall()]
+    
+    @staticmethod
+    def get_user_feeds(session_id: str) -> List[Dict]:
+        """Get feeds for a specific session"""
+        with get_db() as conn:
+            return [dict(row) for row in conn.execute("""
+                SELECT f.*, uf.added_at as subscribed_at
+                FROM feeds f
+                JOIN user_feeds uf ON f.id = uf.feed_id
+                WHERE uf.session_id = ?
+                ORDER BY f.title
+            """, (session_id,)).fetchall()]
+
+class FeedItemModel:
+    @staticmethod
+    def create_item(feed_id: int, guid: str, title: str, link: str, 
+                   description: str = None, content: str = None, 
+                   published: datetime = None) -> int:
+        """Create feed item"""
+        with get_db() as conn:
+            cursor = conn.execute("""
+                INSERT OR REPLACE INTO feed_items 
+                (feed_id, guid, title, link, description, content, published)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (feed_id, guid, title, link, description, content, published))
+            return cursor.lastrowid
+    
+    @staticmethod
+    def get_items_for_user(session_id: str, feed_id: int = None, unread_only: bool = False) -> List[Dict]:
+        """Get feed items for user with read status"""
+        query = """
+            SELECT fi.*, f.title as feed_title, 
+                   COALESCE(ui.is_read, 0) as is_read,
+                   COALESCE(ui.starred, 0) as starred,
+                   fo.name as folder_name
+            FROM feed_items fi
+            JOIN feeds f ON fi.feed_id = f.id
+            JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
+            LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
+            LEFT JOIN folders fo ON ui.folder_id = fo.id
+        """
+        
+        params = [session_id, session_id]
+        
+        if feed_id:
+            query += " WHERE fi.feed_id = ?"
+            params.append(feed_id)
+        
+        if unread_only:
+            query += " AND " if feed_id else " WHERE "
+            query += "COALESCE(ui.is_read, 0) = 0"
+        
+        query += " ORDER BY fi.published DESC LIMIT 100"
+        
+        with get_db() as conn:
+            return [dict(row) for row in conn.execute(query, params).fetchall()]
+
+class SessionModel:
+    @staticmethod
+    def create_session(session_id: str):
+        """Create or update session"""
+        with get_db() as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO sessions (id, last_accessed) 
+                VALUES (?, CURRENT_TIMESTAMP)
+            """, (session_id,))
+    
+    @staticmethod
+    def subscribe_to_feed(session_id: str, feed_id: int):
+        """Subscribe user to feed"""
+        with get_db() as conn:
+            conn.execute("""
+                INSERT OR IGNORE INTO user_feeds (session_id, feed_id) 
+                VALUES (?, ?)
+            """, (session_id, feed_id))
+    
+    @staticmethod
+    def unsubscribe_from_feed(session_id: str, feed_id: int):
+        """Unsubscribe user from feed"""
+        with get_db() as conn:
+            conn.execute("""
+                DELETE FROM user_feeds 
+                WHERE session_id = ? AND feed_id = ?
+            """, (session_id, feed_id))
+
+class UserItemModel:
+    @staticmethod
+    def mark_read(session_id: str, item_id: int, is_read: bool = True):
+        """Mark item as read/unread"""
+        with get_db() as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO user_items (session_id, item_id, is_read, starred, folder_id)
+                VALUES (?, ?, ?, 
+                    COALESCE((SELECT starred FROM user_items WHERE session_id = ? AND item_id = ?), 0),
+                    (SELECT folder_id FROM user_items WHERE session_id = ? AND item_id = ?)
+                )
+            """, (session_id, item_id, is_read, session_id, item_id, session_id, item_id))
+    
+    @staticmethod
+    def toggle_star(session_id: str, item_id: int):
+        """Toggle star status for item"""
+        with get_db() as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO user_items (session_id, item_id, starred, is_read, folder_id)
+                VALUES (?, ?, 
+                    NOT COALESCE((SELECT starred FROM user_items WHERE session_id = ? AND item_id = ?), 0),
+                    COALESCE((SELECT is_read FROM user_items WHERE session_id = ? AND item_id = ?), 0),
+                    (SELECT folder_id FROM user_items WHERE session_id = ? AND item_id = ?)
+                )
+            """, (session_id, item_id, session_id, item_id, session_id, item_id, session_id, item_id))
+    
+    @staticmethod
+    def move_to_folder(session_id: str, item_id: int, folder_id: int):
+        """Move item to folder"""
+        with get_db() as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO user_items (session_id, item_id, folder_id, is_read, starred)
+                VALUES (?, ?, ?, 
+                    COALESCE((SELECT is_read FROM user_items WHERE session_id = ? AND item_id = ?), 0),
+                    COALESCE((SELECT starred FROM user_items WHERE session_id = ? AND item_id = ?), 0)
+                )
+            """, (session_id, item_id, folder_id, session_id, item_id, session_id, item_id))
+
+class FolderModel:
+    @staticmethod
+    def create_folder(session_id: str, name: str) -> int:
+        """Create folder for user"""
+        with get_db() as conn:
+            cursor = conn.execute("""
+                INSERT INTO folders (session_id, name) VALUES (?, ?)
+            """, (session_id, name))
+            return cursor.lastrowid
+    
+    @staticmethod
+    def get_folders(session_id: str) -> List[Dict]:
+        """Get all folders for user"""
+        with get_db() as conn:
+            return [dict(row) for row in conn.execute("""
+                SELECT * FROM folders WHERE session_id = ? ORDER BY name
+            """, (session_id,)).fetchall()]
+
+# Initialize database on import
+init_db()

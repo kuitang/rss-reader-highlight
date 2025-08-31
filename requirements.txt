@@ -1,0 +1,8 @@
+python-fasthtml
+monsterui
+feedparser
+httpx
+pytest
+pytest-httpx
+playwright
+python-dateutil
