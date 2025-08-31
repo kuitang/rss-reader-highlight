@@ -236,8 +236,14 @@ def FeedItem(item, unread_view=False, for_desktop=False):
             Small(item.get('feed_title', 'Unknown Feed'), cls=TextPresets.muted_sm),
             Time(human_time_diff(item.get('published')), cls='text-xs text-muted-foreground')
         ),
-        # Description
-        Div(mistletoe.markdown((item.get('description') or '')[:150] + '...' if item.get('description') else ''), cls=TextPresets.muted_sm + ' mt-2'),
+        # Summary (use full description, truncate only as fallback if too long)
+        Div(
+            mistletoe.markdown(
+                item.get('description') if item.get('description') and len(item.get('description', '')) <= 300 
+                else (item.get('description', '')[:150] + '...' if item.get('description') else 'No summary available')
+            ), 
+            cls=TextPresets.muted_sm + ' mt-2'
+        ),
         # Optional folder label
         DivLAligned(
             *([Label(A(item.get('folder_name', 'General'), href='#'), 
@@ -591,8 +597,14 @@ def show_item(item_id: int, request, unread_view: bool = False):
                     Small(item_after.get('feed_title', 'Unknown Feed'), cls=TextPresets.muted_sm),
                     Time(human_time_diff(item_after.get('published')), cls='text-xs text-muted-foreground')
                 ),
-                # Description
-                Div(mistletoe.markdown((item_after.get('description') or '')[:150] + '...' if item_after.get('description') else ''), cls=TextPresets.muted_sm + ' mt-2'),
+                # Summary (use full description, truncate only as fallback if too long)
+                Div(
+                    mistletoe.markdown(
+                        item_after.get('description') if item_after.get('description') and len(item_after.get('description', '')) <= 300 
+                        else (item_after.get('description', '')[:150] + '...' if item_after.get('description') else 'No summary available')
+                    ), 
+                    cls=TextPresets.muted_sm + ' mt-2'
+                ),
                 **updated_item_attrs
             )
             responses.append(updated_item)
@@ -685,5 +697,5 @@ def add_folder(request):
     return FeedsSidebar(session_id)
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5001))
+    port = int(os.environ.get("PORT", 8080))
     serve(port=port, host="0.0.0.0")

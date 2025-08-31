@@ -115,17 +115,35 @@ async def test_comprehensive_functionality():
             back_to_list = await page.locator("#main-content .js-filter").is_visible()
             print(f"✓ Mobile back navigation: {back_to_list}")
         
-        # Test 3: External links
-        print("\\n--- TEST 3: External Links ---")
+        # Test 3: Summary and Content Fields
+        print("\\n--- TEST 3: Summary and Content Fields ---")
         await page.set_viewport_size({"width": 1920, "height": 1080})
         await page.goto("http://localhost:5001")
         await page.wait_for_load_state("networkidle")
         
-        # Click article to load detail
-        await page.locator("#desktop-feeds-content .js-filter li").first.click()
+        # Check that articles show summaries (not just truncated text)
+        first_article = page.locator("#desktop-feeds-content .js-filter li").first
+        article_text = await first_article.inner_text()
+        lines = article_text.split('\\n')
+        has_title = len(lines) >= 1
+        has_source_time = len(lines) >= 2  
+        has_summary = len(lines) >= 3 and len(lines[2]) > 20  # Should have meaningful summary
+        
+        print(f"✓ Article structure: title={has_title}, source/time={has_source_time}, summary={has_summary}")
+        print(f"✓ Summary length: {len(lines[2]) if len(lines) >= 3 else 0} chars")
+        
+        # Click article to load detail and verify content vs summary
+        await first_article.click()
         await page.wait_for_timeout(500)
         
-        # Check if Open Link exists and has target="_blank"
+        detail_content = await page.locator("#desktop-item-detail").inner_text()
+        content_length = len(detail_content)
+        summary_length = len(lines[2]) if len(lines) >= 3 else 0
+        
+        print(f"✓ Detail view content: {content_length} chars")
+        print(f"✓ Summary vs Content: summary={summary_length}, detail={content_length}")
+        
+        # External links test
         open_link = page.locator("a").filter(has_text="Open Link")
         if await open_link.count() > 0:
             target_attr = await open_link.get_attribute("target")
