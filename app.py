@@ -5,6 +5,7 @@ from monsterui.all import *
 import uuid
 from datetime import datetime, timezone
 import os
+import time
 from models import (
     SessionModel, FeedModel, FeedItemModel, UserItemModel, FolderModel,
     init_db, get_db
@@ -19,6 +20,20 @@ init_db()
 if not FeedModel.get_feeds_to_update(max_age_minutes=9999):
     print("Setting up default feeds...")
     setup_default_feeds()
+
+# Timing middleware for performance monitoring
+def timing_middleware(req, sess):
+    """Add timing info to requests"""
+    req.scope['start_time'] = time.time()
+
+def after_middleware(req, response):
+    """Log request timing"""
+    if 'start_time' in req.scope:
+        duration = (time.time() - req.scope['start_time']) * 1000  # Convert to ms
+        path = req.scope.get('path', 'unknown')
+        method = req.scope.get('method', 'unknown')
+        print(f"TIMING: {method} {path} - {duration:.2f}ms")
+    return response
 
 # Beforeware for session management
 def before(req, sess):
@@ -55,14 +70,18 @@ def before(req, sess):
     # Store in request scope for easy access
     req.scope['session_id'] = session_id
 
-bware = Beforeware(before)
-
 # FastHTML app with session support and beforeware
 app, rt = fast_app(
-    hdrs=Theme.blue.headers(),
+    hdrs=Theme.blue.headers() + [
+        Script("""
+        htmx.logAll();
+        htmx.config.includeIndicatorStyles = false;
+        """)
+    ],
     live=True,
     debug=True,
-    before=bware
+    before=[timing_middleware, before],
+    after=after_middleware
 )
 
 def human_time_diff(dt):
@@ -104,7 +123,10 @@ def FeedSidebarItem(feed, count=""):
                 Span(feed['title'] or 'Untitled Feed'),
                 P(f"updated {last_updated}", cls=TextPresets.muted_sm)
             ),
-            href=f"/?feed_id={feed['id']}", 
+            href=f"/?feed_id={feed['id']}",
+            hx_get=f"/?feed_id={feed['id']}",
+            hx_target="#main-content",
+            hx_push_url="true",
             cls='hover:bg-secondary p-4'
         )
     )
@@ -142,7 +164,10 @@ def FeedsSidebar(session_id):
                     Span("All Feeds"),
                     P("", cls=TextPresets.muted_sm)
                 ),
-                href="/", 
+                href="/",
+                hx_get="/",
+                hx_target="#main-content",
+                hx_push_url="true",
                 cls='hover:bg-secondary p-4'
             )
         ),
@@ -150,7 +175,11 @@ def FeedsSidebar(session_id):
         Li(Hr()),
         NavHeaderLi(H4("Folders"), cls='p-3'),
         *[Li(A(DivLAligned(Span(UkIcon('folder')), Span(folder['name'])), 
-               href=f"/?folder_id={folder['id']}", cls='hover:bg-secondary p-4')) 
+               href=f"/?folder_id={folder['id']}",
+               hx_get=f"/?folder_id={folder['id']}",
+               hx_target="#main-content",
+               hx_push_url="true",
+               cls='hover:bg-secondary p-4')) 
           for folder in folders],
         Li(
             Button(
@@ -165,15 +194,32 @@ def FeedsSidebar(session_id):
         cls='mt-3'
     )
 
-def FeedItem(item, unread_view=False):
-    """Create feed item (adapted from MailItem)"""
-    # Only 2 states: Read (grey+border+no dot) vs Unread (white+border+dot)
+def FeedItem(item, unread_view=False, for_desktop=False):
+    """Create feed item with consistent HTMX approach"""
     cls_base = 'relative rounded-lg border border-border p-3 text-sm hover:bg-secondary space-y-2 cursor-pointer'
     is_read = item.get('is_read', 0) == 1
     
-    # Read: grey background, Unread: white background (no bg class = white)
-    read_bg = 'bg-muted' if is_read else ''  # Grey for read, white for unread
+    read_bg = 'bg-muted' if is_read else ''
     cls = f"{cls_base} {read_bg} tag-{'unread' if not is_read else 'read'}"
+    
+    # Simple consistent approach: same HTMX pattern, just different targets
+    if for_desktop:
+        target = "#desktop-item-detail"
+        push_url = None  # No URL push for desktop detail panel
+    else:
+        target = "#main-content" 
+        push_url = "true"  # URL push for mobile full-page navigation
+    
+    attrs = {
+        "cls": cls,
+        "id": f"feed-item-{item['id']}",
+        "hx_get": f"/item/{item['id']}?unread_view={unread_view}",
+        "hx_target": target,
+        "hx_trigger": "click"
+    }
+    
+    if push_url:
+        attrs["hx_push_url"] = push_url
     
     return Li(
         DivFullySpaced(
@@ -190,18 +236,14 @@ def FeedItem(item, unread_view=False):
             *([Label(A(item.get('folder_name', 'General'), href='#'), 
                     cls='uk-label-primary')] if item.get('folder_name') else [])
         ),
-        cls=cls,
-        id=f"feed-item-{item['id']}",  # Unique ID for HTMX targeting
-        hx_get=f"/item/{item['id']}?unread_view={unread_view}",  # Pass view context
-        hx_target="#item-detail",
-        hx_trigger="click"
+        **attrs
     )
 
-def FeedsList(items, unread_view=False):
+def FeedsList(items, unread_view=False, for_desktop=False):
     """Create list of feed items (adapted from MailList)"""
-    return Ul(cls='js-filter space-y-2 p-4 pt-0')(*[FeedItem(item, unread_view) for item in items])
+    return Ul(cls='js-filter space-y-2 p-4 pt-0')(*[FeedItem(item, unread_view, for_desktop) for item in items])
 
-def FeedsContent(session_id, feed_id=None, unread_only=False, page=1):
+def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_desktop=False):
     """Create main feeds content area with pagination (adapted from MailContent)"""
     # Get all items first
     all_items = FeedItemModel.get_items_for_user(session_id, feed_id, unread_only)
@@ -250,10 +292,16 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1):
                 DivLAligned(
                     DivCentered(f'Page {page} of {total_pages}', cls=TextT.sm),
                     DivLAligned(
-                        UkIconLink(icon='chevrons-left', href=first_url, button=True, uk_tooltip="First page"),
-                        UkIconLink(icon='chevron-left', href=prev_url, button=True, uk_tooltip="Previous page"),
-                        UkIconLink(icon='chevron-right', href=next_url, button=True, uk_tooltip="Next page"),
-                        UkIconLink(icon='chevrons-right', href=last_url, button=True, uk_tooltip="Last page"),
+                        # Mobile versions
+                        Button(UkIcon('chevrons-left'), hx_get=first_url, hx_target="#main-content", hx_push_url="true", cls="p-2 rounded border hover:bg-secondary lg:hidden"),
+                        Button(UkIcon('chevron-left'), hx_get=prev_url, hx_target="#main-content", hx_push_url="true", cls="p-2 rounded border hover:bg-secondary lg:hidden"),
+                        Button(UkIcon('chevron-right'), hx_get=next_url, hx_target="#main-content", hx_push_url="true", cls="p-2 rounded border hover:bg-secondary lg:hidden"),
+                        Button(UkIcon('chevrons-right'), hx_get=last_url, hx_target="#main-content", hx_push_url="true", cls="p-2 rounded border hover:bg-secondary lg:hidden"),
+                        # Desktop versions - use HTMX for consistency
+                        Button(UkIcon('chevrons-left'), hx_get=first_url, hx_target="#desktop-feeds-content" if for_desktop else "#main-content", cls="p-2 rounded border hover:bg-secondary hidden lg:inline-block"),
+                        Button(UkIcon('chevron-left'), hx_get=prev_url, hx_target="#desktop-feeds-content" if for_desktop else "#main-content", cls="p-2 rounded border hover:bg-secondary hidden lg:inline-block"),
+                        Button(UkIcon('chevron-right'), hx_get=next_url, hx_target="#desktop-feeds-content" if for_desktop else "#main-content", cls="p-2 rounded border hover:bg-secondary hidden lg:inline-block"),
+                        Button(UkIcon('chevrons-right'), hx_get=last_url, hx_target="#desktop-feeds-content" if for_desktop else "#main-content", cls="p-2 rounded border hover:bg-secondary hidden lg:inline-block"),
                         cls='space-x-1'
                     )
                 )
@@ -279,14 +327,75 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1):
                 )
             ),
             Div(cls='flex-1 overflow-y-auto', id="feeds-list-container")(
-                FeedsList(paginated_items, unread_only) if paginated_items else Div(P("No posts available"), cls='p-4 text-center text-muted-foreground')
+                FeedsList(paginated_items, unread_only, for_desktop) if paginated_items else Div(P("No posts available"), cls='p-4 text-center text-muted-foreground')
             ),
             pagination_footer()
         )
     )
 
-def ItemDetailView(item):
-    """Create item detail view (adapted from MailDetailView)"""
+def MobileSidebar(session_id):
+    """Create mobile sidebar overlay"""
+    return Div(
+        id="mobile-sidebar",
+        cls="fixed inset-0 z-50 lg:hidden",
+        hidden="true"
+    )(
+        Div(cls="bg-black bg-opacity-50 absolute inset-0", uk_toggle="target: #mobile-sidebar"),
+        Div(cls="bg-background w-80 h-full overflow-y-auto relative z-10")(
+            Div(cls="p-4 border-b")(
+                DivFullySpaced(
+                    H3("RSS Reader"),
+                    Button(
+                        UkIcon('x'),
+                        cls="p-1 rounded hover:bg-secondary",
+                        uk_toggle="target: #mobile-sidebar"
+                    )
+                )
+            ),
+            FeedsSidebar(session_id)
+        )
+    )
+
+def MobileHeader(session_id, show_back=False):
+    """Create mobile header with hamburger menu and optional back button"""
+    
+    # Loading spinner
+    loading_spinner = Div(
+        id="loading-spinner",
+        cls="fixed top-20 left-1/2 transform -translate-x-1/2 bg-background border rounded p-3 z-50 lg:hidden htmx-indicator"
+    )(
+        DivLAligned(
+            UkIcon('loader', cls="animate-spin"),
+            Span("Loading...", cls="ml-2")
+        )
+    )
+    
+    return Div(
+        # Fixed header bar
+        Div(cls="lg:hidden fixed top-0 left-0 right-0 bg-background border-b p-4 z-40")(
+            DivFullySpaced(
+                DivLAligned(
+                    Button(
+                        UkIcon('arrow-left'),
+                        hx_get="/",
+                        hx_target="#main-content", 
+                        hx_push_url="true",
+                        cls="p-2 rounded border hover:bg-secondary mr-2"
+                    ) if show_back else "",
+                    Button(
+                        UkIcon('menu'),
+                        cls="p-2 rounded border hover:bg-secondary",
+                        uk_toggle="target: #mobile-sidebar"
+                    ),
+                    H3("RSS Reader", cls="ml-3")
+                )
+            )
+        ),
+        loading_spinner
+    )
+
+def ItemDetailView(item, show_back=False):
+    """Create item detail view with optional back button for mobile"""
     if not item:
         return Container(
             P("Select a post to read", cls='text-center text-muted-foreground p-8')
@@ -299,14 +408,18 @@ def ItemDetailView(item):
         ('mail', 'Mark unread' if item.get('is_read', 0) else 'Mark read')
     ]
     
+    # Mobile back button (will be handled by mobile header)
+    back_button = "" if show_back else ""
+    
     return Container(
+        back_button,
         DivFullySpaced(
             DivLAligned(
                 *[UkIcon(
                     icon, 
                     uk_tooltip=tooltip,
                     hx_post=f"/api/item/{item['id']}/{'star' if 'star' in tooltip.lower() else 'folder' if 'folder' in tooltip.lower() else 'read'}",
-                    hx_target="#item-detail",
+                    hx_target="#main-content",
                     cls='cursor-pointer hover:text-blue-600'
                 ) for icon, tooltip in action_icons],
                 cls='space-x-2'
@@ -333,7 +446,6 @@ def ItemDetailView(item):
         ),
         DividerLine(),
         Div(
-            # Show content if available, otherwise description
             NotStr(item.get('content') or item.get('description', 'No content available')),
             cls=TextT.sm + 'p-4 prose max-w-none'
         ),
@@ -342,7 +454,7 @@ def ItemDetailView(item):
 
 @rt('/')
 def index(request, feed_id: int = None, unread: bool = True, folder_id: int = None, page: int = 1):
-    """Main page"""
+    """Main page with mobile-first responsive design"""
     session_id = request.scope['session_id']
     print(f"DEBUG: Main page for session: {session_id}")
     
@@ -358,20 +470,40 @@ def index(request, feed_id: int = None, unread: bool = True, folder_id: int = No
     parser = FeedParser()
     parser.update_all_feeds(max_age_minutes=1)
     
+    # This is now handled by MobileHeader function
+    
+    # Check if this is an HTMX request for mobile content updates
+    is_htmx = request.headers.get('HX-Request') == 'true'
+    
+    if is_htmx:
+        # Return only the feeds content for HTMX requests
+        return FeedsContent(session_id, feed_id, unread, page)
+    
     return Title("RSS Reader"), Container(
-        Grid(
-            Div(id="sidebar")(FeedsSidebar(session_id), cls='col-span-1 h-screen overflow-y-auto'),
-            Div(FeedsContent(session_id, feed_id, unread, page), cls='col-span-2 h-screen'),
-            Div(id="item-detail")(ItemDetailView(None), cls='col-span-2 h-screen overflow-y-auto'),
-            cols_sm=1, cols_md=1, cols_lg=5, cols_xl=5,
-            gap=0, cls='h-screen'
+        Div(id="mobile-header")(MobileHeader(session_id, show_back=False)),
+        MobileSidebar(session_id),
+        # Desktop layout: sidebar + feeds + article detail
+        Div(cls="hidden lg:grid", id="desktop-layout")(
+            Grid(
+                Div(id="sidebar")(FeedsSidebar(session_id), cls='col-span-1 h-screen'),
+                Div(cls='col-span-2 h-screen flex flex-col', id="desktop-feeds-content")(
+                    Div(cls='flex-1 overflow-y-auto')(FeedsContent(session_id, feed_id, unread, page, for_desktop=True))
+                ),
+                Div(id="desktop-item-detail")(ItemDetailView(None), cls='col-span-2 h-screen'),
+                cols_lg=5, cols_xl=5,
+                gap=0, cls='h-screen'
+            )
+        ),
+        # Mobile layout: just feeds content (articles list) with top padding for fixed header
+        Div(cls="lg:hidden pt-20", id="main-content")(
+            FeedsContent(session_id, feed_id, unread, page)
         ),
         cls=('min-h-screen', ContainerT.xl)
     )
 
 @rt('/item/{item_id}')
 def show_item(item_id: int, request, unread_view: bool = False):
-    """Get item detail and mark as read with UI updates"""
+    """Get item detail and mark as read with mobile-responsive UI updates"""
     session_id = request.scope['session_id']
     
     # Get item before marking as read to check original status
@@ -379,7 +511,7 @@ def show_item(item_id: int, request, unread_view: bool = False):
     item_before = next((i for i in items_before if i['id'] == item_id), None)
     
     if not item_before:
-        return ItemDetailView(None)
+        return ItemDetailView(None, show_back=True)
     
     was_unread = not item_before.get('is_read', 0)
     
@@ -390,30 +522,73 @@ def show_item(item_id: int, request, unread_view: bool = False):
     items_after = FeedItemModel.get_items_for_user(session_id)
     item_after = next((i for i in items_after if i['id'] == item_id), None)
     
-    # Prepare response components
+    # Check the target to determine mobile vs desktop  
+    hx_target = request.headers.get('HX-Target', '')
+    is_mobile_request = hx_target in ['#main-content', 'main-content']
+    is_desktop_request = hx_target in ['#desktop-item-detail', 'desktop-item-detail']
+    
+    
     responses = []
     
-    # 1. Main response: Item detail view
-    detail_view = ItemDetailView(item_after)
+    # Main response: Item detail view
+    detail_view = ItemDetailView(item_after, show_back=is_mobile_request)
     responses.append(detail_view)
     
-    # 2. Out-of-band swap: Update the list item appearance (remove blue indicator)
+    # Update list item appearance if it was unread
     if was_unread and item_after:
-        # For ALL views: only update appearance to "read" style (grey + no dot)
-        # Never immediately remove - let server-side filtering handle removal on next page load
-        updated_item = FeedItem(item_after, unread_view=False)
-        updated_item = Li(
-            *updated_item.children,  # Copy the content
-            cls=updated_item.get('cls', ''),  # Copy classes (should be read style now)
-            id=f"feed-item-{item_id}",
-            hx_swap_oob="true",  # Update appearance only
-            hx_get=f"/item/{item_after['id']}?unread_view={unread_view}",
-            hx_target="#item-detail",
-            hx_trigger="click"
-        )
-        responses.append(updated_item)
+        if is_mobile_request:
+            # Mobile: update header to show back button
+            mobile_header_with_back = Div(
+                cls="lg:hidden fixed top-0 left-0 right-0 bg-background border-b p-4 z-40",
+                hx_swap_oob="true",
+                id="mobile-header"
+            )(
+                DivFullySpaced(
+                    DivLAligned(
+                        Button(
+                            UkIcon('arrow-left'),
+                            hx_get="/",
+                            hx_target="#main-content", 
+                            hx_push_url="true",
+                            cls="p-2 rounded border hover:bg-secondary mr-2"
+                        ),
+                        Button(
+                            UkIcon('menu'),
+                            cls="p-2 rounded border hover:bg-secondary",
+                            uk_toggle="target: #mobile-sidebar"
+                        ),
+                        H3("RSS Reader", cls="ml-3")
+                    )
+                )
+            )
+            responses.append(mobile_header_with_back)
+        elif is_desktop_request:
+            # Desktop: update the list item appearance with correct attributes
+            updated_item_attrs = {
+                "cls": f"relative rounded-lg border border-border p-3 text-sm hover:bg-secondary space-y-2 cursor-pointer bg-muted tag-read",
+                "id": f"feed-item-{item_id}",
+                "hx_get": f"/item/{item_after['id']}?unread_view={unread_view}",
+                "hx_target": "#desktop-item-detail",
+                "hx_trigger": "click",
+                "hx_swap_oob": "true"
+            }
+            
+            updated_item = Li(
+                DivFullySpaced(
+                    DivLAligned(
+                        Strong(item_after['title']),
+                        # No blue dot for read items
+                    ),
+                    DivLAligned(
+                        Small(item_after.get('feed_title', 'Unknown Feed'), cls=TextPresets.muted_sm),
+                        Time(human_time_diff(item_after.get('published')), cls='text-xs')
+                    )
+                ),
+                Div((item_after.get('description', '') or '')[:150] + '...', cls=TextPresets.muted_sm),
+                **updated_item_attrs
+            )
+            responses.append(updated_item)
     
-    # Return tuple of responses for HTMX to handle
     return tuple(responses) if len(responses) > 1 else detail_view
 
 @rt('/api/feed/add')
@@ -462,10 +637,11 @@ def star_item(item_id: int, request):
     session_id = request.scope['session_id']
     UserItemModel.toggle_star(session_id, item_id)
     
-    # Return updated item detail
+    # Return updated item detail with mobile support
     items = FeedItemModel.get_items_for_user(session_id)
     item = next((i for i in items if i['id'] == item_id), None)
-    return ItemDetailView(item)
+    is_htmx = request.headers.get('HX-Request') == 'true'
+    return ItemDetailView(item, show_back=is_htmx)
 
 @rt('/api/item/{item_id}/read')
 def toggle_read(item_id: int, request):
@@ -480,10 +656,11 @@ def toggle_read(item_id: int, request):
         is_read = not item.get('is_read', 0)
         UserItemModel.mark_read(session_id, item_id, is_read)
         
-        # Return updated item detail
+        # Return updated item detail with mobile support
         items = FeedItemModel.get_items_for_user(session_id)
         item = next((i for i in items if i['id'] == item_id), None)
-        return ItemDetailView(item)
+        is_htmx = request.headers.get('HX-Request') == 'true'
+        return ItemDetailView(item, show_back=is_htmx)
     
     return Div("Item not found", cls='text-red-500 p-4')
 
