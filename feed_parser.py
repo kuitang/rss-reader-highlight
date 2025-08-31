@@ -194,17 +194,50 @@ class FeedParser:
         return results
     
     def add_feed(self, url: str) -> Dict:
-        """Add new feed and do initial parsing"""
+        """Add new feed ONLY if it can be successfully parsed"""
         try:
-            # Create or get existing feed
-            feed_id = FeedModel.create_feed(url)
+            # FIRST: Try to fetch and parse the feed (don't create DB entry yet)
+            fetch_result = self.fetch_feed(url)
             
-            # Do initial parse
+            if not fetch_result['updated'] or fetch_result['status'] != 200:
+                return {
+                    'success': False,
+                    'error': f"Cannot fetch feed: HTTP {fetch_result['status']}"
+                }
+            
+            # SECOND: Verify it has parseable content
+            feed_data = fetch_result['data']
+            if not hasattr(feed_data, 'feed') or not hasattr(feed_data, 'entries'):
+                return {
+                    'success': False, 
+                    'error': 'Invalid RSS/Atom format - no feed data found'
+                }
+            
+            # Get feed metadata
+            feed_title = getattr(feed_data.feed, 'title', None)
+            if not feed_title:
+                return {
+                    'success': False,
+                    'error': 'Invalid RSS/Atom format - no feed title found'
+                }
+            
+            # THIRD: Only create feed if parsing was successful
+            feed_id = FeedModel.create_feed(url, feed_title)
+            
+            # FOURTH: Store the articles we already parsed
             result = self.parse_and_store_feed(feed_id, url)
+            
+            if not result['updated']:
+                # Parsing failed after DB creation - this shouldn't happen
+                return {
+                    'success': False,
+                    'error': 'Feed parsing failed after creation'
+                }
             
             return {
                 'success': True,
                 'feed_id': feed_id,
+                'feed_title': feed_title,
                 **result
             }
             

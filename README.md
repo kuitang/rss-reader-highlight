@@ -227,12 +227,13 @@ Our testing strategy focuses on **complex workflows that broke during developmen
 
 #### **Quick Development Tests**
 ```bash
-# Critical UI flows (recommended for development)
+# Core logic tests (fast, always work) - ✅ 20 PASSING TESTS
 source venv/bin/activate
-python -m pytest test_critical_ui_flows.py::TestFormParameterBugFlow -v
+python -m pytest test_optimized_integration.py test_essential_mocks.py test_direct_functions.py -v
 
-# HTTP integration (fast, no browser)
-python -m pytest test_optimized_integration.py -v
+# Manual UI verification (requires browser + running server) 
+python app.py  # Start server in separate terminal
+python -m pytest test_critical_ui_flows.py::TestFormParameterBugFlow -v
 ```
 
 #### **Full Test Suite**

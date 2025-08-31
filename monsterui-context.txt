@@ -1,0 +1,52 @@
+MonsterUI Context Files for RSS Reader Development
+
+## Overview
+MonsterUI is a Python library designed to enhance styling for FastHTML applications.
+
+## Key Features
+1. Comprehensive UI Components - Cards, Forms, Modals, Buttons
+2. Multiple themes and color schemes
+3. Integration with Tailwind CSS, DaisyUI, and other styling frameworks
+4. "Python-first beautifully designed components because you deserve to focus on features that matter and your app deserves to be beautiful from day one."
+
+## Key Submodules
+1. `monsterui.core`: Theme management and configuration
+2. `monsterui.daisy`: DaisyUI-inspired components like Alerts, Steps, Loading
+3. `monsterui.foundations`: Utility functions and data structures  
+4. `monsterui.franken`: Extensive UI components including:
+   - Typography elements (H1-H6, CodeSpan, etc.)
+   - Form components
+   - Layout utilities
+   - Navigation elements
+   - Modal and Card systems
+
+## Important Documentation Links
+- API Reference: https://raw.githubusercontent.com/AnswerDotAI/MonsterUI/refs/heads/main/docs/apilist.txt
+- Mail Example: https://monsterui.answer.ai/mail/md
+- Cards: https://monsterui.answer.ai/cards/md
+- Dashboard: https://monsterui.answer.ai/dashboard/md
+- Forms: https://monsterui.answer.ai/forms/md
+
+## Basic Usage Pattern
+```python
+from fasthtml.common import *
+from monsterui.all import *
+
+app, rt = fast_app(hdrs=Theme.blue.headers())
+
+@rt
+def index():
+    return Title("App"), Container(...)
+
+serve()
+```
+
+## Notable Features for RSS Reader
+- Theme selection (e.g., slate, stone, blue)
+- Responsive design components
+- Navigation containers
+- Grid layouts
+- Icon integration (UkIcon)
+- Tab containers
+- Search components
+- Card layouts for content display

@@ -22,35 +22,74 @@ def test_server():
     
     os.makedirs(os.path.dirname(TEST_DB_PATH), exist_ok=True)
     
-    # Start minimal server
-    process = subprocess.Popen([
-        sys.executable, "-c", f"""
-import os, sys
-os.environ['RSS_DB_PATH'] = '{TEST_DB_PATH}'
-sys.path.insert(0, '.')
+    # Create a proper startup script
+    startup_script = f"""
+import os
+import sys
+sys.path.insert(0, '{os.getcwd()}')
 
+# Set database path before any imports
+os.environ['RSS_DB_PATH'] = '{TEST_DB_PATH}'
+
+# Import models and override DB_PATH
 import models
 models.DB_PATH = '{TEST_DB_PATH}'
 
-from app import serve
-serve(port={TEST_PORT}, host='127.0.0.1', reload=False)
+# Initialize database
+models.init_db()
+
+# Import and start app
+from app import app
+import uvicorn
+
+if __name__ == '__main__':
+    uvicorn.run(app, host='127.0.0.1', port={TEST_PORT}, log_level='error')
 """
-    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     
-    time.sleep(6)
+    # Write startup script to file
+    script_path = f"test_server_{TEST_PORT}.py"
+    with open(script_path, 'w') as f:
+        f.write(startup_script)
     
     try:
-        # Verify server started
-        response = httpx.get(f"{TEST_URL}/", timeout=5)
-        if response.status_code != 200:
-            raise Exception("Server failed to start")
+        # Start server process
+        process = subprocess.Popen([
+            sys.executable, script_path
+        ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        
+        # Wait for server startup with retries
+        server_started = False
+        for attempt in range(12):  # 12 attempts, 1 second each
+            time.sleep(1)
+            try:
+                response = httpx.get(f"{TEST_URL}/", timeout=3)
+                if response.status_code == 200:
+                    server_started = True
+                    break
+            except:
+                continue
+        
+        if not server_started:
+            stdout, stderr = process.communicate(timeout=5)
+            print(f"Server startup failed. STDOUT: {stdout.decode()}")
+            print(f"STDERR: {stderr.decode()}")
+            raise Exception("Failed to start test server after 12 seconds")
+        
         yield TEST_URL
-    except:
-        process.terminate()
-        raise
+        
     finally:
-        process.terminate()
-        process.wait(timeout=3)
+        # Cleanup
+        if process.poll() is None:
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                process.kill()
+        
+        # Remove startup script
+        if os.path.exists(script_path):
+            os.remove(script_path)
+            
         if os.path.exists(TEST_DB_PATH):
             os.remove(TEST_DB_PATH)
 
@@ -229,6 +268,50 @@ class TestCriticalHTTPWorkflows:
                     # Test with unread_view parameter (our HTMX logic)
                     unread_detail_resp = client.get(f"{server_url}/item/{article_id}?unread_view=true")
                     assert unread_detail_resp.status_code == 200
+                
+            finally:
+                client.close()
+    
+    def test_no_untitled_feeds_error_detection(self):
+        """Test: Verify no 'Untitled Feed' appears → Catch hidden errors
+        
+        'Untitled Feed updated Unknown' indicates silent failures.
+        """
+        with test_server() as server_url:
+            client = httpx.Client(timeout=30)
+            
+            try:
+                # Wait for feeds to load
+                time.sleep(8)
+                
+                resp = client.get(f"{server_url}/")
+                soup = parse_html(resp.text)
+                
+                # Check all feed links for "Untitled Feed"
+                feed_links = soup.find_all('a', href=lambda h: h and 'feed_id' in h)
+                
+                for feed_link in feed_links:
+                    feed_text = feed_link.get_text()
+                    
+                    # Should NEVER see "Untitled Feed" - indicates parsing failure
+                    assert 'Untitled Feed' not in feed_text, f"Found untitled feed: {feed_text}"
+                    
+                    # Should NEVER see "updated Unknown" - indicates timestamp failure  
+                    assert 'updated Unknown' not in feed_text, f"Found unknown timestamp: {feed_text}"
+                    
+                    # Should NEVER see "None" as feed title - indicates failed feed parsing
+                    assert 'None updated' not in feed_text, f"Found feed with None title: {feed_text}"
+                    
+                    # All feeds should have proper names
+                    assert len(feed_text.strip()) > 0, "Feed should have a name"
+                
+                # Should have actual feed names
+                feed_names = [link.get_text() for link in feed_links]
+                expected_feeds = ["Hacker News", "Reddit", "WSJ", "BBC"]
+                
+                # At least some default feeds should be properly named
+                found_proper_feeds = any(any(expected in name for expected in expected_feeds) for name in feed_names)
+                assert found_proper_feeds, f"No properly named feeds found. Got: {feed_names}"
                 
             finally:
                 client.close()

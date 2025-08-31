@@ -46,8 +46,11 @@ def before(req, sess):
                 try:
                     SessionModel.subscribe_to_feed(session_id, feed['id'])
                     print(f"DEBUG: Subscribed to feed {feed['id']}: {feed['title']}")
-                except:
-                    print(f"DEBUG: Already subscribed to feed {feed['id']}: {feed['title']}")
+                except Exception as e:
+                    print(f"DEBUG: Subscription error for feed {feed['id']}: {str(e)}")
+                    # Re-raise critical errors, only catch known duplicates
+                    if "UNIQUE constraint failed" not in str(e):
+                        raise
     
     # Store in request scope for easy access
     req.scope['session_id'] = session_id
@@ -446,7 +449,9 @@ def add_feed(request, new_feed_url: str = ""):
             if feed:
                 return FeedSidebarItem(feed)
         except Exception as e:
-            return Div(f"Already subscribed to this feed", cls='text-yellow-600 p-4')
+            # Log the actual error for debugging
+            print(f"ERROR: Feed subscription failed for {url}: {str(e)}")
+            return Div(f"Error subscribing to feed: {str(e)}", cls='text-red-500 p-4')
     
     return Div(f"Failed to add feed: {result.get('error', 'Unknown error')}", 
               cls='text-red-500 p-4')

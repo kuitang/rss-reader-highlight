@@ -175,6 +175,126 @@ class TestDateParsingEdgeCases:
 class TestFeedParsingEdgeCases:
     """Test feed parsing scenarios that need controlled data"""
     
+    def test_feed_should_never_be_added_if_parsing_fails(self):
+        """CRITICAL: Backend should never add feeds that cannot be successfully scraped
+        
+        This prevents 'Untitled Feed updated Unknown' errors.
+        """
+        from feed_parser import FeedParser
+        import tempfile
+        import models
+        
+        # Use temporary database  
+        with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
+            tmp_db = tmp.name
+        
+        try:
+            original_db = models.DB_PATH
+            models.DB_PATH = tmp_db
+            models.init_db()
+            
+            parser = FeedParser()
+            
+            # Test 1: HTTP error should NOT create feed
+            with patch.object(parser.client, 'get') as mock_get:
+                mock_resp = Mock()
+                mock_resp.status_code = 404
+                mock_get.return_value = mock_resp
+                
+                result = parser.add_feed("https://404error.test")
+                
+                assert result['success'] is False
+                assert 'Cannot fetch feed' in result['error']
+                
+                # Verify NO feed was created in database
+                with models.get_db() as conn:
+                    feed_count = conn.execute("SELECT COUNT(*) FROM feeds").fetchone()[0]
+                    assert feed_count == 0, "No feed should be created for 404 errors"
+            
+            # Test 2: Invalid RSS should NOT create feed
+            with patch.object(parser.client, 'get') as mock_get:
+                mock_resp = Mock()
+                mock_resp.status_code = 200
+                mock_resp.text = "Not RSS at all"
+                mock_resp.headers = {}
+                mock_get.return_value = mock_resp
+                
+                # Mock feedparser to return invalid structure
+                with patch('feedparser.parse') as mock_parse:
+                    mock_parsed = Mock()
+                    mock_parsed.feed = None  # No feed structure
+                    mock_parsed.entries = None
+                    mock_parse.return_value = mock_parsed
+                    
+                    result = parser.add_feed("https://invalid-rss.test")
+                    
+                    assert result['success'] is False
+                    assert 'Invalid RSS/Atom format' in result['error']
+                    
+                    # Verify NO feed was created
+                    with models.get_db() as conn:
+                        feed_count = conn.execute("SELECT COUNT(*) FROM feeds").fetchone()[0]
+                        assert feed_count == 0, "No feed should be created for invalid RSS"
+            
+            # Test 3: Feed without title should NOT be created
+            with patch.object(parser.client, 'get') as mock_get:
+                mock_resp = Mock()
+                mock_resp.status_code = 200
+                mock_resp.text = '''<?xml version="1.0"?>
+                <rss><channel><!-- No title --><item>
+                <title>Test</title><link>https://test.com</link><guid>1</guid>
+                </item></channel></rss>'''
+                mock_resp.headers = {}
+                mock_get.return_value = mock_resp
+                
+                # Mock feedparser to return feed without title
+                with patch('feedparser.parse') as mock_parse:
+                    mock_parsed = Mock()
+                    mock_parsed.feed = Mock(title=None)  # No title
+                    mock_parsed.entries = [Mock()]
+                    mock_parse.return_value = mock_parsed
+                    
+                    result = parser.add_feed("https://no-title.test")
+                    
+                    assert result['success'] is False
+                    assert 'no feed title found' in result['error']
+                    
+                    # Verify NO feed was created
+                    with models.get_db() as conn:
+                        feed_count = conn.execute("SELECT COUNT(*) FROM feeds").fetchone()[0]
+                        assert feed_count == 0, "No feed should be created without title"
+            
+            # Test 4: Only successful feeds should be created
+            with patch.object(parser.client, 'get') as mock_get:
+                mock_resp = Mock()
+                mock_resp.status_code = 200
+                mock_resp.text = '''<?xml version="1.0"?>
+                <rss><channel><title>Good Feed</title><item>
+                <title>Good Article</title><link>https://good.test/1</link><guid>good-1</guid>
+                </item></channel></rss>'''
+                mock_resp.headers = {}
+                mock_get.return_value = mock_resp
+                
+                result = parser.add_feed("https://good-feed.test")
+                
+                # This should succeed
+                assert result['success'] is True
+                assert result['feed_title'] == 'Good Feed'
+                
+                # Verify feed WAS created
+                with models.get_db() as conn:
+                    feed_count = conn.execute("SELECT COUNT(*) FROM feeds").fetchone()[0]
+                    assert feed_count == 1, "Successful feed should be created"
+                    
+                    feed = conn.execute("SELECT * FROM feeds").fetchone()
+                    assert feed['title'] == 'Good Feed'
+                    assert feed['url'] == 'https://good-feed.test'
+        
+        finally:
+            models.DB_PATH = original_db
+            if os.path.exists(tmp_db):
+                os.unlink(tmp_db)
+    
     def test_missing_required_fields(self):
         """Test: RSS items missing title/link/guid → Graceful handling"""
         parser = FeedParser()
