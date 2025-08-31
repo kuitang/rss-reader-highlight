@@ -167,8 +167,13 @@ def FeedsSidebar(session_id):
 
 def FeedItem(item, unread_view=False):
     """Create feed item (adapted from MailItem)"""
+    # Only 2 states: Read (grey+border+no dot) vs Unread (white+border+dot)
     cls_base = 'relative rounded-lg border border-border p-3 text-sm hover:bg-secondary space-y-2 cursor-pointer'
-    cls = f"{cls_base} {'bg-muted' if item.get('is_read', 0) == 0 else ''} tag-{'unread' if not item.get('is_read', 0) else 'read'}"
+    is_read = item.get('is_read', 0) == 1
+    
+    # Read: grey background, Unread: white background (no bg class = white)
+    read_bg = 'bg-muted' if is_read else ''  # Grey for read, white for unread
+    cls = f"{cls_base} {read_bg} tag-{'unread' if not is_read else 'read'}"
     
     return Li(
         DivFullySpaced(
@@ -212,19 +217,20 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1):
     end_idx = start_idx + page_size
     paginated_items = all_items[start_idx:end_idx]
     
-    feed_name = "All Posts"
+    # Simple header logic
     if feed_id:
         feeds = FeedModel.get_user_feeds(session_id)
         feed = next((f for f in feeds if f['id'] == feed_id), None)
         feed_name = feed['title'] if feed else "Unknown Feed"
+    else:
+        feed_name = "All Feeds"  # Unconditionally for the all feeds case
     
-    # Build URL parameters for pagination
+    # Build URL parameters for pagination (excluding unread for tab navigation)
     url_params = []
     if feed_id:
         url_params.append(f"feed_id={feed_id}")
-    if unread_only:
-        url_params.append("unread=1")
     
+    # Base URL for tab navigation (without unread parameter)
     base_url = "/?" + "&".join(url_params) if url_params else "/"
     
     def pagination_footer():
@@ -258,9 +264,9 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1):
         Div(cls='flex px-4 py-2')(
             H3(feed_name),
             TabContainer(
-                Li(A("All Posts", href=base_url, role='button'), 
+                Li(A("All Posts", href=f"{base_url}{'&' if url_params else '?'}unread=0" if base_url != "/" else "/?unread=0", role='button'),
                    cls='uk-active' if not unread_only else ''),
-                Li(A("Unread", href=f"{base_url}{'&' if url_params else '?'}unread=1" if base_url != "/" else "/?unread=1", role='button'),
+                Li(A("Unread", href=base_url if base_url != "/" else "/", role='button'),
                    cls='uk-active' if unread_only else ''),
                 alt=True, cls='ml-auto max-w-40'
             )
@@ -335,7 +341,7 @@ def ItemDetailView(item):
     )
 
 @rt('/')
-def index(request, feed_id: int = None, unread: bool = False, folder_id: int = None, page: int = 1):
+def index(request, feed_id: int = None, unread: bool = True, folder_id: int = None, page: int = 1):
     """Main page"""
     session_id = request.scope['session_id']
     print(f"DEBUG: Main page for session: {session_id}")
@@ -393,28 +399,19 @@ def show_item(item_id: int, request, unread_view: bool = False):
     
     # 2. Out-of-band swap: Update the list item appearance (remove blue indicator)
     if was_unread and item_after:
-        if unread_view:
-            # In unread view: remove the item entirely using HTMX delete
-            removal_element = Div(
-                id=f"feed-item-{item_id}",
-                hx_swap_oob="delete"
-            )
-            responses.append(removal_element)
-        else:
-            # In all posts view: update item to remove blue dot but keep visible
-            # Create updated item without blue dot
-            updated_item = FeedItem(item_after, unread_view=False)
-            # Set proper HTMX OOB attributes for replacement
-            updated_item = Li(
-                *updated_item.children,  # Copy the content
-                cls=updated_item.get('cls', ''),  # Copy classes (should not have blue dot now)
-                id=f"feed-item-{item_id}",
-                hx_swap_oob="true",  # Use true for replacement, not outerHTML
-                hx_get=f"/item/{item_after['id']}?unread_view=False",
-                hx_target="#item-detail",
-                hx_trigger="click"
-            )
-            responses.append(updated_item)
+        # For ALL views: only update appearance to "read" style (grey + no dot)
+        # Never immediately remove - let server-side filtering handle removal on next page load
+        updated_item = FeedItem(item_after, unread_view=False)
+        updated_item = Li(
+            *updated_item.children,  # Copy the content
+            cls=updated_item.get('cls', ''),  # Copy classes (should be read style now)
+            id=f"feed-item-{item_id}",
+            hx_swap_oob="true",  # Update appearance only
+            hx_get=f"/item/{item_after['id']}?unread_view={unread_view}",
+            hx_target="#item-detail",
+            hx_trigger="click"
+        )
+        responses.append(updated_item)
     
     # Return tuple of responses for HTMX to handle
     return tuple(responses) if len(responses) > 1 else detail_view

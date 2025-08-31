@@ -377,11 +377,45 @@ rss-reader-highlight/
 ## Contributing
 
 ### Development Workflow
+
+#### **Standard Development**
 1. Create feature branch
 2. Write tests for new functionality
 3. Implement feature following existing patterns
 4. Run full test suite
 5. Submit pull request
+
+#### **Parallel Development with Worktrees**
+For working on multiple features simultaneously:
+
+```bash
+# Create isolated worktree with fresh database
+./create-worktree.sh feature-auth
+
+# Create worktree with copied data for testing
+./create-worktree.sh bugfix-feeds --copy-db
+
+# List all worktrees and their ports
+./manage-worktrees.sh list
+
+# Remove worktree when done
+./manage-worktrees.sh remove feature-auth
+```
+
+**Each worktree provides:**
+- **Isolated app** (ports 5002, 5003, etc.)
+- **Isolated database** (`data/rss.db` per worktree)
+- **Isolated Playwright MCP** (ports 6002, 6003, etc.)
+- **Isolated Claude Code testing** (`.mcp.json` per worktree)
+
+**Workflow:**
+1. `./create-worktree.sh my-feature`
+2. `cd ../rss-reader-my-feature`
+3. `./playwright-start.sh &` (start MCP server)
+4. `./run.sh &` (start app)
+5. `claude` (test with isolated MCP)
+
+This allows testing multiple branches simultaneously without port conflicts or database interference.
 
 ### Code Style
 - Follow existing patterns in the codebase
