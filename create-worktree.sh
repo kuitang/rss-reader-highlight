@@ -142,17 +142,8 @@ cat > "$WORKTREE_DIR/.mcp.json" << EOF
 }
 EOF
 
-# Create playwright-start.sh script to start MCP server
-cat > "$WORKTREE_DIR/playwright-start.sh" << EOF
-#!/bin/bash
-echo "🎭 Starting Playwright MCP server on port $PLAYWRIGHT_PORT"
-npx @playwright/mcp --port $PLAYWRIGHT_PORT --host localhost
-EOF
-
-chmod +x "$WORKTREE_DIR/playwright-start.sh"
-
-# Create run.sh launcher script
-cat > "$WORKTREE_DIR/run.sh" << 'EOF'
+# Create single startup script that handles everything
+cat > "$WORKTREE_DIR/start.sh" << 'EOF'
 #!/bin/bash
 
 # Load environment variables
@@ -168,19 +159,18 @@ elif [ -d "../rss-reader-highlight/venv" ]; then
 fi
 
 echo "🚀 Starting RSS Reader Worktree"
-echo "📱 App: http://localhost:$PORT"
-echo "🎭 Playwright MCP: localhost:$PLAYWRIGHT_MCP_PORT"
+echo "📱 App: http://localhost:$PORT"  
 echo "💾 Database: $DATABASE_PATH"
 echo ""
-echo "💡 To test with Claude Code in this worktree:"
-echo "   claude # (from this directory)"
+echo "💡 Claude Code will auto-start Playwright MCP on port $PLAYWRIGHT_MCP_PORT"
+echo "💡 Run 'claude' from this directory for isolated testing"
 echo ""
 
 python app.py
 EOF
 
 # Make launcher executable
-chmod +x "$WORKTREE_DIR/run.sh"
+chmod +x "$WORKTREE_DIR/start.sh"
 
 # Create info file for easy reference
 cat > "$WORKTREE_DIR/WORKTREE_INFO.md" << EOF
@@ -192,18 +182,15 @@ cat > "$WORKTREE_DIR/WORKTREE_INFO.md" << EOF
 - **App URL**: http://localhost:$WORKTREE_PORT
 
 ## Commands
-- Start server: \`./run.sh\`
-- Test with Claude Code: \`claude\` (from this directory)
-- Run tests: \`python -m pytest\`
-- Access main worktree: \`cd ../rss-reader-highlight\`
+- **Start everything**: \`./start.sh\`
+- **Test with Claude**: \`claude\` (from this directory - auto-starts MCP)
+- **Run tests**: \`python -m pytest\`
+- **Access main worktree**: \`cd ../rss-reader-highlight\`
 
-## MCP Configuration
-This worktree has its own Playwright MCP server configured in \`.mcp.json\`:
-- **Server name**: playwright-worktree
-- **Port**: $PLAYWRIGHT_PORT
-- **Scope**: Local (private to this worktree)
-
-When you run \`claude\` from this directory, it will automatically use the local MCP configuration to test against port $WORKTREE_PORT.
+## Simplified Workflow
+1. \`./start.sh\` (starts app on port $WORKTREE_PORT)
+2. \`claude\` (auto-starts Playwright MCP on port $PLAYWRIGHT_PORT)
+3. Test away!
 
 ## Cleanup
 To remove this worktree:
@@ -222,7 +209,7 @@ echo "💾 Database: $([ "$COPY_DB_FLAG" = "--copy-db" ] && echo "Copied from ma
 echo ""
 echo "🚀 To start:"
 echo "   cd $WORKTREE_DIR"
-echo "   ./run.sh"
+echo "   ./start.sh"
 echo ""
 echo "🌍 Then visit: http://localhost:$WORKTREE_PORT"
 echo "🤖 Claude Code in worktree will auto-use MCP port $PLAYWRIGHT_PORT"

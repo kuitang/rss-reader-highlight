@@ -408,12 +408,11 @@ For working on multiple features simultaneously:
 - **Isolated Playwright MCP** (ports 6002, 6003, etc.)
 - **Isolated Claude Code testing** (`.mcp.json` per worktree)
 
-**Workflow:**
+**Simplified Workflow:**
 1. `./create-worktree.sh my-feature`
 2. `cd ../rss-reader-my-feature`
-3. `./playwright-start.sh &` (start MCP server)
-4. `./run.sh &` (start app)
-5. `claude` (test with isolated MCP)
+3. `./start.sh` (starts app)
+4. `claude` (auto-starts isolated MCP for testing)
 
 This allows testing multiple branches simultaneously without port conflicts or database interference.
 
