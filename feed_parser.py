@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from typing import Dict, List, Optional
 from dateutil import parser as date_parser
 import logging
+import trafilatura
 from models import FeedModel, FeedItemModel
 
 logging.basicConfig(level=logging.INFO)
@@ -115,20 +116,25 @@ class FeedParser:
                     title = getattr(entry, 'title', 'Untitled')
                     link = getattr(entry, 'link', '')
                     
-                    # Get description and content
+                    # Get description and content, sanitize HTML and convert to Markdown
                     description = None
                     content = None
                     
                     if hasattr(entry, 'summary'):
-                        description = entry.summary
+                        # Convert HTML summary to clean Markdown
+                        description = trafilatura.extract(entry.summary, include_formatting=True, output_format='markdown')
+                        if not description:  # Fallback if trafilatura fails
+                            description = trafilatura.html_to_markdown(entry.summary) if entry.summary else None
                     
                     if hasattr(entry, 'content') and entry.content:
                         # Take the first content entry
                         content_entry = entry.content[0] if isinstance(entry.content, list) else entry.content
-                        if hasattr(content_entry, 'value'):
-                            content = content_entry.value
-                        else:
-                            content = str(content_entry)
+                        raw_content = content_entry.value if hasattr(content_entry, 'value') else str(content_entry)
+                        
+                        # Convert HTML content to clean Markdown
+                        content = trafilatura.extract(raw_content, include_formatting=True, output_format='markdown')
+                        if not content:  # Fallback if trafilatura fails
+                            content = trafilatura.html_to_markdown(raw_content) if raw_content else None
                     
                     # Parse published date
                     published = None
@@ -258,8 +264,16 @@ def setup_default_feeds():
     parser = FeedParser()
     
     default_feeds = [
+        "https://feeds.feedburner.com/reuters/businessNews",  # BizToc
+        "https://feeds.bloomberg.com/economics/news.rss",  # Bloomberg Economics
+        "https://feeds.bloomberg.com/markets/news.rss",  # Bloomberg Markets
+        "https://www.ft.com/rss/home",  # Financial Times
         "https://hnrss.org/frontpage",  # Hacker News
+        "https://www.reddit.com/r/ClaudeAI/.rss",  # ClaudeAI subreddit
+        "https://www.reddit.com/r/MicroSaaS/.rss",  # MicroSaaS subreddit (larger one)
+        "https://www.reddit.com/r/OpenAI/.rss",  # OpenAI subreddit
         "https://www.reddit.com/r/all/.rss",  # Reddit All
+        "https://www.reddit.com/r/vibecoding/.rss",  # vibecoding subreddit
         "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain"  # WSJ Markets
     ]
     

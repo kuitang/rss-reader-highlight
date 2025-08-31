@@ -28,24 +28,52 @@ async def test_comprehensive_functionality():
         mobile_header_hidden = not await page.locator("#mobile-header").is_visible()
         print(f"✓ Desktop layout: {desktop_visible}, Mobile header hidden: {mobile_header_hidden}")
         
-        # Test article loading and unread marking
+        # Test article loading and unread marking with proper styling assertions
         first_article = page.locator("#desktop-feeds-content .js-filter li").first
         article_title = (await first_article.inner_text()).split('\\n')[0]
         
-        # Check for blue dot before click
-        has_blue_dot_before = "bg-blue-600" in await first_article.inner_html()
+        # Get article ID for stable reference (should be desktop-feed-item-*)
+        article_id = await first_article.get_attribute("id")
+        stable_article = page.locator(f"#{article_id}")
+        print(f"✓ Testing article with stable ID: {article_id}")
+        
+        # Check complete styling before click (unread state)
+        style_before = await stable_article.evaluate("""(element) => ({
+            hasBlueSpan: element.querySelector('.bg-blue-600') !== null,
+            hasBgMuted: element.classList.contains('bg-muted'),
+            isTaggedUnread: element.classList.contains('tag-unread'),
+            hasStrongTitle: element.querySelector('strong') !== null,
+            backgroundColor: window.getComputedStyle(element).backgroundColor
+        })""")
         
         # Click article
         start_time = time.time()
-        await first_article.click()
+        await stable_article.click()
         await page.wait_for_function("document.querySelector('#desktop-item-detail').innerText !== 'Select a post to read'", timeout=2000)
         load_time = time.time() - start_time
         
-        # Check for blue dot after click
-        has_blue_dot_after = "bg-blue-600" in await first_article.inner_html()
+        # Wait for OOB swap to complete and check styling after click (read state)
+        await page.wait_for_timeout(500)
+        style_after = await stable_article.evaluate("""(element) => ({
+            hasBlueSpan: element.querySelector('.bg-blue-600') !== null,
+            hasBgMuted: element.classList.contains('bg-muted'),
+            isTaggedRead: element.classList.contains('tag-read'),
+            hasStrongTitle: element.querySelector('strong') !== null,
+            backgroundColor: window.getComputedStyle(element).backgroundColor
+        })""")
         
         print(f"✓ Article '{article_title[:40]}...' loaded in {load_time:.2f}s")
-        print(f"✓ Unread marking: blue dot before={has_blue_dot_before}, after={has_blue_dot_after}")
+        print(f"✓ BEFORE: blue_dot={style_before['hasBlueSpan']}, grey_bg={style_before['hasBgMuted']}, bold_title={style_before['hasStrongTitle']}")
+        print(f"✓ AFTER:  blue_dot={style_after['hasBlueSpan']}, grey_bg={style_after['hasBgMuted']}, bold_title={style_after['hasStrongTitle']}")
+        
+        # Assert proper styling transitions
+        assert style_before['hasBlueSpan'] == True, "Unread: must have blue dot"
+        assert style_before['hasBgMuted'] == False, "Unread: must not have grey background"
+        assert style_before['hasStrongTitle'] == True, "Unread: must have bold title"
+        assert style_after['hasBlueSpan'] == False, "Read: must not have blue dot"
+        assert style_after['hasBgMuted'] == True, "Read: must have grey background"
+        assert style_after['hasStrongTitle'] == False, "Read: must not have bold title"
+        print("✅ Desktop unread → read styling FULLY VERIFIED")
         
         # Test pagination
         next_button = page.locator("#desktop-feeds-content button").filter(has_text="").last

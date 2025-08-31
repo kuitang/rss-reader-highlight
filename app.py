@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timezone
 import os
 import time
+import mistletoe
 from models import (
     SessionModel, FeedModel, FeedItemModel, UserItemModel, FolderModel,
     init_db, get_db
@@ -210,9 +211,12 @@ def FeedItem(item, unread_view=False, for_desktop=False):
         target = "#main-content" 
         push_url = "true"  # URL push for mobile full-page navigation
     
+    # Use unique IDs for desktop vs mobile to avoid HTML violations
+    item_id = f"{'desktop-' if for_desktop else 'mobile-'}feed-item-{item['id']}"
+    
     attrs = {
         "cls": cls,
-        "id": f"feed-item-{item['id']}",
+        "id": item_id,
         "hx_get": f"/item/{item['id']}?unread_view={unread_view}",
         "hx_target": target,
         "hx_trigger": "click"
@@ -222,16 +226,19 @@ def FeedItem(item, unread_view=False, for_desktop=False):
         attrs["hx_push_url"] = push_url
     
     return Li(
-        DivFullySpaced(
-            DivLAligned(
-                Strong(item['title']),
-                Span(cls='flex h-2 w-2 rounded-full bg-blue-600') if not item.get('is_read', 0) else ''),
-            DivLAligned(
-                Small(item.get('feed_title', 'Unknown Feed'), cls=TextPresets.muted_sm),
-                Time(human_time_diff(item.get('published')), cls='text-xs')
-            )
+        # Title row with blue dot
+        DivLAligned(
+            Strong(item['title']) if not is_read else Span(item['title']),  # Bold for unread, normal for read
+            Span(cls='flex h-2 w-2 rounded-full bg-blue-600') if not item.get('is_read', 0) else ''
         ),
-        Div((item.get('description', '') or '')[:150] + '...', cls=TextPresets.muted_sm),
+        # Source and time row - source left, time right
+        DivFullySpaced(
+            Small(item.get('feed_title', 'Unknown Feed'), cls=TextPresets.muted_sm),
+            Time(human_time_diff(item.get('published')), cls='text-xs text-muted-foreground')
+        ),
+        # Description
+        Div(mistletoe.markdown((item.get('description') or '')[:150] + '...' if item.get('description') else ''), cls=TextPresets.muted_sm + ' mt-2'),
+        # Optional folder label
         DivLAligned(
             *([Label(A(item.get('folder_name', 'General'), href='#'), 
                     cls='uk-label-primary')] if item.get('folder_name') else [])
@@ -446,7 +453,7 @@ def ItemDetailView(item, show_back=False):
         ),
         DividerLine(),
         Div(
-            NotStr(item.get('content') or item.get('description', 'No content available')),
+            NotStr(mistletoe.markdown(item.get('content') or item.get('description') or 'No content available')),
             cls=TextT.sm + 'p-4 prose max-w-none'
         ),
         id="item-detail"
@@ -566,7 +573,7 @@ def show_item(item_id: int, request, unread_view: bool = False):
             # Desktop: update the list item appearance with correct attributes
             updated_item_attrs = {
                 "cls": f"relative rounded-lg border border-border p-3 text-sm hover:bg-secondary space-y-2 cursor-pointer bg-muted tag-read",
-                "id": f"feed-item-{item_id}",
+                "id": f"desktop-feed-item-{item_id}",
                 "hx_get": f"/item/{item_after['id']}?unread_view={unread_view}",
                 "hx_target": "#desktop-item-detail",
                 "hx_trigger": "click",
@@ -574,17 +581,18 @@ def show_item(item_id: int, request, unread_view: bool = False):
             }
             
             updated_item = Li(
-                DivFullySpaced(
-                    DivLAligned(
-                        Strong(item_after['title']),
-                        # No blue dot for read items
-                    ),
-                    DivLAligned(
-                        Small(item_after.get('feed_title', 'Unknown Feed'), cls=TextPresets.muted_sm),
-                        Time(human_time_diff(item_after.get('published')), cls='text-xs')
-                    )
+                # Title row with no blue dot (read state)
+                DivLAligned(
+                    Span(item_after['title']),  # Unbolded title for read items
+                    # No blue dot for read items
                 ),
-                Div((item_after.get('description', '') or '')[:150] + '...', cls=TextPresets.muted_sm),
+                # Source and time row - source left, time right
+                DivFullySpaced(
+                    Small(item_after.get('feed_title', 'Unknown Feed'), cls=TextPresets.muted_sm),
+                    Time(human_time_diff(item_after.get('published')), cls='text-xs text-muted-foreground')
+                ),
+                # Description
+                Div(mistletoe.markdown((item_after.get('description') or '')[:150] + '...' if item_after.get('description') else ''), cls=TextPresets.muted_sm + ' mt-2'),
                 **updated_item_attrs
             )
             responses.append(updated_item)
