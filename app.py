@@ -154,7 +154,7 @@ def FeedSidebarItem(feed, count=""):
             ),
             href=f"/?feed_id={feed['id']}",
             uk_toggle="target: #mobile-sidebar",  # Auto-close mobile sidebar when clicked
-            hx_disable="true",  # Explicitly disable HTMX for this element
+            **{"data-hx-disable": "true"},  # Explicitly disable HTMX for this element
             cls='hover:bg-secondary p-4'
         )
     )
@@ -194,7 +194,7 @@ def FeedsSidebar(session_id):
                 ),
                 href="/",
                 uk_toggle="target: #mobile-sidebar",  # Auto-close mobile sidebar when clicked
-                hx_disable="true",  # Explicitly disable HTMX for this element
+                **{"data-hx-disable": "true"},  # Explicitly disable HTMX for this element
                 cls='hover:bg-secondary p-4'
             )
         ),
@@ -204,7 +204,7 @@ def FeedsSidebar(session_id):
         *[Li(A(DivLAligned(Span(UkIcon('folder')), Span(folder['name'])), 
                href=f"/?folder_id={folder['id']}",
                uk_toggle="target: #mobile-sidebar",  # Auto-close mobile sidebar when clicked
-               hx_disable="true",  # Explicitly disable HTMX for this element
+               **{"data-hx-disable": "true"},  # Explicitly disable HTMX for this element
                cls='hover:bg-secondary p-4')) 
           for folder in folders],
         Li(
