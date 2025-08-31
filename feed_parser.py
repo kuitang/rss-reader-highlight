@@ -11,7 +11,10 @@ from bs4 import BeautifulSoup
 import urllib.parse
 from models import FeedModel, FeedItemModel
 
-logging.basicConfig(level=logging.DEBUG)
+import os
+# Configure logging level from environment variable
+log_level = getattr(logging, os.environ.get('LOG_LEVEL', 'INFO').upper(), logging.INFO)
+logging.basicConfig(level=log_level)
 logger = logging.getLogger(__name__)
 
 class FeedParser:
@@ -214,15 +217,24 @@ class FeedParser:
                         logger.debug(f"Summary preview: {entry.summary[:200] if entry.summary else 'None'}...")
                         
                         try:
-                            description = trafilatura.extract(entry.summary, include_formatting=True, output_format='markdown')
+                            # Wrap fragment in complete HTML document for trafilatura
+                            wrapped_html = f"<html><body>{entry.summary}</body></html>"
+                            description = trafilatura.extract(wrapped_html, include_formatting=True, output_format='markdown')
                             if description:
                                 logger.debug(f"Trafilatura extraction successful: {len(description)} chars")
                             else:
-                                logger.warning(f"Trafilatura extract returned None for {title[:50]} - SKIPPING ENTRY")
-                                logger.debug(f"Failed input: {entry.summary[:500] if entry.summary else 'None'}")
-                                continue  # Skip this entry entirely
+                                # Final fallback: use BeautifulSoup for simple text extraction
+                                from bs4 import BeautifulSoup
+                                soup = BeautifulSoup(entry.summary, 'html.parser')
+                                text_content = soup.get_text(strip=True)
+                                if text_content and len(text_content) > 10:  # Only use if meaningful content
+                                    description = text_content
+                                    logger.debug(f"Using BeautifulSoup fallback: {len(description)} chars")
+                                else:
+                                    logger.error(f"Trafilatura extract returned None for '{title}' - FULL XML ENTRY: {entry}")
+                                    continue  # Skip this entry entirely
                         except Exception as e:
-                            logger.error(f"Trafilatura extract failed for {title[:50]}: {str(e)} - SKIPPING ENTRY")
+                            logger.error(f"Trafilatura extract failed for '{title}': {str(e)} - FULL XML ENTRY: {entry}")
                             continue  # Skip this entry entirely
                     
                     if hasattr(entry, 'content') and entry.content:
@@ -237,15 +249,24 @@ class FeedParser:
                         logger.debug(f"Content preview: {raw_content[:200] if raw_content else 'None'}...")
                         
                         try:
-                            content = trafilatura.extract(raw_content, include_formatting=True, output_format='markdown')
+                            # Wrap fragment in complete HTML document for trafilatura
+                            wrapped_content = f"<html><body>{raw_content}</body></html>"
+                            content = trafilatura.extract(wrapped_content, include_formatting=True, output_format='markdown')
                             if content:
                                 logger.debug(f"Trafilatura content extraction successful: {len(content)} chars")
                             else:
-                                logger.warning(f"Trafilatura content extract returned None for {title[:50]} - SKIPPING ENTRY")
-                                logger.debug(f"Failed content input: {raw_content[:500] if raw_content else 'None'}")
-                                continue  # Skip this entry entirely
+                                # Final fallback: use BeautifulSoup for simple text extraction
+                                from bs4 import BeautifulSoup
+                                soup = BeautifulSoup(raw_content, 'html.parser')
+                                text_content = soup.get_text(strip=True)
+                                if text_content and len(text_content) > 10:  # Only use if meaningful content
+                                    content = text_content
+                                    logger.debug(f"Using BeautifulSoup content fallback: {len(content)} chars")
+                                else:
+                                    logger.error(f"Trafilatura content extract returned None for '{title}' - FULL XML ENTRY: {entry}")
+                                    continue  # Skip this entry entirely
                         except Exception as e:
-                            logger.error(f"Trafilatura content extract failed for {title[:50]}: {str(e)} - SKIPPING ENTRY")
+                            logger.error(f"Trafilatura content extract failed for '{title}': {str(e)} - FULL XML ENTRY: {entry}")
                             continue  # Skip this entry entirely
                     
                     # Parse published date
