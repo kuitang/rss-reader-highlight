@@ -355,103 +355,6 @@ class FeedParser:
         
         return results
     
-    def add_feed(self, url: str) -> Dict:
-        """Add new feed with auto-discovery support"""
-        try:
-            # FIRST: Try direct feed parsing
-            fetch_result = self.fetch_feed(url)
-            
-            if fetch_result['updated'] and fetch_result['status'] == 200:
-                # Check if it's a valid feed
-                feed_data = fetch_result['data']
-                if hasattr(feed_data, 'feed') and hasattr(feed_data, 'entries'):
-                    feed_title = getattr(feed_data.feed, 'title', None)
-                    if feed_title:
-                        # Direct feed URL works - proceed normally
-                        feed_id = FeedModel.create_feed(url, feed_title)
-                        result = self.parse_and_store_feed(feed_id, url)
-                        
-                        if not result['updated']:
-                            return {
-                                'success': False,
-                                'error': 'Feed parsing failed after creation'
-                            }
-                        
-                        return {
-                            'success': True,
-                            'feed_id': feed_id,
-                            'feed_title': feed_title,
-                            **result
-                        }
-            
-            # SECOND: If direct parsing failed, try auto-discovery
-            logger.info(f"Direct feed parsing failed for {url}, trying auto-discovery...")
-            discovered_feeds = self.discover_feeds(url)
-            
-            if not discovered_feeds:
-                return {
-                    'success': False,
-                    'error': 'No RSS/Atom feeds found via auto-discovery'
-                }
-            
-            # THIRD: Try the first discovered feed
-            primary_feed = discovered_feeds[0]
-            feed_url = primary_feed['url']
-            
-            logger.info(f"Found feed via auto-discovery: {feed_url}")
-            
-            # Try to parse the discovered feed
-            fetch_result = self.fetch_feed(feed_url)
-            
-            if not fetch_result['updated'] or fetch_result['status'] != 200:
-                return {
-                    'success': False,
-                    'error': f"Cannot fetch discovered feed: HTTP {fetch_result['status']}"
-                }
-            
-            # Verify discovered feed has parseable content
-            feed_data = fetch_result['data']
-            if not hasattr(feed_data, 'feed') or not hasattr(feed_data, 'entries'):
-                return {
-                    'success': False, 
-                    'error': 'Discovered feed has invalid RSS/Atom format'
-                }
-            
-            # Get feed metadata
-            feed_title = getattr(feed_data.feed, 'title', None) or primary_feed['title']
-            if not feed_title:
-                return {
-                    'success': False,
-                    'error': 'Discovered feed has no title'
-                }
-            
-            # Create feed with discovered URL
-            feed_id = FeedModel.create_feed(feed_url, feed_title)
-            
-            # Store the articles
-            result = self.parse_and_store_feed(feed_id, feed_url)
-            
-            if not result['updated']:
-                return {
-                    'success': False,
-                    'error': 'Feed parsing failed after creation'
-                }
-            
-            return {
-                'success': True,
-                'feed_id': feed_id,
-                'feed_title': feed_title,
-                'discovered_from': url,
-                'feed_url': feed_url,
-                **result
-            }
-            
-        except Exception as e:
-            logger.error(f"Error adding feed {url}: {str(e)}")
-            return {
-                'success': False,
-                'error': str(e)
-            }
     
     def _extract_description_with_images(self, html_summary: str) -> str:
         """Extract description with images from HTML summary"""
@@ -521,32 +424,47 @@ class FeedParser:
             self.client.close()
 
 def setup_default_feeds():
-    """Set up default RSS feeds"""
-    parser = FeedParser()
-    
+    """Set up default RSS feeds - FAST database records only, background worker handles content"""
     default_feeds = [
-        "https://feeds.feedburner.com/reuters/businessNews",  # BizToc
-        "https://feeds.bloomberg.com/economics/news.rss",  # Bloomberg Economics
-        "https://feeds.bloomberg.com/markets/news.rss",  # Bloomberg Markets
-        "https://www.ft.com/rss/home",  # Financial Times
-        "https://hnrss.org/frontpage",  # Hacker News
-        "https://www.reddit.com/r/ClaudeAI/.rss",  # ClaudeAI subreddit
-        "https://www.reddit.com/r/MicroSaaS/.rss",  # MicroSaaS subreddit (larger one)
-        "https://www.reddit.com/r/OpenAI/.rss",  # OpenAI subreddit
-        "https://www.reddit.com/r/all/.rss",  # Reddit All
-        "https://www.reddit.com/r/vibecoding/.rss",  # vibecoding subreddit
-        "https://feeds.content.dowjones.io/public/rss/RSSMarketsMain"  # WSJ Markets
+        ("https://feeds.feedburner.com/reuters/businessNews", "BizToc"),
+        ("https://feeds.bloomberg.com/economics/news.rss", "Bloomberg Economics"),
+        ("https://feeds.bloomberg.com/markets/news.rss", "Bloomberg Markets"),
+        ("https://www.ft.com/rss/home", "Financial Times"),
+        ("https://hnrss.org/frontpage", "Hacker News"),
+        ("https://www.reddit.com/r/ClaudeAI/.rss", "ClaudeAI"),
+        ("https://www.reddit.com/r/MicroSaaS/.rss", "MicroSaaS"),
+        ("https://www.reddit.com/r/OpenAI/.rss", "OpenAI"),
+        ("https://www.reddit.com/r/all/.rss", "Reddit All"),
+        ("https://www.reddit.com/r/vibecoding/.rss", "VibeCoding"),
+        ("https://feeds.content.dowjones.io/public/rss/RSSMarketsMain", "WSJ Markets"),
+        ("https://techcrunch.com/feed/", "TechCrunch"),
+        ("https://stackoverflow.com/feeds/tag?tagnames=python&sort=newest", "Python Q&A"),
+        ("https://reddit.com/r/Python/.rss", "Python")
     ]
     
     results = []
-    for url in default_feeds:
+    feeds_created = 0
+    
+    for url, title in default_feeds:
         try:
-            result = parser.add_feed(url)
-            results.append(result)
-            logger.info(f"Added default feed: {url} - {result}")
+            # FAST: Only create database record if not exists
+            if not FeedModel.feed_exists_by_url(url):
+                feed_id = FeedModel.create_feed(url, title)
+                feeds_created += 1
+                logger.info(f"Created default feed record: {title} ({url})")
+                results.append({'success': True, 'feed_id': feed_id, 'url': url, 'title': title})
+            else:
+                logger.debug(f"Default feed already exists: {title}")
+                results.append({'success': True, 'url': url, 'title': title, 'already_exists': True})
+                
         except Exception as e:
-            logger.error(f"Failed to add default feed {url}: {str(e)}")
-            results.append({'success': False, 'url': url, 'error': str(e)})
+            logger.error(f"Failed to create default feed {title}: {str(e)}")
+            results.append({'success': False, 'url': url, 'title': title, 'error': str(e)})
+    
+    if feeds_created > 0:
+        logger.info(f"Fast startup: Created {feeds_created} default feed records (background worker will fetch content)")
+    else:
+        logger.info("Fast startup: All default feeds already exist")
     
     return results
 

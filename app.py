@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 import os
 import time
 import mistletoe
+from bs4 import BeautifulSoup
+import asyncio
 from models import (
     SessionModel, FeedModel, FeedItemModel, UserItemModel, FolderModel,
     init_db, get_db
@@ -80,10 +82,9 @@ async def lifespan(app):
     await initialize_worker_system()
     print("Background worker system initialized")
     
-    # Check if we need to add default feeds (first run)
-    if not FeedModel.get_feeds_to_update(max_age_minutes=9999):
-        print("Setting up default feeds via background worker...")
-        setup_default_feeds()
+    # Always add default feeds - database constraints handle duplicates
+    print("Adding default feeds to database...")
+    setup_default_feeds()
     
     yield  # App is running
     
@@ -134,6 +135,91 @@ app, rt = fast_app(
     lifespan=lifespan
 )
 
+def smart_truncate_html(text, max_length=150):
+    """Smart truncation that counts only visible text, preserves images regardless of URL length
+    
+    Strategy:
+    1. Convert markdown to HTML first (ALWAYS)
+    2. Parse with BeautifulSoup
+    3. Count only VISIBLE text characters (exclude image URLs, HTML attributes)
+    4. Preserve ALL images regardless of URL length
+    5. Truncate text content when visible text limit reached
+    """
+    if not text:
+        return 'No content available'
+    
+    # ALWAYS convert markdown to HTML first
+    html_content = mistletoe.markdown(text)
+    
+    # Parse with BeautifulSoup for proper element handling
+    soup = BeautifulSoup(html_content, 'html.parser')
+    
+    # Extract all images first - these are always preserved
+    images = soup.find_all('img')
+    
+    # Get visible text length (excluding images)
+    visible_text = soup.get_text()
+    
+    # If visible text is within limit, return full content
+    if len(visible_text) <= max_length:
+        return html_content
+    
+    # Need to truncate: build result with images + truncated text
+    result_elements = []
+    visible_char_count = 0
+    
+    # Process each top-level element
+    for element in soup.children:
+        if hasattr(element, 'name'):  # It's a tag
+            if element.name == 'img':
+                # Always include images, don't count toward text limit
+                result_elements.append(str(element))
+            elif element.find('img'):
+                # Element contains image - preserve the whole element
+                result_elements.append(str(element))
+            else:
+                # Text-based element - check if we can fit it
+                element_text = element.get_text()
+                element_text_length = len(element_text)
+                
+                if visible_char_count + element_text_length <= max_length:
+                    # Fits completely
+                    result_elements.append(str(element))
+                    visible_char_count += element_text_length
+                else:
+                    # Need to truncate this element
+                    remaining_chars = max_length - visible_char_count
+                    if remaining_chars > 20:  # Only add if meaningful text remains
+                        truncated_text = element_text[:remaining_chars].rsplit(' ', 1)[0] + '...'
+                        
+                        # Create new element with truncated text
+                        new_element = soup.new_tag(element.name)
+                        new_element.string = truncated_text
+                        
+                        # Copy attributes
+                        for attr_name, attr_value in element.attrs.items():
+                            new_element[attr_name] = attr_value
+                            
+                        result_elements.append(str(new_element))
+                    break
+        else:
+            # Direct text node
+            text_content = str(element).strip()
+            if text_content:
+                text_length = len(text_content)
+                if visible_char_count + text_length <= max_length:
+                    result_elements.append(text_content)
+                    visible_char_count += text_length
+                else:
+                    # Truncate text node
+                    remaining_chars = max_length - visible_char_count
+                    if remaining_chars > 10:
+                        truncated = text_content[:remaining_chars].rsplit(' ', 1)[0] + '...'
+                        result_elements.append(truncated)
+                    break
+    
+    return ''.join(result_elements)
+
 def human_time_diff(dt):
     """Convert datetime to human readable relative time"""
     if not dt:
@@ -177,35 +263,44 @@ def FeedSidebarItem(feed, count=""):
                 cls="gap-3"
             ),
             href=f"/?feed_id={feed['id']}",
-            # Removed uk_toggle to allow normal link navigation
-            hx_boost="false",  # Disable HTMX boost for full page navigation
             cls='hover:bg-secondary p-4 block'
         )
     )
 
-def FeedsSidebar(session_id):
+def FeedsSidebar(session_id, for_mobile=False):
     """Create feeds sidebar (adapted from mail sidebar)"""
     feeds = FeedModel.get_user_feeds(session_id)
     folders = FolderModel.get_folders(session_id)
     
+    # Use different IDs for mobile vs desktop to avoid conflicts
+    input_id = "mobile-feed-url" if for_mobile else "new-feed-url"
+    button_id = "mobile-add-feed-button" if for_mobile else "add-feed-button"
+    target = "#mobile-sidebar" if for_mobile else "#sidebar"
+    
     return Ul(
         Li(H3("Feeds"), cls='p-3'),
         Li(
-            DivLAligned(
-                Input(
-                    placeholder="Enter RSS URL", 
-                    id="new-feed-url",
-                    name="new_feed_url",  # This maps to FastHTML function parameter
-                    cls="flex-1 mr-2"
+            Form(
+                DivLAligned(
+                    Input(
+                        placeholder="Enter RSS URL", 
+                        id=input_id,
+                        name="new_feed_url",  # This maps to FastHTML function parameter
+                        cls="flex-1 mr-2"
+                    ),
+                    Button(
+                        UkIcon('plus'),
+                        hx_post="/api/feed/add",
+                        hx_target=target,
+                        hx_swap="outerHTML", 
+                        cls="px-2",
+                        type="submit",
+                        id=button_id
+                    )
                 ),
-                Button(
-                    UkIcon('plus'),
-                    hx_post="/api/feed/add",
-                    hx_include="#new-feed-url",
-                    hx_target="#feeds-list",
-                    hx_swap="beforeend",
-                    cls="px-2"
-                )
+                hx_post="/api/feed/add",
+                hx_target=target, 
+                hx_swap="outerHTML"
             ),
             cls='p-4'
         ),
@@ -218,12 +313,10 @@ def FeedsSidebar(session_id):
                     cls="gap-3"
                 ),
                 href="/",
-                # Removed uk_toggle to allow normal link navigation
-                hx_boost="false",  # Disable HTMX for full page navigation
                 cls="hover:bg-secondary p-4 block"
             )
         ),
-        Div(id="feeds-list")(*[FeedSidebarItem(feed) for feed in feeds]),
+        Div(id="desktop-feeds-list")(*[FeedSidebarItem(feed) for feed in feeds]),
         Li(Hr()),
         Li(H4("Folders"), cls='p-3'),
         *[Li(
@@ -234,8 +327,6 @@ def FeedsSidebar(session_id):
                     cls="gap-3"
                 ),
                 href=f"/?folder_id={folder['id']}",
-                # Removed uk_toggle to allow normal link navigation
-                hx_boost="false",  # Disable HTMX for full page navigation
                 cls="hover:bg-secondary p-4 block"
             )
         ) for folder in folders],
@@ -293,13 +384,14 @@ def FeedItem(item, unread_view=False, for_desktop=False):
             Small(item.get('feed_title', 'Unknown Feed'), cls=TextPresets.muted_sm),
             Time(human_time_diff(item.get('published')), cls='text-xs text-muted-foreground')
         ),
-        # Summary (use full description, truncate only as fallback if too long)
+        # Summary with smart HTML truncation that preserves images
         Div(
-            NotStr(mistletoe.markdown(
-                item.get('description') if item.get('description') and len(item.get('description', '')) <= 300 
-                else (item.get('description', '')[:150] + '...' if item.get('description') else 'No summary available')
-            )), 
-            cls=TextPresets.muted_sm + ' mt-2'
+            NotStr(
+                smart_truncate_html(item.get('description', ''), max_length=300) 
+                if item.get('description') 
+                else 'No summary available'
+            ), 
+            cls='text-sm text-muted-foreground mt-2 prose prose-sm max-w-none'
         ),
         # Optional folder label
         DivLAligned(
@@ -313,11 +405,64 @@ def FeedsList(items, unread_view=False, for_desktop=False):
     """Create list of feed items (adapted from MailList)"""
     return Ul(cls='js-filter space-y-2 p-4 pt-0')(*[FeedItem(item, unread_view, for_desktop) for item in items])
 
+def MobilePersistentHeader(session_id, feed_id=None, unread_only=False):
+    """Create persistent mobile header with tabs and search form - stays fixed during navigation"""
+    # Simple header logic
+    if feed_id:
+        feeds = FeedModel.get_user_feeds(session_id)
+        feed = next((f for f in feeds if f['id'] == feed_id), None)
+        feed_name = feed['title'] if feed else "Unknown Feed"
+    else:
+        feed_name = "All Feeds"
+    
+    # Build URL parameters for tab navigation
+    url_params = []
+    if feed_id:
+        url_params.append(f"feed_id={feed_id}")
+    
+    # Base URL for tab navigation
+    base_url = "/?" + "&".join(url_params) if url_params else "/"
+    
+    print(f"🔍 MOBILE_FORM_BUG_FIX: MobilePersistentHeader() - feed_name='{feed_name}', unread_only={unread_only}")
+    print(f"🔍 MOBILE_FORM_BUG_FIX: MobilePersistentHeader() - This header will PERSIST during navigation!")
+    
+    return Div(cls='flex-shrink-0 bg-background border-b z-10 lg:hidden', 
+               id='mobile-persistent-header',
+               onwheel="event.preventDefault(); event.stopPropagation(); return false;")(
+        Div(cls='flex px-4 py-2')(
+            H3(feed_name),
+            TabContainer(
+                Li(A("All Posts", 
+                     href=f"{base_url}{'&' if url_params else '?'}unread=0" if base_url != "/" else "/?unread=0", 
+                     hx_get=f"{base_url}{'&' if url_params else '?'}unread=0" if base_url != "/" else "/?unread=0",
+                     hx_target="#main-content",
+                     hx_push_url="true",
+                     role='button'),
+                   cls='uk-active' if not unread_only else ''),
+                Li(A("Unread", 
+                     href=base_url if base_url != "/" else "/",
+                     hx_get=base_url if base_url != "/" else "/", 
+                     hx_target="#main-content",
+                     hx_push_url="true",
+                     role='button'),
+                   cls='uk-active' if unread_only else ''),
+                alt=True, cls='ml-auto max-w-40'
+            )
+        ),
+        Div(cls='px-4 pb-2')(
+            Div(cls='uk-inline w-full')(
+                Span(cls='uk-form-icon text-muted-foreground')(UkIcon('search')),
+                Input(placeholder='Search posts', uk_filter_control="", id="mobile-persistent-search")
+            )
+        )
+    )
+
 def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_desktop=False):
-    """Create main feeds content area with pagination (adapted from MailContent)"""
+    """Create main feeds content area with pagination - MOBILE VERSION NO LONGER INCLUDES HEADER"""
     # Get all items first
     all_items = FeedItemModel.get_items_for_user(session_id, feed_id, unread_only)
     print(f"DEBUG: FeedsContent got {len(all_items)} items for session {session_id}")
+    print(f"🔍 MOBILE_FORM_BUG_FIX: FeedsContent() - for_desktop={for_desktop}, MOBILE header moved to persistent header")
     
     # Pagination logic (following MonsterUI tasks example)
     page_size = 20
@@ -329,13 +474,13 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
     end_idx = start_idx + page_size
     paginated_items = all_items[start_idx:end_idx]
     
-    # Simple header logic
+    # Simple header logic for desktop only
     if feed_id:
         feeds = FeedModel.get_user_feeds(session_id)
         feed = next((f for f in feeds if f['id'] == feed_id), None)
         feed_name = feed['title'] if feed else "Unknown Feed"
     else:
-        feed_name = "All Feeds"  # Unconditionally for the all feeds case
+        feed_name = "All Feeds"
     
     # Build URL parameters for pagination (excluding unread for tab navigation)
     url_params = []
@@ -380,7 +525,7 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
     
     # Different layouts for mobile vs desktop
     if for_desktop:
-        # Desktop: sticky header + scrollable content
+        # Desktop: sticky header + scrollable content (unchanged)
         return Div(cls='flex flex-col h-full')(
             # Sticky header section
             Div(cls='sticky top-0 bg-background border-b z-10')(
@@ -408,34 +553,11 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
             )
         )
     else:
-        # Mobile: fixed header + scrollable content
-        return Div(cls='flex flex-col h-full')(
-            # Fixed header section at top of container - prevent scroll propagation
-            Div(cls='flex-shrink-0 bg-background border-b z-10', 
-                id='mobile-feeds-header',
-                onwheel="event.preventDefault(); event.stopPropagation(); return false;")(
-                Div(cls='flex px-4 py-2')(
-                    H3(feed_name),
-                    TabContainer(
-                        Li(A("All Posts", href=f"{base_url}{'&' if url_params else '?'}unread=0" if base_url != "/" else "/?unread=0", role='button'),
-                           cls='uk-active' if not unread_only else ''),
-                        Li(A("Unread", href=base_url if base_url != "/" else "/", role='button'),
-                           cls='uk-active' if unread_only else ''),
-                        alt=True, cls='ml-auto max-w-40'
-                    )
-                ),
-                Div(cls='px-4 pb-2')(
-                    Div(cls='uk-inline w-full')(
-                        Span(cls='uk-form-icon text-muted-foreground')(UkIcon('search')),
-                        Input(placeholder='Search posts', uk_filter_control="")
-                    )
-                )
-            ),
-            # Scrollable content area that takes remaining space
-            Div(cls='flex-1 overflow-y-auto', id="feeds-list-container", uk_filter="target: .js-filter")(
-                FeedsList(paginated_items, unread_only, for_desktop) if paginated_items else Div(P("No posts available"), cls='p-4 text-center text-muted-foreground'),
-                pagination_footer()
-            )
+        # Mobile: ONLY content (header moved to persistent header, parent handles scrolling)
+        print(f"🔍 MOBILE_FORM_BUG_FIX: FeedsContent() - Mobile content WITHOUT header (header is now persistent)")
+        return Div(cls='p-0', id="feeds-list-container", uk_filter="target: .js-filter")(
+            FeedsList(paginated_items, unread_only, for_desktop) if paginated_items else Div(P("No posts available"), cls='p-4 text-center text-muted-foreground'),
+            pagination_footer()
         )
 
 def MobileSidebar(session_id):
@@ -460,7 +582,7 @@ def MobileSidebar(session_id):
                     )
                 )
             ),
-            FeedsSidebar(session_id)
+            FeedsSidebar(session_id, for_mobile=True)
         )
     )
 
@@ -583,19 +705,23 @@ def index(request, feed_id: int = None, unread: bool = True, folder_id: int = No
     
     # Check if this is an HTMX request for mobile content updates
     is_htmx = request.headers.get('HX-Request') == 'true'
+    hx_target = request.headers.get('HX-Target', 'none')
+    
+    print(f"🔍 MOBILE_FORM_BUG_DEBUG: index() - is_htmx={is_htmx}, target={hx_target}, feed_id={feed_id}, unread={unread}")
     
     if is_htmx:
         # Return only the feeds content for HTMX requests
+        print(f"🔍 MOBILE_FORM_BUG_DEBUG: index() - HTMX request detected, returning FeedsContent only")
         return FeedsContent(session_id, feed_id, unread, page)
     
     return Title("RSS Reader"), Body(
         Div(id="mobile-header")(MobileHeader(session_id, show_back=False)),
         MobileSidebar(session_id),
-        # Desktop layout: sidebar + feeds + article detail
+        # Desktop layout: sidebar + feeds + article detail (unchanged)
         Div(cls="hidden lg:grid h-screen pt-4", id="desktop-layout")(
             Grid(
                 Div(id="sidebar", cls='col-span-1 h-screen overflow-y-auto border-r px-2')(
-                    FeedsSidebar(session_id)
+                    FeedsSidebar(session_id, for_mobile=False)
                 ),
                 Div(cls='col-span-2 h-screen flex flex-col overflow-hidden border-r px-4', id="desktop-feeds-content")(
                     FeedsContent(session_id, feed_id, unread, page, for_desktop=True)
@@ -607,12 +733,14 @@ def index(request, feed_id: int = None, unread: bool = True, folder_id: int = No
                 gap=4, cls='h-screen gap-4'
             )
         ),
-        # Mobile layout: full height flex container with proper header spacing
-        Div(cls="lg:hidden fixed inset-0 flex flex-col overflow-hidden", id="main-content")(
-            # Spacer for fixed header
+        # Mobile layout: NEW STRUCTURE with persistent header
+        Div(cls="lg:hidden fixed inset-0 flex flex-col overflow-hidden", id="mobile-layout")(
+            # Spacer for fixed mobile header (hamburger menu)
             Div(cls="h-20 flex-shrink-0"),
-            # Content takes remaining space
-            Div(cls="flex-1 overflow-hidden")(
+            # PERSISTENT header with tabs and search (NEVER gets replaced)
+            MobilePersistentHeader(session_id, feed_id, unread),
+            # Content area that gets replaced by HTMX - MUST be scrollable
+            Div(cls="flex-1 overflow-y-auto", id="main-content")(
                 FeedsContent(session_id, feed_id, unread, page)
             )
         ),
@@ -638,14 +766,21 @@ def show_item(item_id: int, request, unread_view: bool = False):
     """Get item detail and mark as read with mobile-responsive UI updates"""
     session_id = request.scope['session_id']
     
+    # Debug logging for mobile form bug tracing
+    hx_target = request.headers.get('HX-Target', '')
+    hx_request = request.headers.get('HX-Request', 'false')
+    print(f"🔍 MOBILE_FORM_BUG_DEBUG: show_item({item_id}) - target={hx_target}, htmx={hx_request}, session={session_id}")
+    
     # Get item before marking as read to check original status
     items_before = FeedItemModel.get_items_for_user(session_id)
     item_before = next((i for i in items_before if i['id'] == item_id), None)
     
     if not item_before:
+        print(f"🔍 MOBILE_FORM_BUG_DEBUG: show_item({item_id}) - item not found, returning empty detail view")
         return ItemDetailView(None, show_back=True)
     
     was_unread = not item_before.get('is_read', 0)
+    print(f"🔍 MOBILE_FORM_BUG_DEBUG: show_item({item_id}) - item '{item_before['title']}', was_unread={was_unread}")
     
     # Mark item as read
     UserItemModel.mark_read(session_id, item_id, True)
@@ -655,16 +790,19 @@ def show_item(item_id: int, request, unread_view: bool = False):
     item_after = next((i for i in items_after if i['id'] == item_id), None)
     
     # Check the target to determine mobile vs desktop  
-    hx_target = request.headers.get('HX-Target', '')
     is_mobile_request = hx_target in ['#main-content', 'main-content']
     is_desktop_request = hx_target in ['#desktop-item-detail', 'desktop-item-detail']
     
+    print(f"🔍 MOBILE_FORM_BUG_DEBUG: show_item({item_id}) - is_mobile={is_mobile_request}, is_desktop={is_desktop_request}")
     
     responses = []
     
     # Main response: Item detail view
     detail_view = ItemDetailView(item_after, show_back=is_mobile_request)
     responses.append(detail_view)
+    
+    print(f"🔍 MOBILE_FORM_BUG_DEBUG: show_item({item_id}) - returning ItemDetailView (mobile back button: {is_mobile_request})")
+    print(f"🔍 MOBILE_FORM_BUG_DEBUG: show_item({item_id}) - ⚠️  This REPLACES entire #main-content, losing search form!")
     
     # Update list item appearance if it was unread
     if was_unread and item_after:
@@ -716,13 +854,14 @@ def show_item(item_id: int, request, unread_view: bool = False):
                     Small(item_after.get('feed_title', 'Unknown Feed'), cls=TextPresets.muted_sm),
                     Time(human_time_diff(item_after.get('published')), cls='text-xs text-muted-foreground')
                 ),
-                # Summary (use full description, truncate only as fallback if too long)
+                # Summary with smart HTML truncation that preserves images
                 Div(
-                    NotStr(mistletoe.markdown(
-                        item_after.get('description') if item_after.get('description') and len(item_after.get('description', '')) <= 300 
-                        else (item_after.get('description', '')[:150] + '...' if item_after.get('description') else 'No summary available')
-                    )), 
-                    cls=TextPresets.muted_sm + ' mt-2'
+                    NotStr(
+                        smart_truncate_html(item_after.get('description', ''), max_length=300) 
+                        if item_after.get('description') 
+                        else 'No summary available'
+                    ), 
+                    cls='text-sm text-muted-foreground mt-2 prose prose-sm max-w-none'
                 ),
                 **updated_item_attrs
             )
@@ -737,6 +876,12 @@ def add_feed(request, new_feed_url: str = ""):
     url = new_feed_url.strip()
     print(f"DEBUG: add_feed called with URL='{url}'")
     
+    # Determine if request is from mobile or desktop based on target
+    hx_target = request.headers.get('HX-Target', '')
+    is_mobile_request = 'mobile-sidebar' in hx_target
+    
+    print(f"DEBUG: add_feed request from mobile: {is_mobile_request} (target: {hx_target})")
+    
     if not url:
         return Div("Please enter a URL", cls='text-red-500 p-4')
     
@@ -748,27 +893,84 @@ def add_feed(request, new_feed_url: str = ""):
         return Div(f"Already subscribed to: {existing_feed['title']}", 
                   cls='text-yellow-600 p-4')
     
-    parser = FeedParser()
-    result = parser.add_feed(url)
-    
-    if result['success']:
-        # Subscribe user to the new feed
+    try:
+        # FAST: Create feed record only (follow setup_default_feeds pattern)
+        if not FeedModel.feed_exists_by_url(url):
+            feed_id = FeedModel.create_feed(url, "Loading...")
+            print(f"DEBUG: Created feed record {feed_id} for {url}")
+        else:
+            # Feed exists, get the ID
+            with get_db() as conn:
+                feed_id = conn.execute("SELECT id FROM feeds WHERE url = ?", (url,)).fetchone()[0]
+            print(f"DEBUG: Feed already exists with ID {feed_id}")
+        
+        # Subscribe user to the feed
         try:
-            SessionModel.subscribe_to_feed(session_id, result['feed_id'])
-            
-            # Get feed details and return updated sidebar
-            feeds = FeedModel.get_user_feeds(session_id)
-            feed = next((f for f in feeds if f['id'] == result['feed_id']), None)
-            
-            if feed:
-                return FeedSidebarItem(feed)
+            SessionModel.subscribe_to_feed(session_id, feed_id)
+            print(f"SUCCESS: User subscribed to feed {feed_id}")
         except Exception as e:
-            # Log the actual error for debugging
-            print(f"ERROR: Feed subscription failed for {url}: {str(e)}")
-            return Div(f"Error subscribing to feed: {str(e)}", cls='text-red-500 p-4')
-    
-    return Div(f"Failed to add feed: {result.get('error', 'Unknown error')}", 
-              cls='text-red-500 p-4')
+            if "UNIQUE constraint failed" in str(e):
+                print(f"DEBUG: User already subscribed to feed {feed_id}")
+            else:
+                raise
+        
+        # Queue for background processing (content will be fetched asynchronously)
+        if queue_manager:
+            feed_data = {
+                'id': feed_id,
+                'url': url,
+                'title': 'Loading...',
+                'last_updated': None,
+                'etag': None,
+                'last_modified': None
+            }
+            import asyncio
+            asyncio.create_task(queue_manager.queue_user_feeds(session_id))
+            print(f"SUCCESS: Feed {feed_id} queued for background content extraction")
+        
+        # Return updated sidebar immediately with new feed (content loads in background)
+        if is_mobile_request:
+            # Mobile: return the complete mobile sidebar structure
+            return Div(
+                id="mobile-sidebar",
+                cls="fixed inset-0 z-50 lg:hidden"
+            )(
+                Div(
+                    cls="bg-black bg-opacity-50 absolute inset-0",
+                    onclick="document.getElementById('mobile-sidebar').setAttribute('hidden', 'true')"
+                ),
+                Div(cls="bg-background w-80 h-full overflow-y-auto relative z-10")(
+                    Div(cls="p-4 border-b")(
+                        DivFullySpaced(
+                            H3("RSS Reader"),
+                            Button(
+                                UkIcon('x'),
+                                cls="p-1 rounded hover:bg-secondary",
+                                onclick="document.getElementById('mobile-sidebar').setAttribute('hidden', 'true')"
+                            )
+                        )
+                    ),
+                    FeedsSidebar(session_id, for_mobile=True)
+                )
+            )
+        else:
+            # Desktop: return the full sidebar div with proper structure
+            return Div(id="sidebar", cls='col-span-1 h-screen overflow-y-auto border-r px-2')(
+                FeedsSidebar(session_id, for_mobile=False)
+            )
+        
+    except Exception as e:
+        print(f"ERROR: Exception in add_feed for {url}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        # Return proper sidebar structure even on error
+        if is_mobile_request:
+            return FeedsSidebar(session_id, for_mobile=True)
+        else:
+            return Div(id="sidebar", cls='col-span-1 h-screen overflow-y-auto border-r px-2')(
+                FeedsSidebar(session_id, for_mobile=False)
+            )
 
 @rt('/api/item/{item_id}/star')
 def star_item(item_id: int, request):
@@ -812,8 +1014,8 @@ def add_folder(request):
     if name:
         FolderModel.create_folder(session_id, name)
     
-    # Return updated sidebar
-    return FeedsSidebar(session_id)
+    # Return updated sidebar (this is for folder add, always from sidebar)
+    return FeedsSidebar(session_id, for_mobile=False)
 
 @rt('/api/update-status')
 def update_status():
