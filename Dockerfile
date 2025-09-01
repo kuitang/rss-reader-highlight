@@ -32,9 +32,5 @@ EXPOSE 8080
 # Initialize SQLite with WAL mode for better performance
 RUN sqlite3 /tmp/init.db "PRAGMA journal_mode=WAL; PRAGMA synchronous=1;" && rm /tmp/init.db
 
-# Make production script executable
-RUN chmod +x run_production.sh
-
-# Use gunicorn with multiple workers in production
-# Falls back to simple uvicorn if gunicorn fails
-CMD ["sh", "-c", "./run_production.sh || python app.py"]
+# Use single uvicorn process with integrated background worker
+CMD ["python", "app.py"]

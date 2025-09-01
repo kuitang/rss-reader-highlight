@@ -76,32 +76,20 @@ async def lifespan(app):
     """Handle app startup and shutdown with background worker"""
     print("FastHTML app starting up...")
     
-    # In production with multiple workers, disable background worker to avoid conflicts
-    # Background feed updates should be handled by a separate process in production
-    is_production = os.environ.get("PRODUCTION", "false").lower() == "true"
+    # Always initialize background worker in single process
+    await initialize_worker_system()
+    print("Background worker system initialized")
     
-    if not is_production:
-        # Startup: Initialize background worker
-        await initialize_worker_system()
-        print("Background worker system initialized")
-        
-        # Check if we need to add default feeds (first run)
-        if not FeedModel.get_feeds_to_update(max_age_minutes=9999):
-            print("Setting up default feeds via background worker...")
-            setup_default_feeds()  # This will be quick since worker handles the updates
-    else:
-        print("Background worker disabled in production mode")
-        # Still ensure default feeds exist (they'll be updated manually or via cron)
-        if not FeedModel.get_feeds_to_update(max_age_minutes=9999):
-            print("Setting up default feeds (no background worker)...")
-            setup_default_feeds()
+    # Check if we need to add default feeds (first run)
+    if not FeedModel.get_feeds_to_update(max_age_minutes=9999):
+        print("Setting up default feeds via background worker...")
+        setup_default_feeds()
     
     yield  # App is running
     
     # Shutdown: Clean up background worker
-    if not is_production:
-        print("Shutting down background worker...")
-        await shutdown_worker_system()
+    print("Shutting down background worker...")
+    await shutdown_worker_system()
     print("FastHTML app shutdown complete")
 
 # FastHTML app with session support and lifespan
@@ -863,20 +851,17 @@ if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8080))
     
-    # Check if we're in production mode (can be set via environment variable)
+    # Always use single uvicorn process with integrated background worker
+    # Check if we're in production mode
     is_production = os.environ.get("PRODUCTION", "false").lower() == "true"
     
     if is_production:
-        # Production: Use uvicorn directly with production settings
-        print(f"Starting production server on 0.0.0.0:{port}")
+        # Production: Single uvicorn process with integrated background worker
+        print(f"Starting server on 0.0.0.0:{port}")
         
-        # Note: For multiple workers in production, you should run with gunicorn:
-        # gunicorn app:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8080
-        
-        # Single-process uvicorn for simple deployments
         uvicorn.run(app, host="0.0.0.0", port=port, 
-                   log_level="info",  # Use "warning" or "error" for less verbosity
-                   access_log=False,  # Disable access logs (let nginx/reverse proxy handle it)
+                   log_level="info",
+                   access_log=True,   # Enable access logs for production monitoring
                    reload=False,      # Never reload in production
                    # Performance optimizations:
                    limit_concurrency=1000,  # Max concurrent connections
@@ -884,12 +869,9 @@ if __name__ == "__main__":
                    server_header=False,     # Don't send server header (security)
                    date_header=False)       # Don't send date header (slight performance gain)
     else:
-        # Development: Use serve() for auto-reload or uvicorn with reload=True
+        # Development: Use uvicorn with reload
         print(f"Starting development server on 0.0.0.0:{port}")
-        # Option 1: Use FastHTML's serve() - it uses uvicorn internally
-        # serve(port=port, reload=True, host="0.0.0.0")
         
-        # Option 2: Use uvicorn directly with reload (more control)
         uvicorn.run("app:app", host="0.0.0.0", port=port, 
                    reload=True,
                    log_level="info",

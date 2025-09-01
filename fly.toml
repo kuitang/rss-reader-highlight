@@ -38,5 +38,5 @@ primary_region = 'ewr'
 
 [vm]
   cpu_kind = 'shared'
-  cpus = 2  # Increased for multiple workers
-  memory_mb = 512  # Increased memory for 9 workers (~50MB each)
+  cpus = 1
+  memory_mb = 256
