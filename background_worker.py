@@ -4,11 +4,14 @@ Background worker system for RSS feed updates with domain rate limiting
 
 import asyncio
 import logging
+import os
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Dict, Set, Optional, Any
 import httpx
 from urllib.parse import urlparse
+import trafilatura
+from bs4 import BeautifulSoup
 
 from models import FeedModel
 from feed_parser import FeedParser
@@ -170,13 +173,18 @@ class FeedUpdateWorker:
             return {'updated': False, 'status': 0, 'error': str(e)}
     
     def _parse_feed_content(self, content: str, feed_id: int, etag: str, last_modified: str) -> Dict[str, Any]:
-        """Synchronous feed parsing (runs in thread pool)"""
+        """Synchronous feed parsing (runs in thread pool) - FULL EXTRACTION LOGIC"""
         import feedparser
+        import trafilatura
+        from bs4 import BeautifulSoup
         
         # Parse the feed content
         feed_data = feedparser.parse(content)
         
-        if not feed_data or feed_data.bozo:
+        if feed_data.bozo and hasattr(feed_data, 'bozo_exception'):
+            logger.warning(f"Feed parsing warning for feed {feed_id}: {feed_data.bozo_exception}")
+        
+        if not feed_data or not hasattr(feed_data, 'feed'):
             return {'updated': False, 'status': 0, 'error': 'Invalid feed format'}
         
         # Update feed metadata
@@ -191,51 +199,128 @@ class FeedUpdateWorker:
             last_modified=last_modified
         )
         
-        # Process feed items - simplified for background worker
+        # Process feed entries with FULL extraction logic
         items_added = 0
         if hasattr(feed_data, 'entries'):
             from models import FeedItemModel
             
             for entry in feed_data.entries:
                 try:
-                    # Extract basic item data
+                    # Extract item data
                     guid = getattr(entry, 'id', None) or getattr(entry, 'guid', None) or getattr(entry, 'link', None)
                     title = getattr(entry, 'title', 'Untitled')
                     link = getattr(entry, 'link', '')
                     
-                    if not (guid and title and link):
-                        continue
-                    
-                    # Simple description extraction for testing
+                    # Get description and content, sanitize HTML and convert to Markdown
                     description = None
+                    content = None
+                    
                     if hasattr(entry, 'summary') and entry.summary:
-                        description = entry.summary[:500]  # Simple truncation for testing
+                        # Convert HTML summary to clean Markdown
+                        logger.debug(f"Processing summary for entry: {title[:50]}...")
+                        logger.debug(f"Summary content type: {type(entry.summary)}")
+                        logger.debug(f"Summary length: {len(entry.summary) if entry.summary else 0}")
+                        logger.debug(f"Summary preview: {entry.summary[:200] if entry.summary else 'None'}...")
+                        
+                        # Extract images first using BeautifulSoup
+                        soup = BeautifulSoup(entry.summary, 'html.parser')
+                        images = []
+                        for img in soup.find_all('img'):
+                            src = img.get('src')
+                            alt = img.get('alt', '')
+                            if src:
+                                # Create markdown image syntax: ![alt text](url)
+                                images.append(f"![{alt}]({src})")
+                        
+                        # Extract text content with trafilatura
+                        wrapped_html = f"<html><body>{entry.summary}</body></html>"
+                        description = trafilatura.extract(wrapped_html, include_formatting=True, output_format='markdown')
+                        
+                        # Combine images and text
+                        if images and description:
+                            # Add images at the beginning of the description
+                            description = '\n'.join(images) + '\n\n' + description
+                        elif images and not description:
+                            # If only images, use them as description
+                            description = '\n'.join(images)
+                        elif not description:
+                            # No text or images - skip this item
+                            logger.warning(f"Skipping '{title}' - trafilatura couldn't extract content from: {entry.summary[:200]}")
+                            continue
+                    
+                    if hasattr(entry, 'content') and entry.content:
+                        # Take the first content entry
+                        content_entry = entry.content[0] if isinstance(entry.content, list) else entry.content
+                        raw_content = content_entry.value if hasattr(content_entry, 'value') else str(content_entry)
+                        
+                        # Convert HTML content to clean Markdown
+                        logger.debug(f"Processing content for entry: {title[:50]}...")
+                        logger.debug(f"Content type: {type(raw_content)}")
+                        logger.debug(f"Content length: {len(raw_content) if raw_content else 0}")
+                        logger.debug(f"Content preview: {raw_content[:200] if raw_content else 'None'}...")
+                        
+                        # Extract images first using BeautifulSoup
+                        soup = BeautifulSoup(raw_content, 'html.parser')
+                        images = []
+                        for img in soup.find_all('img'):
+                            src = img.get('src')
+                            alt = img.get('alt', '')
+                            if src:
+                                # Create markdown image syntax: ![alt text](url)
+                                images.append(f"![{alt}]({src})")
+                        
+                        # Extract text content with trafilatura
+                        wrapped_content = f"<html><body>{raw_content}</body></html>"
+                        content = trafilatura.extract(wrapped_content, include_formatting=True, output_format='markdown')
+                        
+                        # Combine images and text
+                        if images and content:
+                            # Add images at appropriate position (after first paragraph if exists)
+                            paragraphs = content.split('\n\n')
+                            if len(paragraphs) > 1:
+                                # Insert images after first paragraph
+                                content = paragraphs[0] + '\n\n' + '\n'.join(images) + '\n\n' + '\n\n'.join(paragraphs[1:])
+                            else:
+                                # Add images at the beginning
+                                content = '\n'.join(images) + '\n\n' + content
+                        elif images and not content:
+                            # If only images, use them as content
+                            content = '\n'.join(images)
+                        elif not content:
+                            # Log the failure - but if we have a description, continue with that
+                            logger.warning(f"Couldn't extract content for '{title}' - using description only")
+                            if not description:
+                                # No description either - skip this item entirely
+                                logger.error(f"Skipping '{title}' - no extractable content or description")
+                                continue
                     
                     # Parse published date
                     published = None
                     if hasattr(entry, 'published'):
-                        try:
-                            published = self.feed_parser.parse_date(entry.published)
-                        except:
-                            published = datetime.now()
+                        published = self.feed_parser.parse_date(entry.published)
+                    elif hasattr(entry, 'updated'):
+                        published = self.feed_parser.parse_date(entry.updated)
                     
-                    # Save to database (INSERT OR REPLACE handles duplicates)
-                    if description:
+                    # Only save items that have meaningful content
+                    if guid and title and link and (description or content):
                         FeedItemModel.create_item(
                             feed_id=feed_id,
                             guid=guid,
                             title=title,
                             link=link,
                             description=description,
-                            content=None,
+                            content=content,
                             published=published
                         )
                         items_added += 1
+                    else:
+                        logger.warning(f"Skipping item '{title}' - missing required fields or content")
                         
                 except Exception as e:
-                    logger.error(f"Error processing feed item: {e}")
+                    logger.error(f"Error processing entry for feed {feed_id}: {str(e)}")
                     continue
         
+        logger.info(f"Updated feed {feed_id}: {items_added} items added")
         return {
             'updated': True,
             'status': 200,
@@ -332,17 +417,32 @@ async def initialize_worker_system():
     """Initialize the global worker system"""
     global feed_worker, queue_manager
     
+    timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+    print(f"[{timestamp}] DEBUG: initialize_worker_system() called")
+    print(f"[{timestamp}] DEBUG: Before init - feed_worker: {feed_worker}, queue_manager: {queue_manager}")
+    
     if feed_worker is None:
+        print(f"[{timestamp}] DEBUG: Creating new worker and queue manager...")
         feed_worker = FeedUpdateWorker()
+        print(f"[{timestamp}] DEBUG: Created feed_worker: {feed_worker}")
+        
         queue_manager = FeedQueueManager(feed_worker)
+        print(f"[{timestamp}] DEBUG: Created queue_manager: {queue_manager}")
+        
         await feed_worker.start()
+        print(f"[{timestamp}] DEBUG: Worker started")
         
         # Queue all feeds initially for first startup
         all_feeds = FeedModel.get_feeds_to_update(max_age_minutes=60)  # Feeds older than 1 hour
+        print(f"[{timestamp}] DEBUG: Found {len(all_feeds)} feeds to queue")
+        
         for feed in all_feeds:
             await feed_worker.queue.put(feed)
         
-        logger.info(f"Worker system initialized, queued {len(all_feeds)} feeds")
+        print(f"[{timestamp}] DEBUG: After init - feed_worker: {feed_worker}, queue_manager: {queue_manager}")
+        logger.info(f"[{timestamp}] Worker system initialized, queued {len(all_feeds)} feeds (PIDs: main={os.getpid()})")
+    else:
+        print(f"[{timestamp}] DEBUG: Worker system already initialized")
 
 
 async def shutdown_worker_system():

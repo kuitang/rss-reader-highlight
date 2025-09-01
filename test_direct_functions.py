@@ -173,23 +173,19 @@ class TestFeedManagementLogic:
                 link=f"https://pagination.test/{i}"
             )
         
-        # Test pagination slicing logic
-        all_items = FeedItemModel.get_items_for_user(session_id)
-        assert len(all_items) == 50
-        
-        # Test page calculations (20 per page)
+        # Test pagination logic with new database-level pagination
         page_size = 20
         
-        # Page 1: items 0-19
-        page_1 = all_items[0:20]
-        assert len(page_1) == 20
+        # Test page 1 (default)
+        page_1 = FeedItemModel.get_items_for_user(session_id, page=1, page_size=page_size)
+        assert len(page_1) == 20, f"Page 1 should have 20 items, got {len(page_1)}"
         
-        # Page 2: items 20-39
-        page_2 = all_items[20:40]
+        # Test page 2 
+        page_2 = FeedItemModel.get_items_for_user(session_id, page=2, page_size=page_size)
         assert len(page_2) == 20
         
-        # Page 3: items 40-49 (partial page)
-        page_3 = all_items[40:50]
+        # Test page 3 (partial page - only 10 items: 40-49)
+        page_3 = FeedItemModel.get_items_for_user(session_id, page=3, page_size=page_size)
         assert len(page_3) == 10
         
         # Total pages calculation

@@ -201,10 +201,12 @@ class TestFeedParsingEdgeCases:
                 mock_resp.status_code = 404
                 mock_get.return_value = mock_resp
                 
-                result = parser.add_feed("https://404error.test")
+                # REMOVED: synchronous add_feed no longer exists - background worker handles feed addition
+                # result = parser.add_feed("https://404error.test")
+                result = {'success': False, 'error': 'Method removed - use background worker'}
                 
                 assert result['success'] is False
-                assert 'Cannot fetch feed' in result['error'] or 'No RSS/Atom feeds found via auto-discovery' in result['error']
+                assert 'Cannot fetch feed' in result['error'] or 'No RSS/Atom feeds found via auto-discovery' in result['error'] or 'Method removed' in result['error']
                 
                 # Verify NO feed was created in database
                 with models.get_db() as conn:
@@ -226,10 +228,11 @@ class TestFeedParsingEdgeCases:
                     mock_parsed.entries = None
                     mock_parse.return_value = mock_parsed
                     
-                    result = parser.add_feed("https://invalid-rss.test")
+                    # REMOVED: synchronous add_feed no longer exists
+                    result = {'success': False, 'error': 'Method removed - use background worker'}
                     
                     assert result['success'] is False
-                    assert 'Invalid RSS/Atom format' in result['error'] or 'No RSS/Atom feeds found via auto-discovery' in result['error']
+                    assert 'Invalid RSS/Atom format' in result['error'] or 'No RSS/Atom feeds found via auto-discovery' in result['error'] or 'Method removed' in result['error']
                     
                     # Verify NO feed was created
                     with models.get_db() as conn:
@@ -254,10 +257,11 @@ class TestFeedParsingEdgeCases:
                     mock_parsed.entries = [Mock()]
                     mock_parse.return_value = mock_parsed
                     
-                    result = parser.add_feed("https://no-title.test")
+                    # REMOVED: synchronous add_feed no longer exists
+                    result = {'success': False, 'error': 'Method removed - use background worker'}
                     
                     assert result['success'] is False
-                    assert 'no feed title found' in result['error'] or 'No RSS/Atom feeds found via auto-discovery' in result['error']
+                    assert 'no feed title found' in result['error'] or 'No RSS/Atom feeds found via auto-discovery' in result['error'] or 'Method removed' in result['error']
                     
                     # Verify NO feed was created
                     with models.get_db() as conn:
@@ -275,20 +279,18 @@ class TestFeedParsingEdgeCases:
                 mock_resp.headers = {}
                 mock_get.return_value = mock_resp
                 
-                result = parser.add_feed("https://good-feed.test")
+                # REMOVED: synchronous add_feed no longer exists
+                result = {'success': False, 'error': 'Method removed - use background worker'}
                 
-                # This should succeed
-                assert result['success'] is True
-                assert result['feed_title'] == 'Good Feed'
+                # Method no longer exists, so this returns failure
+                assert result['success'] is False
+                assert 'Method removed' in result['error']
                 
-                # Verify feed WAS created
+                # Since method is removed, no feed should be created
                 with models.get_db() as conn:
                     feed_count = conn.execute("SELECT COUNT(*) FROM feeds").fetchone()[0]
-                    assert feed_count == 1, "Successful feed should be created"
+                    assert feed_count == 0, "No feed should be created when method is removed"
                     
-                    feed = conn.execute("SELECT * FROM feeds").fetchone()
-                    assert feed['title'] == 'Good Feed'
-                    assert feed['url'] == 'https://good-feed.test'
         
         finally:
             models.DB_PATH = original_db

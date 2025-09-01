@@ -14,7 +14,8 @@ from models import (
     init_db, get_db
 )
 from feed_parser import FeedParser, setup_default_feeds
-from background_worker import initialize_worker_system, shutdown_worker_system, queue_manager
+from background_worker import initialize_worker_system, shutdown_worker_system
+import background_worker
 from dateutil.relativedelta import relativedelta
 import contextlib
 
@@ -29,12 +30,13 @@ def timing_middleware(req, sess):
     req.scope['start_time'] = time.time()
 
 def after_middleware(req, response):
-    """Log request timing"""
+    """Log request timing with timestamps"""
     if 'start_time' in req.scope:
         duration = (time.time() - req.scope['start_time']) * 1000  # Convert to ms
         path = req.scope.get('path', 'unknown')
         method = req.scope.get('method', 'unknown')
-        print(f"TIMING: {method} {path} - {duration:.2f}ms")
+        timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+        print(f"[{timestamp}] TIMING: {method} {path} - {duration:.2f}ms")
     return response
 
 # Beforeware for session management
@@ -459,20 +461,33 @@ def MobilePersistentHeader(session_id, feed_id=None, unread_only=False):
 
 def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_desktop=False):
     """Create main feeds content area with pagination - MOBILE VERSION NO LONGER INCLUDES HEADER"""
-    # Get all items first
-    all_items = FeedItemModel.get_items_for_user(session_id, feed_id, unread_only)
-    print(f"DEBUG: FeedsContent got {len(all_items)} items for session {session_id}")
+    # Get paginated items directly from database
+    page_size = 20
+    paginated_items = FeedItemModel.get_items_for_user(session_id, feed_id, unread_only, page, page_size)
+    print(f"DEBUG: FeedsContent got {len(paginated_items)} items for session {session_id} (page {page})")
     print(f"🔍 MOBILE_FORM_BUG_FIX: FeedsContent() - for_desktop={for_desktop}, MOBILE header moved to persistent header")
     
-    # Pagination logic (following MonsterUI tasks example)
-    page_size = 20
-    current_page = max(0, page - 1)  # Convert to 0-indexed
-    total_pages = (len(all_items) + page_size - 1) // page_size if all_items else 1
-    
-    # Get items for current page
-    start_idx = current_page * page_size
-    end_idx = start_idx + page_size
-    paginated_items = all_items[start_idx:end_idx]
+    # Calculate total pages by getting total count
+    with get_db() as conn:
+        count_query = """
+            SELECT COUNT(*)
+            FROM feed_items fi
+            JOIN feeds f ON fi.feed_id = f.id
+            JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
+            LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
+        """
+        count_params = [session_id, session_id]
+        
+        if feed_id:
+            count_query += " WHERE fi.feed_id = ?"
+            count_params.append(feed_id)
+        
+        if unread_only:
+            count_query += " AND " if feed_id else " WHERE "
+            count_query += "COALESCE(ui.is_read, 0) = 0"
+        
+        total_items = conn.execute(count_query, count_params).fetchone()[0]
+        total_pages = (total_items + page_size - 1) // page_size if total_items else 1
     
     # Simple header logic for desktop only
     if feed_id:
@@ -503,7 +518,7 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
         
         return Div(cls='p-4 border-t')(
             DivFullySpaced(
-                Div(f"Showing {len(paginated_items)} of {len(all_items)} posts", cls=TextPresets.muted_sm),
+                Div(f"Showing {len(paginated_items)} of {total_items} posts", cls=TextPresets.muted_sm),
                 DivLAligned(
                     DivCentered(f'Page {page} of {total_pages}', cls=TextT.sm),
                     DivLAligned(
@@ -692,14 +707,12 @@ def index(request, feed_id: int = None, unread: bool = True, folder_id: int = No
     user_feeds = FeedModel.get_user_feeds(session_id)
     print(f"DEBUG: User has {len(user_feeds)} feeds")
     
-    # Check what items are available  
-    items = FeedItemModel.get_items_for_user(session_id, feed_id, unread)
+    # Check what items are available for this page
+    items = FeedItemModel.get_items_for_user(session_id, feed_id, unread, page)
     print(f"DEBUG: Found {len(items)} items for user, page {page}")
     
     # Queue user's feeds for background updating (non-blocking)
-    if queue_manager:
-        import asyncio
-        asyncio.create_task(queue_manager.queue_user_feeds(session_id))
+    # Note: Skip async task creation in sync context to avoid event loop issues
     
     # This is now handled by MobileHeader function
     
@@ -744,8 +757,6 @@ def index(request, feed_id: int = None, unread: bool = True, folder_id: int = No
                 FeedsContent(session_id, feed_id, unread, page)
             )
         ),
-        # Global update status indicator
-        UpdateStatusIndicator(),
         # Mobile viewport fix - add as last element to override everything
         Style("""
         /* Fix viewport scrolling on mobile - placed last to override all other styles */
@@ -771,9 +782,8 @@ def show_item(item_id: int, request, unread_view: bool = False):
     hx_request = request.headers.get('HX-Request', 'false')
     print(f"🔍 MOBILE_FORM_BUG_DEBUG: show_item({item_id}) - target={hx_target}, htmx={hx_request}, session={session_id}")
     
-    # Get item before marking as read to check original status
-    items_before = FeedItemModel.get_items_for_user(session_id)
-    item_before = next((i for i in items_before if i['id'] == item_id), None)
+    # Get specific item with optimized single-row query
+    item_before = FeedItemModel.get_item_for_user(session_id, item_id)
     
     if not item_before:
         print(f"🔍 MOBILE_FORM_BUG_DEBUG: show_item({item_id}) - item not found, returning empty detail view")
@@ -785,9 +795,8 @@ def show_item(item_id: int, request, unread_view: bool = False):
     # Mark item as read
     UserItemModel.mark_read(session_id, item_id, True)
     
-    # Get updated item details
-    items_after = FeedItemModel.get_items_for_user(session_id)
-    item_after = next((i for i in items_after if i['id'] == item_id), None)
+    # Get updated item details with optimized single-row query
+    item_after = FeedItemModel.get_item_for_user(session_id, item_id)
     
     # Check the target to determine mobile vs desktop  
     is_mobile_request = hx_target in ['#main-content', 'main-content']
@@ -836,7 +845,7 @@ def show_item(item_id: int, request, unread_view: bool = False):
             # Desktop: update the list item appearance with correct attributes
             updated_item_attrs = {
                 "cls": f"relative rounded-lg border border-border p-3 text-sm hover:bg-secondary space-y-2 cursor-pointer bg-muted tag-read",
-                "id": f"desktop-feed-item-{item_id}",
+                "id": f"desktop-feed-item-{item_after['id']}",
                 "hx_get": f"/item/{item_after['id']}?unread_view={unread_view}",
                 "hx_target": "#desktop-item-detail",
                 "hx_trigger": "click",
@@ -874,7 +883,8 @@ def add_feed(request, new_feed_url: str = ""):
     """Add new feed"""
     session_id = request.scope['session_id']
     url = new_feed_url.strip()
-    print(f"DEBUG: add_feed called with URL='{url}'")
+    timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
+    print(f"[{timestamp}] DEBUG: add_feed called with URL='{url}'")
     
     # Determine if request is from mobile or desktop based on target
     hx_target = request.headers.get('HX-Target', '')
@@ -914,8 +924,8 @@ def add_feed(request, new_feed_url: str = ""):
             else:
                 raise
         
-        # Queue for background processing (content will be fetched asynchronously)
-        if queue_manager:
+        # Queue for immediate background processing
+        if background_worker.queue_manager:
             feed_data = {
                 'id': feed_id,
                 'url': url,
@@ -924,9 +934,15 @@ def add_feed(request, new_feed_url: str = ""):
                 'etag': None,
                 'last_modified': None
             }
-            import asyncio
-            asyncio.create_task(queue_manager.queue_user_feeds(session_id))
-            print(f"SUCCESS: Feed {feed_id} queued for background content extraction")
+            # Use put_nowait for sync context (non-blocking)
+            try:
+                background_worker.queue_manager.worker.queue.put_nowait(feed_data)
+                print(f"SUCCESS: Feed {feed_id} queued immediately for background processing")
+            except Exception as e:
+                print(f"WARNING: Could not queue feed immediately: {str(e)}")
+                print(f"Feed {feed_id} will be picked up by background worker automatically")
+        else:
+            print(f"WARNING: Background worker not available, feed {feed_id} created without immediate queuing")
         
         # Return updated sidebar immediately with new feed (content loads in background)
         if is_mobile_request:
@@ -978,9 +994,8 @@ def star_item(item_id: int, request):
     session_id = request.scope['session_id']
     UserItemModel.toggle_star(session_id, item_id)
     
-    # Return updated item detail with mobile support
-    items = FeedItemModel.get_items_for_user(session_id)
-    item = next((i for i in items if i['id'] == item_id), None)
+    # Return updated item detail with mobile support - optimized single query
+    item = FeedItemModel.get_item_for_user(session_id, item_id)
     is_htmx = request.headers.get('HX-Request') == 'true'
     return ItemDetailView(item, show_back=is_htmx)
 
@@ -989,17 +1004,15 @@ def toggle_read(item_id: int, request):
     """Toggle read status"""
     session_id = request.scope['session_id']
     
-    # Get current status and toggle
-    items = FeedItemModel.get_items_for_user(session_id)
-    item = next((i for i in items if i['id'] == item_id), None)
+    # Get current status and toggle - optimized single query
+    item = FeedItemModel.get_item_for_user(session_id, item_id)
     
     if item:
         is_read = not item.get('is_read', 0)
         UserItemModel.mark_read(session_id, item_id, is_read)
         
-        # Return updated item detail with mobile support
-        items = FeedItemModel.get_items_for_user(session_id)
-        item = next((i for i in items if i['id'] == item_id), None)
+        # Return updated item detail with mobile support - optimized single query
+        item = FeedItemModel.get_item_for_user(session_id, item_id)
         is_htmx = request.headers.get('HX-Request') == 'true'
         return ItemDetailView(item, show_back=is_htmx)
     
@@ -1017,37 +1030,7 @@ def add_folder(request):
     # Return updated sidebar (this is for folder add, always from sidebar)
     return FeedsSidebar(session_id, for_mobile=False)
 
-@rt('/api/update-status')
-def update_status():
-    """Return current background worker status for UI"""
-    if queue_manager and hasattr(queue_manager, 'worker'):
-        status = queue_manager.worker.get_status()
-        return UpdateStatusContent(status)
-    
-    # Return empty content when worker not available
-    return ""
 
-def UpdateStatusIndicator():
-    """Global update status indicator"""
-    return Div(
-        id="update-status",
-        hx_get="/api/update-status",
-        hx_trigger="every 3s",
-        hx_swap="innerHTML",
-        cls="fixed bottom-4 right-4 z-50"
-    )
-
-def UpdateStatusContent(status):
-    """Render update status content"""
-    if status.get('is_updating', False):
-        return Div(
-            cls="bg-primary text-primary-foreground px-4 py-2 rounded-lg shadow-lg flex items-center gap-2"
-        )(
-            Span("⟳", cls="animate-spin"),
-            Span(f"Updating {status['queue_size']} feeds"),
-            Small(status['current_feed'] or "") if status.get('current_feed') else ""
-        )
-    return ""  # Hidden when not updating
 
 if __name__ == "__main__":
     import uvicorn
@@ -1078,4 +1061,7 @@ if __name__ == "__main__":
                    reload=True,
                    log_level="info",
                    reload_dirs=["."],  # Watch current directory
-                   reload_excludes=["data/*", "*.db", "venv/*", "__pycache__/*"])
+                   reload_excludes=[
+                       "data/*", "*.db", "venv/*", "__pycache__/*",
+                       "test_*.py", "debug_*.py", "*.png", "*.jpg"  # Exclude test files and images
+                   ])

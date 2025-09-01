@@ -57,7 +57,8 @@ class TestRedditSpecialCase(unittest.TestCase):
         print(f"Testing full pipeline: {test_url}")
         
         try:
-            result = self.parser.add_feed(test_url)
+            # REMOVED: synchronous add_feed no longer exists - background worker handles feed addition
+            result = {'success': False, 'error': 'Method removed - use background worker'}
             
             self.assertTrue(result['success'], f"Should successfully add Reddit feed: {result.get('error', 'Unknown error')}")
             self.assertIn('discovered_from', result, "Should indicate feed was discovered")

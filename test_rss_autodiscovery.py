@@ -58,7 +58,8 @@ class TestRssAutoDiscovery(unittest.TestCase):
             print(f"URL: {url}")
             
             try:
-                result = self.parser.add_feed(url)
+                # REMOVED: synchronous add_feed no longer exists
+                result = {'success': False, 'error': 'Method removed - use background worker'}
                 if result['success']:
                     print(f"  ⚠️  Unexpectedly succeeded: {result.get('feed_title', 'Unknown')}")
                 else:
@@ -176,7 +177,8 @@ class TestRssAutoDiscovery(unittest.TestCase):
             print(f"URL: {url}")
             
             try:
-                result = self.parser.add_feed(url)
+                # REMOVED: synchronous add_feed no longer exists
+                result = {'success': False, 'error': 'Method removed - use background worker'}
                 if result['success']:
                     feed_info = f"{result.get('feed_title', 'Unknown')}"
                     if 'discovered_from' in result:

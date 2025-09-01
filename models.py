@@ -156,6 +156,77 @@ class FeedModel:
                 WHERE uf.session_id = ?
                 ORDER BY f.title
             """, (session_id,)).fetchall()]
+    
+    @staticmethod
+    def feed_exists_by_url(url: str) -> bool:
+        """Check if a feed with the given URL already exists"""
+        with get_db() as conn:
+            result = conn.execute("SELECT 1 FROM feeds WHERE url = ? LIMIT 1", (url,)).fetchone()
+            return result is not None
+    
+    @staticmethod
+    def cleanup_duplicate_feeds() -> Dict[str, int]:
+        """Clean up duplicate feeds by URL, keeping the one with most recent update"""
+        with get_db() as conn:
+            # Find all URLs that have duplicates
+            duplicate_urls = conn.execute("""
+                SELECT url, COUNT(*) as count
+                FROM feeds 
+                GROUP BY url 
+                HAVING count > 1
+            """).fetchall()
+            
+            feeds_removed = 0
+            subscriptions_migrated = 0
+            
+            for url_row in duplicate_urls:
+                url = url_row[0]
+                
+                # Get all feeds for this URL, ordered by last_updated (most recent first, NULLs last)
+                duplicate_feeds = conn.execute("""
+                    SELECT id, url, title, last_updated
+                    FROM feeds 
+                    WHERE url = ?
+                    ORDER BY 
+                        CASE WHEN last_updated IS NULL THEN 1 ELSE 0 END,
+                        last_updated DESC
+                """, (url,)).fetchall()
+                
+                if len(duplicate_feeds) <= 1:
+                    continue
+                    
+                # Keep the first one (most recent), remove the rest
+                keep_feed_id = duplicate_feeds[0][0]
+                remove_feed_ids = [feed[0] for feed in duplicate_feeds[1:]]
+                
+                # Migrate user subscriptions from feeds being removed to the kept feed
+                for remove_id in remove_feed_ids:
+                    # Get all user subscriptions to the feed being removed
+                    subscriptions = conn.execute("""
+                        SELECT session_id FROM user_feeds WHERE feed_id = ?
+                    """, (remove_id,)).fetchall()
+                    
+                    for sub in subscriptions:
+                        session_id = sub[0]
+                        # Move subscription to kept feed (ignore if already exists)
+                        conn.execute("""
+                            INSERT OR IGNORE INTO user_feeds (session_id, feed_id) 
+                            VALUES (?, ?)
+                        """, (session_id, keep_feed_id))
+                        subscriptions_migrated += 1
+                    
+                    # Remove the old user subscriptions
+                    conn.execute("DELETE FROM user_feeds WHERE feed_id = ?", (remove_id,))
+                    
+                    # Remove the duplicate feed (CASCADE will handle feed_items)
+                    conn.execute("DELETE FROM feeds WHERE id = ?", (remove_id,))
+                    feeds_removed += 1
+            
+            return {
+                'duplicate_urls_found': len(duplicate_urls),
+                'feeds_removed': feeds_removed,
+                'subscriptions_migrated': subscriptions_migrated
+            }
 
 class FeedItemModel:
     @staticmethod
@@ -172,8 +243,8 @@ class FeedItemModel:
             return cursor.lastrowid
     
     @staticmethod
-    def get_items_for_user(session_id: str, feed_id: int = None, unread_only: bool = False) -> List[Dict]:
-        """Get feed items for user with read status"""
+    def get_items_for_user(session_id: str, feed_id: int = None, unread_only: bool = False, page: int = 1, page_size: int = 20) -> List[Dict]:
+        """Get feed items for user with read status - optimized with configurable limit"""
         query = """
             SELECT fi.*, f.title as feed_title, 
                    COALESCE(ui.is_read, 0) as is_read,
@@ -196,10 +267,30 @@ class FeedItemModel:
             query += " AND " if feed_id else " WHERE "
             query += "COALESCE(ui.is_read, 0) = 0"
         
-        query += " ORDER BY fi.published DESC LIMIT 100"
+        offset = (page - 1) * page_size
+        query += f" ORDER BY fi.published DESC LIMIT {page_size} OFFSET {offset}"
         
         with get_db() as conn:
             return [dict(row) for row in conn.execute(query, params).fetchall()]
+    
+    @staticmethod
+    def get_item_for_user(session_id: str, item_id: int) -> Dict:
+        """Get single feed item for user with read status - optimized single-row query"""
+        with get_db() as conn:
+            result = conn.execute("""
+                SELECT fi.*, f.title as feed_title, 
+                       COALESCE(ui.is_read, 0) as is_read,
+                       COALESCE(ui.starred, 0) as starred,
+                       fo.name as folder_name
+                FROM feed_items fi
+                JOIN feeds f ON fi.feed_id = f.id
+                JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
+                LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
+                LEFT JOIN folders fo ON ui.folder_id = fo.id
+                WHERE fi.id = ?
+            """, (session_id, session_id, item_id)).fetchone()
+            
+            return dict(result) if result else None
 
 class SessionModel:
     @staticmethod
