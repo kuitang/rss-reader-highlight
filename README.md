@@ -81,7 +81,7 @@ python app.py
 ```
 
 3. **Open browser**:
-   - Navigate to `http://localhost:5001`
+   - Navigate to `http://localhost:8080`
    - The app will automatically set up default feeds on first run
 
 ### Development Setup
@@ -100,15 +100,15 @@ python clear_db.py
 
 3. **Run comprehensive tests**:
 ```bash
-# Quick integration tests
-python -m pytest test_comprehensive_integration.py -v
+# Quick core logic tests
+python -m pytest tests/test_optimized_integration.py tests/test_essential_mocks.py tests/test_direct_functions.py -v
 
 # Full test suite with coverage
-coverage run --source=. -m pytest test_comprehensive_*.py -v
+coverage run --source=. -m pytest tests/ -v
 coverage report --show-missing
 
-# E2E browser tests
-python -m pytest test_comprehensive_e2e.py -v
+# UI flow tests (requires running server: python app.py)
+python -m pytest tests/test_critical_ui_flows.py -v
 ```
 
 ### Fresh Installation Workflow
@@ -127,7 +127,7 @@ python clear_db.py  # Choose 'y' to confirm
 # 3. Start application
 python app.py
 
-# 4. Open http://localhost:5001
+# 4. Open http://localhost:8080
 # Default feeds (Hacker News, Reddit, WSJ) will auto-load
 # First visitor automatically subscribed to all feeds
 ```
@@ -227,13 +227,16 @@ Our testing strategy focuses on **complex workflows that broke during developmen
 
 #### **Quick Development Tests**
 ```bash
-# Core logic tests (fast, always work) - ✅ 20 PASSING TESTS
+# Core logic tests (fast, always work) - ✅ 21+ PASSING TESTS
 source venv/bin/activate
-python -m pytest test_optimized_integration.py test_essential_mocks.py test_direct_functions.py -v
+python -m pytest tests/test_optimized_integration.py tests/test_essential_mocks.py tests/test_direct_functions.py -v
+
+# Feed ingestion tests (Reddit, RSS autodiscovery)
+python -m pytest tests/test_feed_ingestion.py -v
 
 # Manual UI verification (requires browser + running server) 
 python app.py  # Start server in separate terminal
-python -m pytest test_critical_ui_flows.py::TestFormParameterBugFlow -v
+python -m pytest tests/test_critical_ui_flows.py::TestFormParameterBugFlow -v
 ```
 
 #### **Full Test Suite**
@@ -241,14 +244,14 @@ python -m pytest test_critical_ui_flows.py::TestFormParameterBugFlow -v
 # Complete optimized test suite
 source venv/bin/activate
 
-# All integration tests
-python -m pytest test_optimized_integration.py test_essential_mocks.py -v
+# All unit/integration tests (no server required)
+python -m pytest tests/test_optimized_integration.py tests/test_essential_mocks.py tests/test_direct_functions.py tests/test_feed_ingestion.py -v
 
-# All UI flow tests (requires browser setup time)
-python -m pytest test_critical_ui_flows.py -v
+# All UI flow tests (requires running server: python app.py)
+python -m pytest tests/test_critical_ui_flows.py tests/test_add_feed_flows.py tests/test_mobile_flows.py -v
 
 # Everything with coverage
-coverage run --source=. -m pytest test_optimized_integration.py test_essential_mocks.py -v
+coverage run --source=. -m pytest tests/ -v
 coverage report --show-missing
 ```
 
@@ -258,22 +261,16 @@ coverage report --show-missing
 source venv/bin/activate
 
 # Form and BBC redirect bugs
-python -m pytest test_critical_ui_flows.py::TestFormParameterBugFlow test_critical_ui_flows.py::TestBBCRedirectHandlingFlow -v
+python -m pytest tests/test_critical_ui_flows.py::TestFormParameterBugFlow tests/test_critical_ui_flows.py::TestBBCRedirectHandlingFlow -v
 
 # Blue indicator and HTMX updates
-python -m pytest test_critical_ui_flows.py::TestBlueIndicatorHTMXFlow -v
+python -m pytest tests/test_critical_ui_flows.py::TestBlueIndicatorHTMXFlow -v
 
-# Session and auto-subscription 
-python -m pytest test_critical_ui_flows.py::TestSessionAndSubscriptionFlow -v
+# Mobile and add feed flows
+python -m pytest tests/test_mobile_flows.py tests/test_add_feed_flows.py -v
 
 # Error handling scenarios
-python -m pytest test_essential_mocks.py::TestNetworkErrorScenarios -v
-```
-
-#### **Network Tests** (Optional)
-```bash
-# Test with real RSS feeds (requires internet)
-NETWORK_TESTS=1 python -m pytest test_comprehensive_integration.py::TestRealWorldScenarios -v
+python -m pytest tests/test_essential_mocks.py::TestNetworkErrorScenarios -v
 ```
 
 ### Database Management

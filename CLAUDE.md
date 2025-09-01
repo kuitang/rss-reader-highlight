@@ -29,25 +29,38 @@ python clear_db.py
 #### Quick Development Tests (Fast, Core Logic)
 ```bash
 # Run core logic tests - always work, no browser needed
-python -m pytest test_optimized_integration.py test_essential_mocks.py test_direct_functions.py -v
+python -m pytest tests/test_optimized_integration.py tests/test_essential_mocks.py tests/test_direct_functions.py -v
 
 # Single test for quick feedback
-python -m pytest test_direct_functions.py::test_session_and_feed_workflow -v
+python -m pytest tests/test_direct_functions.py::test_session_and_feed_workflow -v
+
+# Test feed ingestion (Reddit, RSS autodiscovery, parsing)
+python -m pytest tests/test_feed_ingestion.py -v
 ```
 
 #### UI Flow Tests (Require Running Server)
 ```bash
 # Start server first in separate terminal: python app.py
 # Then run UI tests targeting specific bugs we debugged
-python -m pytest test_critical_ui_flows.py::TestFormParameterBugFlow -v
-python -m pytest test_critical_ui_flows.py::TestBBCRedirectHandlingFlow -v
-python -m pytest test_critical_ui_flows.py::TestBlueIndicatorHTMXFlow -v
+python -m pytest tests/test_critical_ui_flows.py::TestFormParameterBugFlow -v
+python -m pytest tests/test_critical_ui_flows.py::TestBBCRedirectHandlingFlow -v
+python -m pytest tests/test_critical_ui_flows.py::TestBlueIndicatorHTMXFlow -v
+
+# Test add feed flows (mobile + desktop)
+python -m pytest tests/test_add_feed_flows.py -v
+
+# Test mobile-specific flows (navigation, forms, scrolling, URL sharing)
+python -m pytest tests/test_mobile_flows.py -v
 ```
 
 #### Test Coverage
 ```bash
 # Run with coverage reporting
-coverage run --source=. -m pytest test_optimized_integration.py test_essential_mocks.py -v
+coverage run --source=. -m pytest tests/test_optimized_integration.py tests/test_essential_mocks.py -v
+coverage report --show-missing
+
+# Full test suite coverage
+coverage run --source=. -m pytest tests/ -v
 coverage report --show-missing
 ```
 
@@ -62,6 +75,15 @@ sqlite3 data/rss.db
 SELECT * FROM feeds;
 SELECT COUNT(*) FROM feed_items;
 ```
+
+## Framework Documentation
+
+### FastHTML and MonsterUI LLM Context Files
+The following framework documentation files are included in this project for reference:
+- **`fasthtml-llm.txt`**: Complete FastHTML framework documentation and API reference
+- **`monsterui-llm.txt`**: MonsterUI component library documentation and examples
+
+These files provide comprehensive information about the frameworks used in this application.
 
 ## Architecture
 
@@ -121,24 +143,30 @@ Tests focus on **complex workflows that broke during development**, not trivial 
 
 ### Test Categories
 
-#### Critical UI Flow Tests (`test_critical_ui_flows.py`) 
-**622 lines, 16 tests** - Playwright automation targeting exact bugs we debugged:
+#### Critical UI Flow Tests (`tests/test_critical_ui_flows.py`) 
+**Comprehensive Playwright automation** targeting exact bugs we debugged:
 - Form parameter mapping issues
 - BBC redirect handling (302 → `follow_redirects=True`)
 - Blue indicator HTMX updates (click article → dot disappears)
 - Unread view behavior (click article → item disappears from list)
 - Session auto-subscription flow
 - Full viewport height utilization
+- **Updated selectors** to match current app.py implementation
 
-#### HTTP Integration Tests (`test_optimized_integration.py`)
-**236 lines, 5 tests** - Black-box server testing:
+#### Consolidated Feature Tests
+- **`tests/test_add_feed_flows.py`** - Mobile + desktop add feed functionality, duplicate handling
+- **`tests/test_mobile_flows.py`** - Navigation, form persistence, scrolling, URL sharing
+- **`tests/test_feed_ingestion.py`** - Reddit special cases, RSS autodiscovery, format parsing
+
+#### HTTP Integration Tests (`tests/test_optimized_integration.py`)
+**Black-box server testing**:
 - Fresh start workflow (empty DB → feed setup → session creation)
 - API endpoint verification with proper HTTP semantics
 - Session persistence across requests
 - Form processing and response validation
 
-#### Essential Mock Tests (`test_essential_mocks.py`)
-**240 lines, 8 tests** - Dangerous scenarios other tests cannot safely cover:
+#### Essential Mock Tests (`tests/test_essential_mocks.py`)
+**Dangerous scenarios** other tests cannot safely cover:
 - Network error simulation (timeouts, HTTP errors)
 - Database constraint violations
 - Malformed RSS/XML handling
@@ -149,13 +177,13 @@ Tests focus on **complex workflows that broke during development**, not trivial 
 #### Before Making Changes
 ```bash
 # Run quick core logic tests
-python -m pytest test_optimized_integration.py test_essential_mocks.py test_direct_functions.py -v
+python -m pytest tests/test_optimized_integration.py tests/test_essential_mocks.py tests/test_direct_functions.py -v
 ```
 
 #### After Major Changes
 ```bash
 # Full coverage verification
-coverage run --source=. -m pytest test_optimized_integration.py test_essential_mocks.py -v
+coverage run --source=. -m pytest tests/test_optimized_integration.py tests/test_essential_mocks.py -v
 coverage report --show-missing
 ```
 
@@ -163,7 +191,7 @@ coverage report --show-missing
 ```bash
 # Start server: python app.py
 # Test specific UI flows
-python -m pytest test_critical_ui_flows.py -v
+python -m pytest tests/test_critical_ui_flows.py -v
 ```
 
 ## Database Schema

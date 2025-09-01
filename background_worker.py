@@ -2,9 +2,13 @@
 Background worker system for RSS feed updates with domain rate limiting
 """
 
-import asyncio
+import threading
+import queue
+import time
 import logging
 import os
+import gc
+import psutil
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Dict, Set, Optional, Any
@@ -26,11 +30,11 @@ class DomainRateLimiter:
         self.max_requests = max_requests
         self.per_seconds = per_seconds
         self.requests = []
-        self.lock = asyncio.Lock()
+        self.lock = threading.Lock()
     
-    async def acquire(self):
+    def acquire(self):
         """Wait if necessary to respect rate limit for this domain"""
-        async with self.lock:
+        with self.lock:
             now = datetime.now()
             
             # Remove old requests outside the time window
@@ -45,7 +49,7 @@ class DomainRateLimiter:
                 
                 if sleep_time > 0:
                     logger.debug(f"Rate limiting: sleeping {sleep_time:.2f}s")
-                    await asyncio.sleep(sleep_time)
+                    time.sleep(sleep_time)
                 
                 # Clean up old requests again after sleeping
                 now = datetime.now()
@@ -56,58 +60,161 @@ class DomainRateLimiter:
             self.requests.append(now)
 
 
-class FeedUpdateWorker:
+class MemoryMonitor:
+    """Memory usage tracking for leak detection"""
+    
+    def __init__(self, memory_limit_mb: int = 256):
+        self.memory_limit_mb = memory_limit_mb
+        self.baseline_mb = None
+        self.memory_samples = []  # Circular buffer for last 24h
+        self.feed_processing_stats = []  # Per-feed memory costs
+        self.feeds_processed_today = 0
+        self.peak_memory_mb = 0
+        self.peak_memory_time = None
+        self.last_gc_time = None
+        self.last_gc_collected = 0
+        
+    def record_memory_sample(self, memory_mb: float, context: str = ""):
+        """Record a memory sample with timestamp"""
+        now = datetime.now()
+        sample = {
+            'time': now,
+            'memory_mb': memory_mb,
+            'context': context
+        }
+        
+        self.memory_samples.append(sample)
+        
+        # Keep only last 24 hours of samples
+        cutoff = now - timedelta(hours=24)
+        self.memory_samples = [s for s in self.memory_samples if s['time'] > cutoff]
+        
+        # Update peak memory
+        if memory_mb > self.peak_memory_mb:
+            self.peak_memory_mb = memory_mb
+            self.peak_memory_time = now
+    
+    def record_feed_processing(self, feed_title: str, memory_before: float, memory_after: float, content_size_kb: float):
+        """Record memory cost of processing a specific feed"""
+        memory_delta = memory_after - memory_before
+        
+        self.feed_processing_stats.append({
+            'time': datetime.now(),
+            'feed_title': feed_title,
+            'memory_before_mb': memory_before,
+            'memory_after_mb': memory_after,
+            'memory_delta_mb': memory_delta,
+            'content_size_kb': content_size_kb
+        })
+        
+        # Keep only last 100 feed processing records
+        self.feed_processing_stats = self.feed_processing_stats[-100:]
+        self.feeds_processed_today += 1
+    
+    def get_memory_trend(self, hours: int = 1) -> float:
+        """Calculate memory trend over last N hours (MB change)"""
+        if len(self.memory_samples) < 2:
+            return 0.0
+            
+        cutoff = datetime.now() - timedelta(hours=hours)
+        recent_samples = [s for s in self.memory_samples if s['time'] > cutoff]
+        
+        if len(recent_samples) < 2:
+            return 0.0
+        
+        return recent_samples[-1]['memory_mb'] - recent_samples[0]['memory_mb']
+    
+    def estimate_feeds_until_oom(self, current_memory_mb: float) -> int:
+        """Estimate how many more feeds can be processed before hitting memory limit"""
+        if not self.feed_processing_stats:
+            return 0
+        
+        # Calculate average memory cost per feed
+        recent_stats = self.feed_processing_stats[-10:]  # Last 10 feeds
+        avg_memory_cost = sum(s['memory_delta_mb'] for s in recent_stats) / len(recent_stats)
+        
+        remaining_memory = self.memory_limit_mb - current_memory_mb
+        return max(0, int(remaining_memory / max(avg_memory_cost, 1.0)))
+    
+    def get_warning_level(self, current_memory_mb: float) -> str:
+        """Get memory warning level based on current usage"""
+        percent_used = (current_memory_mb / self.memory_limit_mb) * 100
+        
+        if percent_used > 90:
+            return "critical"
+        elif percent_used > 75:
+            return "high"
+        elif percent_used > 50:
+            return "medium"
+        else:
+            return "low"
+
+
+class FeedUpdateWorker(threading.Thread):
     """Background worker for processing RSS feed updates"""
     
     def __init__(self, rate_limit_per_domain: int = 10, rate_limit_window: int = 60):
-        self.queue = asyncio.Queue()
+        super().__init__(daemon=True)
+        self.queue = queue.Queue()
         self.domain_limiters = defaultdict(lambda: DomainRateLimiter(rate_limit_per_domain, rate_limit_window))
-        self.worker_task = None
         self.last_heartbeat = datetime.now()
         self.is_running = False
         self.current_feed = None
         self.feed_parser = FeedParser()
+        self.memory_monitor = MemoryMonitor()
     
-    async def start(self):
+    def start(self):
         """Start the background worker"""
         if self.is_running:
             return
             
         self.is_running = True
-        self.worker_task = asyncio.create_task(self._worker_loop())
+        super().start()  # Start the thread
         logger.info("Background feed worker started")
     
-    async def stop(self):
+    def stop(self):
         """Stop the background worker gracefully"""
         self.is_running = False
-        
-        if self.worker_task and not self.worker_task.done():
-            self.worker_task.cancel()
-            try:
-                await asyncio.wait_for(self.worker_task, timeout=5.0)
-            except asyncio.TimeoutError:
-                logger.warning("Worker shutdown timed out")
-            except asyncio.CancelledError:
-                pass
-        
         logger.info("Background feed worker stopped")
     
-    async def _worker_loop(self):
+    def run(self):
         """Main worker loop - processes feeds from queue"""
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        # Set memory baseline
+        process = psutil.Process()
+        baseline_memory = process.memory_info().rss / 1024 / 1024  # MB
+        self.memory_monitor.baseline_mb = baseline_memory
+        self.memory_monitor.record_memory_sample(baseline_memory, "worker_startup")
+        logger.info(f"Worker thread memory baseline: {baseline_memory:.1f}MB")
+        
+        # Create HTTP client with connection limits to prevent memory leaks
+        with httpx.Client(
+            timeout=30.0,
+            limits=httpx.Limits(max_connections=5, max_keepalive_connections=2)
+        ) as client:
             while self.is_running:
                 try:
                     # Wait for a feed to process (with timeout to update heartbeat)
-                    feed = await asyncio.wait_for(self.queue.get(), timeout=60.0)
+                    feed = self.queue.get(timeout=60.0)
                     self.current_feed = feed
                     
-                    await self._process_feed(client, feed)
+                    # Record memory before processing
+                    current_memory = process.memory_info().rss / 1024 / 1024
+                    self.memory_monitor.record_memory_sample(current_memory, f"before_feed_{feed.get('id')}")
+                    
+                    self._process_feed(client, feed)
+                    
+                    # Record memory after processing
+                    memory_after = process.memory_info().rss / 1024 / 1024
+                    self.memory_monitor.record_memory_sample(memory_after, f"after_feed_{feed.get('id')}")
                     
                     self.current_feed = None
                     self.last_heartbeat = datetime.now()
+                    self.queue.task_done()
                     
-                except asyncio.TimeoutError:
-                    # No feeds to process - just update heartbeat
+                except queue.Empty:
+                    # No feeds to process - just update heartbeat and record memory
+                    current_memory = process.memory_info().rss / 1024 / 1024
+                    self.memory_monitor.record_memory_sample(current_memory, "idle_heartbeat")
                     self.last_heartbeat = datetime.now()
                     self.current_feed = None
                     
@@ -115,28 +222,64 @@ class FeedUpdateWorker:
                     logger.error(f"Worker error processing feed: {e}")
                     self.current_feed = None
                     self.last_heartbeat = datetime.now()
+                    if hasattr(self.queue, 'task_done'):
+                        self.queue.task_done()
     
-    async def _process_feed(self, client: httpx.AsyncClient, feed: Dict[str, Any]):
-        """Process a single feed with rate limiting"""
+    def _process_feed(self, client: httpx.Client, feed: Dict[str, Any]):
+        """Process a single feed with rate limiting and memory management"""
+        memory_before = None
+        content_size_kb = 0
         try:
+            # Log memory usage before processing
+            process = psutil.Process()
+            memory_before = process.memory_info().rss / 1024 / 1024  # MB
+            
             # Extract domain for rate limiting
             domain = urlparse(feed['url']).netloc
             rate_limiter = self.domain_limiters[domain]
             
             # Apply rate limiting
-            await rate_limiter.acquire()
+            rate_limiter.acquire()
             
             # Process the feed using existing feed parser logic
-            result = await self._fetch_and_parse_feed(client, feed)
+            result = self._fetch_and_parse_feed(client, feed)
+            content_size_kb = result.get('content_size', 0) / 1024
             
             if result.get('updated'):
                 logger.info(f"Updated feed {feed['id']}: {result.get('items_added', 0)} new items")
             
         except Exception as e:
             logger.error(f"Error processing feed {feed.get('id', 'unknown')}: {e}")
+        finally:
+            # Memory cleanup and monitoring
+            if memory_before:
+                memory_after = psutil.Process().memory_info().rss / 1024 / 1024
+                memory_diff = memory_after - memory_before
+                
+                # Record detailed memory statistics
+                feed_title = feed.get('title', 'Unknown Feed')
+                self.memory_monitor.record_feed_processing(
+                    feed_title, memory_before, memory_after, content_size_kb
+                )
+                
+                logger.info(f"Feed {feed.get('id')} memory: {memory_before:.1f}MB → {memory_after:.1f}MB (Δ{memory_diff:+.1f}MB)")
+                
+                # Force garbage collection after processing
+                collected = gc.collect()
+                self.memory_monitor.last_gc_time = datetime.now()
+                self.memory_monitor.last_gc_collected = collected
+                
+                if collected > 0:
+                    memory_final = psutil.Process().memory_info().rss / 1024 / 1024
+                    logger.info(f"GC collected {collected} objects, final memory: {memory_final:.1f}MB")
+            
+            # Mark feed as processed to clean up queued_feeds set
+            if hasattr(self, '_queue_manager_ref') and self._queue_manager_ref:
+                self._queue_manager_ref.mark_feed_processed(feed.get('id'))
     
-    async def _fetch_and_parse_feed(self, client: httpx.AsyncClient, feed: Dict[str, Any]) -> Dict[str, Any]:
-        """Fetch and parse a single feed (async version of feed_parser logic)"""
+    def _fetch_and_parse_feed(self, client: httpx.Client, feed: Dict[str, Any]) -> Dict[str, Any]:
+        """Fetch and parse a single feed (sync version)"""
+        content = None
         try:
             # Build headers for conditional requests
             headers = {}
@@ -146,7 +289,7 @@ class FeedUpdateWorker:
                 headers['If-Modified-Since'] = feed['last_modified']
             
             # Make HTTP request
-            response = await client.get(feed['url'], headers=headers, follow_redirects=True)
+            response = client.get(feed['url'], headers=headers, follow_redirects=True)
             
             if response.status_code == 304:
                 # Feed not modified
@@ -155,22 +298,33 @@ class FeedUpdateWorker:
                 logger.error(f"HTTP {response.status_code} for feed {feed['url']}")
                 return {'updated': False, 'status': response.status_code}
             
-            # Parse feed using existing synchronous parser
-            # (We'll run the CPU-bound parsing in a thread pool to avoid blocking)
-            parse_result = await asyncio.get_event_loop().run_in_executor(
-                None,
-                self._parse_feed_content,
-                response.text,
+            # Check content size before processing
+            content = response.text
+            content_size = len(content)
+            
+            if content_size > 500_000:  # 500KB limit
+                logger.warning(f"Skipping large feed {feed['url']}: {content_size} bytes")
+                return {'updated': False, 'status': 0, 'error': 'Feed too large'}
+            
+            # Parse feed directly (no thread pool needed)
+            parse_result = self._parse_feed_content(
+                content,
                 feed['id'],
                 response.headers.get('etag'),
                 response.headers.get('last-modified')
             )
             
+            # Add content size to result for memory monitoring
+            parse_result['content_size'] = content_size
             return parse_result
             
         except Exception as e:
             logger.error(f"Error fetching feed {feed['url']}: {e}")
             return {'updated': False, 'status': 0, 'error': str(e)}
+        finally:
+            # Explicit cleanup of large content
+            content = None
+            gc.collect()
     
     def _parse_feed_content(self, content: str, feed_id: int, etag: str, last_modified: str) -> Dict[str, Any]:
         """Synchronous feed parsing (runs in thread pool) - FULL EXTRACTION LOGIC"""
@@ -328,10 +482,10 @@ class FeedUpdateWorker:
             'feed_title': feed_title
         }
     
-    async def _process_feed_direct(self, feed: Dict[str, Any]):
+    def _process_feed_direct(self, feed: Dict[str, Any]):
         """Direct feed processing for testing (bypasses queue)"""
-        async with httpx.AsyncClient(timeout=30.0) as client:
-            await self._process_feed(client, feed)
+        with httpx.Client(timeout=30.0) as client:
+            self._process_feed(client, feed)
     
     def get_status(self) -> Dict[str, Any]:
         """Get current worker status for UI"""
@@ -343,11 +497,66 @@ class FeedUpdateWorker:
             'last_heartbeat': self.last_heartbeat.isoformat()
         }
     
+    def get_memory_status(self) -> Dict[str, Any]:
+        """Get detailed memory status for monitoring"""
+        process = psutil.Process()
+        current_memory = process.memory_info().rss / 1024 / 1024  # MB
+        
+        # Calculate derived metrics
+        memory_increase = current_memory - (self.memory_monitor.baseline_mb or 0)
+        memory_percent = (current_memory / self.memory_monitor.memory_limit_mb) * 100
+        memory_trend_1h = self.memory_monitor.get_memory_trend(hours=1)
+        feeds_until_oom = self.memory_monitor.estimate_feeds_until_oom(current_memory)
+        warning_level = self.memory_monitor.get_warning_level(current_memory)
+        
+        # Recent feed processing stats
+        recent_feeds = self.memory_monitor.feed_processing_stats[-5:]  # Last 5 feeds
+        avg_memory_cost = 0
+        largest_feed = None
+        
+        if recent_feeds:
+            avg_memory_cost = sum(s['memory_delta_mb'] for s in recent_feeds) / len(recent_feeds)
+            largest_feed = max(recent_feeds, key=lambda x: x['memory_delta_mb'])
+        
+        return {
+            # Current memory state
+            'memory_mb': round(current_memory, 1),
+            'memory_baseline_mb': round(self.memory_monitor.baseline_mb or 0, 1),
+            'memory_increase_mb': round(memory_increase, 1),
+            'memory_percent_of_limit': round(memory_percent, 1),
+            
+            # Worker state
+            'worker_status': 'processing' if self.current_feed else ('idle' if self.is_running else 'stopped'),
+            'current_feed': self.current_feed.get('title') if self.current_feed else None,
+            'queue_size': self.queue.qsize(),
+            'feeds_processed_today': self.memory_monitor.feeds_processed_today,
+            
+            # Memory trends and warnings
+            'memory_trend_1h_mb': round(memory_trend_1h, 1),
+            'peak_memory_mb': round(self.memory_monitor.peak_memory_mb, 1),
+            'peak_memory_time': self.memory_monitor.peak_memory_time.isoformat() if self.memory_monitor.peak_memory_time else None,
+            'warning_level': warning_level,
+            'feeds_until_oom': feeds_until_oom,
+            'recommend_restart': warning_level == 'critical' or memory_trend_1h > 20.0,
+            
+            # Garbage collection
+            'last_gc_time': self.memory_monitor.last_gc_time.isoformat() if self.memory_monitor.last_gc_time else None,
+            'last_gc_collected': self.memory_monitor.last_gc_collected,
+            
+            # Feed processing efficiency
+            'avg_memory_cost_per_feed_mb': round(avg_memory_cost, 1) if recent_feeds else 0,
+            'largest_feed_processed': {
+                'title': largest_feed['feed_title'][:50] if largest_feed else None,
+                'memory_cost_mb': round(largest_feed['memory_delta_mb'], 1) if largest_feed else 0,
+                'content_size_kb': round(largest_feed['content_size_kb'], 1) if largest_feed else 0
+            } if largest_feed else None
+        }
+    
     def _is_worker_alive(self) -> bool:
         """Check if worker is healthy"""
         if not self.is_running:
             return False
-        if not self.worker_task or self.worker_task.done():
+        if not self.is_alive():
             return False
         # Worker is alive if heartbeat is recent (< 2 minutes)
         return datetime.now() - self.last_heartbeat < timedelta(minutes=2)
@@ -360,8 +569,10 @@ class FeedQueueManager:
         self.worker = worker
         self.update_interval = timedelta(minutes=update_interval_minutes)
         self.queued_feeds: Set[int] = set()
+        # Give worker reference to queue manager for cleanup
+        self.worker._queue_manager_ref = self
     
-    async def queue_user_feeds(self, session_id: str):
+    def queue_user_feeds(self, session_id: str):
         """Queue feeds for a user if they need updating"""
         try:
             # Get user's subscribed feeds
@@ -379,7 +590,7 @@ class FeedQueueManager:
                         'etag': feed.get('etag'),
                         'last_modified': feed.get('last_modified')
                     }
-                    await self.worker.queue.put(feed_data)
+                    self.worker.queue.put(feed_data)
                     self.queued_feeds.add(feed['id'])
                     feeds_queued += 1
             
@@ -413,7 +624,7 @@ feed_worker: Optional[FeedUpdateWorker] = None
 queue_manager: Optional[FeedQueueManager] = None
 
 
-async def initialize_worker_system():
+def initialize_worker_system():
     """Initialize the global worker system"""
     global feed_worker, queue_manager
     
@@ -429,7 +640,7 @@ async def initialize_worker_system():
         queue_manager = FeedQueueManager(feed_worker)
         print(f"[{timestamp}] DEBUG: Created queue_manager: {queue_manager}")
         
-        await feed_worker.start()
+        feed_worker.start()
         print(f"[{timestamp}] DEBUG: Worker started")
         
         # Queue all feeds initially for first startup
@@ -437,7 +648,7 @@ async def initialize_worker_system():
         print(f"[{timestamp}] DEBUG: Found {len(all_feeds)} feeds to queue")
         
         for feed in all_feeds:
-            await feed_worker.queue.put(feed)
+            feed_worker.queue.put(feed)
         
         print(f"[{timestamp}] DEBUG: After init - feed_worker: {feed_worker}, queue_manager: {queue_manager}")
         logger.info(f"[{timestamp}] Worker system initialized, queued {len(all_feeds)} feeds (PIDs: main={os.getpid()})")
@@ -445,10 +656,12 @@ async def initialize_worker_system():
         print(f"[{timestamp}] DEBUG: Worker system already initialized")
 
 
-async def shutdown_worker_system():
+def shutdown_worker_system():
     """Shutdown the global worker system"""
     global feed_worker
     
     if feed_worker:
-        await feed_worker.stop()
+        feed_worker.stop()
+        if feed_worker.is_alive():
+            feed_worker.join(timeout=5.0)
         feed_worker = None
