@@ -76,20 +76,32 @@ async def lifespan(app):
     """Handle app startup and shutdown with background worker"""
     print("FastHTML app starting up...")
     
-    # Startup: Initialize background worker
-    await initialize_worker_system()
-    print("Background worker system initialized")
+    # In production with multiple workers, disable background worker to avoid conflicts
+    # Background feed updates should be handled by a separate process in production
+    is_production = os.environ.get("PRODUCTION", "false").lower() == "true"
     
-    # Check if we need to add default feeds (first run)
-    if not FeedModel.get_feeds_to_update(max_age_minutes=9999):
-        print("Setting up default feeds via background worker...")
-        setup_default_feeds()  # This will be quick since worker handles the updates
+    if not is_production:
+        # Startup: Initialize background worker
+        await initialize_worker_system()
+        print("Background worker system initialized")
+        
+        # Check if we need to add default feeds (first run)
+        if not FeedModel.get_feeds_to_update(max_age_minutes=9999):
+            print("Setting up default feeds via background worker...")
+            setup_default_feeds()  # This will be quick since worker handles the updates
+    else:
+        print("Background worker disabled in production mode")
+        # Still ensure default feeds exist (they'll be updated manually or via cron)
+        if not FeedModel.get_feeds_to_update(max_age_minutes=9999):
+            print("Setting up default feeds (no background worker)...")
+            setup_default_feeds()
     
     yield  # App is running
     
     # Shutdown: Clean up background worker
-    print("Shutting down background worker...")
-    await shutdown_worker_system()
+    if not is_production:
+        print("Shutting down background worker...")
+        await shutdown_worker_system()
     print("FastHTML app shutdown complete")
 
 # FastHTML app with session support and lifespan
