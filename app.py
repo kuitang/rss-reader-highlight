@@ -24,6 +24,48 @@ init_db()
 
 # Default feeds will be set up by background worker on first startup
 
+# =============================================================================
+# CONFIGURATION - All decisions and constants visible here
+# =============================================================================
+
+class Targets:
+    """HTMX update targets - what gets swapped"""
+    MOBILE_CONTENT = '#main-content'
+    DESKTOP_FEEDS = '#desktop-feeds-content' 
+    DESKTOP_DETAIL = '#desktop-item-detail'
+    MOBILE_SIDEBAR = '#mobile-sidebar'
+    DESKTOP_SIDEBAR = '#sidebar'
+
+class ElementIDs:
+    """DOM element identifiers"""
+    MOBILE_SIDEBAR = 'mobile-sidebar'
+    MOBILE_HEADER = 'mobile-header'
+    MOBILE_PERSISTENT_HEADER = 'mobile-persistent-header'
+    MOBILE_NAV_BUTTON = 'mobile-nav-button'
+    DESKTOP_LAYOUT = 'desktop-layout'
+    MOBILE_LAYOUT = 'mobile-layout'
+    MAIN_CONTENT = 'main-content'
+    DESKTOP_FEEDS_CONTENT = 'desktop-feeds-content'
+    DESKTOP_ITEM_DETAIL = 'desktop-item-detail'
+    SIDEBAR = 'sidebar'
+
+class Styling:
+    """CSS classes for layouts and components"""
+    MOBILE_LAYOUT = 'lg:hidden fixed inset-0 flex flex-col overflow-hidden'
+    DESKTOP_LAYOUT = 'hidden lg:grid h-screen pt-4'
+    FEED_ITEM_BASE = 'relative rounded-lg border border-border p-3 text-sm hover:bg-secondary space-y-2 cursor-pointer'
+    FEED_ITEM_READ = 'bg-muted tag-read'
+    FEED_ITEM_UNREAD = 'tag-unread'
+    SIDEBAR_DESKTOP = 'col-span-1 h-screen overflow-y-auto border-r px-2'
+    DESKTOP_FEEDS_COLUMN = 'col-span-2 h-screen flex flex-col overflow-hidden border-r px-4'
+    DESKTOP_DETAIL_COLUMN = 'col-span-2 h-screen overflow-y-auto px-6'
+    MOBILE_SIDEBAR_OVERLAY = 'fixed inset-0 z-50 lg:hidden'
+    MOBILE_PERSISTENT_HEADER = 'flex-shrink-0 bg-background border-b z-10 lg:hidden'
+    MOBILE_HEADER = 'lg:hidden fixed top-0 left-0 right-0 bg-background border-b p-4 z-40'
+    BUTTON_SECONDARY = 'p-2 rounded border hover:bg-secondary'
+    BUTTON_NAV = 'p-2 rounded border hover:bg-secondary mr-2'
+    SIDEBAR_ITEM = 'hover:bg-secondary p-4 block'
+
 # Timing middleware for performance monitoring
 def timing_middleware(req, sess):
     """Add timing info to requests"""
@@ -283,7 +325,7 @@ def FeedSidebarItem(feed, count=""):
                 cls="gap-3"
             ),
             href=f"/?feed_id={feed['id']}",
-            cls='hover:bg-secondary p-4 block'
+            cls=Styling.SIDEBAR_ITEM
         )
     )
 
@@ -309,7 +351,7 @@ def FeedsSidebar(session_id):
                     )
                 ),
                 hx_post="/api/feed/add",
-                hx_target="#sidebar",  # Default to desktop, JS will override for mobile
+                hx_target=Targets.DESKTOP_SIDEBAR,  # Default to desktop, JS will override for mobile
                 hx_swap="outerHTML",
                 cls="add-feed-form"
             ),
@@ -355,11 +397,11 @@ def FeedsSidebar(session_id):
 
 def FeedItem(item, unread_view=False, for_desktop=False, feed_id=None):
     """Create feed item with consistent HTMX approach and feed context preservation"""
-    cls_base = 'relative rounded-lg border border-border p-3 text-sm hover:bg-secondary space-y-2 cursor-pointer'
+    cls_base = Styling.FEED_ITEM_BASE
     is_read = item.get('is_read', 0) == 1
     
-    read_bg = 'bg-muted' if is_read else ''
-    cls = f"{cls_base} {read_bg} tag-{'unread' if not is_read else 'read'}"
+    read_bg = Styling.FEED_ITEM_READ if is_read else Styling.FEED_ITEM_UNREAD
+    cls = f"{cls_base} {read_bg}"
     
     # Build item URL with feed context preserved
     item_url = f"/item/{item['id']}?unread_view={unread_view}"
@@ -368,10 +410,10 @@ def FeedItem(item, unread_view=False, for_desktop=False, feed_id=None):
     
     # Simple consistent approach: same HTMX pattern, just different targets
     if for_desktop:
-        target = "#desktop-item-detail"
+        target = Targets.DESKTOP_DETAIL
         push_url = "true"  # Enable URL push for desktop to fix back button navigation
     else:
-        target = "#main-content" 
+        target = Targets.MOBILE_CONTENT
         push_url = "true"  # URL push for mobile full-page navigation
     
     # Use unique IDs for desktop vs mobile to avoid HTML violations
@@ -460,14 +502,14 @@ def MobilePersistentHeader(session_id, feed_id=None, unread_only=False, show_chr
                 Li(A("All Posts", 
                      href=f"{base_url}{'&' if url_params else '?'}unread=0" if base_url != "/" else "/?unread=0", 
                      hx_get=f"{base_url}{'&' if url_params else '?'}unread=0" if base_url != "/" else "/?unread=0",
-                     hx_target="#main-content",
+                     hx_target=Targets.MOBILE_CONTENT,
                      hx_push_url="true",
                      role='button'),
                    cls='uk-active' if not unread_only else ''),
                 Li(A("Unread", 
                      href=base_url if base_url != "/" else "/",
                      hx_get=base_url if base_url != "/" else "/", 
-                     hx_target="#main-content",
+                     hx_target=Targets.MOBILE_CONTENT,
                      hx_push_url="true",
                      role='button'),
                    cls='uk-active' if unread_only else ''),
@@ -546,15 +588,15 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
                     DivCentered(f'Page {page} of {total_pages}', cls=TextT.sm),
                     DivLAligned(
                         # Mobile versions
-                        Button(UkIcon('chevrons-left'), hx_get=first_url, hx_target="#main-content", hx_push_url="true", cls="p-2 rounded border hover:bg-secondary lg:hidden"),
-                        Button(UkIcon('chevron-left'), hx_get=prev_url, hx_target="#main-content", hx_push_url="true", cls="p-2 rounded border hover:bg-secondary lg:hidden"),
-                        Button(UkIcon('chevron-right'), hx_get=next_url, hx_target="#main-content", hx_push_url="true", cls="p-2 rounded border hover:bg-secondary lg:hidden"),
-                        Button(UkIcon('chevrons-right'), hx_get=last_url, hx_target="#main-content", hx_push_url="true", cls="p-2 rounded border hover:bg-secondary lg:hidden"),
+                        Button(UkIcon('chevrons-left'), hx_get=first_url, hx_target=Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary lg:hidden"),
+                        Button(UkIcon('chevron-left'), hx_get=prev_url, hx_target=Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary lg:hidden"),
+                        Button(UkIcon('chevron-right'), hx_get=next_url, hx_target=Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary lg:hidden"),
+                        Button(UkIcon('chevrons-right'), hx_get=last_url, hx_target=Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary lg:hidden"),
                         # Desktop versions - use HTMX for consistency
-                        Button(UkIcon('chevrons-left'), hx_get=first_url, hx_target="#desktop-feeds-content" if for_desktop else "#main-content", cls="p-2 rounded border hover:bg-secondary hidden lg:inline-block"),
-                        Button(UkIcon('chevron-left'), hx_get=prev_url, hx_target="#desktop-feeds-content" if for_desktop else "#main-content", cls="p-2 rounded border hover:bg-secondary hidden lg:inline-block"),
-                        Button(UkIcon('chevron-right'), hx_get=next_url, hx_target="#desktop-feeds-content" if for_desktop else "#main-content", cls="p-2 rounded border hover:bg-secondary hidden lg:inline-block"),
-                        Button(UkIcon('chevrons-right'), hx_get=last_url, hx_target="#desktop-feeds-content" if for_desktop else "#main-content", cls="p-2 rounded border hover:bg-secondary hidden lg:inline-block"),
+                        Button(UkIcon('chevrons-left'), hx_get=first_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else "#main-content", cls="p-2 rounded border hover:bg-secondary hidden lg:inline-block"),
+                        Button(UkIcon('chevron-left'), hx_get=prev_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else "#main-content", cls="p-2 rounded border hover:bg-secondary hidden lg:inline-block"),
+                        Button(UkIcon('chevron-right'), hx_get=next_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else "#main-content", cls="p-2 rounded border hover:bg-secondary hidden lg:inline-block"),
+                        Button(UkIcon('chevrons-right'), hx_get=last_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else "#main-content", cls="p-2 rounded border hover:bg-secondary hidden lg:inline-block"),
                         cls='space-x-1'
                     )
                 )
@@ -600,7 +642,7 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
 def MobileSidebar(session_id):
     """Create mobile sidebar overlay"""
     return Div(
-        id="mobile-sidebar",
+        id=ElementIDs.MOBILE_SIDEBAR,
         cls="fixed inset-0 z-50 lg:hidden",
         hidden="true"
     )(
@@ -649,7 +691,7 @@ def MobileHeader(session_id, show_back=False, feed_id=None, unread_view=False):
     nav_button = Button(
         UkIcon('arrow-left'),
         hx_get=return_url,
-        hx_target="#main-content",
+        hx_target=Targets.MOBILE_CONTENT,
         hx_push_url="true",
         cls="p-2 rounded border hover:bg-secondary mr-2",
         id="mobile-nav-button"
@@ -697,7 +739,7 @@ def ItemDetailView(item, show_back=False):
                     icon, 
                     uk_tooltip=tooltip,
                     hx_post=f"/api/item/{item['id']}/{'star' if 'star' in tooltip.lower() else 'folder' if 'folder' in tooltip.lower() else 'read'}",
-                    hx_target="#main-content",
+                    hx_target=Targets.MOBILE_CONTENT,
                     cls='cursor-pointer hover:text-blue-600'
                 ) for icon, tooltip in action_icons],
                 cls='space-x-2'
@@ -787,14 +829,14 @@ def index(request, feed_id: int = None, unread: bool = True, folder_id: int = No
                         Li(A("All Posts", 
                              href=f"/?feed_id={feed_id}&unread=0" if feed_id else "/?unread=0", 
                              hx_get=f"/?feed_id={feed_id}&unread=0" if feed_id else "/?unread=0",
-                             hx_target="#main-content",
+                             hx_target=Targets.MOBILE_CONTENT,
                              hx_push_url="true",
                              role='button'),
                            cls='uk-active' if not unread else ''),
                         Li(A("Unread", 
                              href=f"/?feed_id={feed_id}" if feed_id else "/",
                              hx_get=f"/?feed_id={feed_id}" if feed_id else "/", 
-                             hx_target="#main-content",
+                             hx_target=Targets.MOBILE_CONTENT,
                              hx_push_url="true",
                              role='button'),
                            cls='uk-active' if unread else ''),
@@ -830,15 +872,15 @@ def index(request, feed_id: int = None, unread: bool = True, folder_id: int = No
         Div(id="mobile-header")(MobileHeader(session_id, show_back=False, feed_id=feed_id, unread_view=unread)),
         MobileSidebar(session_id),
         # Desktop layout: sidebar + feeds + article detail (unchanged)
-        Div(cls="hidden lg:grid h-screen pt-4", id="desktop-layout")(
+        Div(cls=Styling.DESKTOP_LAYOUT, id=ElementIDs.DESKTOP_LAYOUT)(
             Grid(
-                Div(id="sidebar", cls='col-span-1 h-screen overflow-y-auto border-r px-2')(
+                Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
                     FeedsSidebar(session_id)
                 ),
-                Div(cls='col-span-2 h-screen flex flex-col overflow-hidden border-r px-4', id="desktop-feeds-content")(
+                Div(cls=Styling.DESKTOP_FEEDS_COLUMN, id="desktop-feeds-content")(
                     FeedsContent(session_id, feed_id, unread, page, for_desktop=True)
                 ),
-                Div(id="desktop-item-detail", cls='col-span-2 h-screen overflow-y-auto px-6')(
+                Div(id=ElementIDs.DESKTOP_ITEM_DETAIL, cls=Styling.DESKTOP_DETAIL_COLUMN)(
                     ItemDetailView(None)
                 ),
                 cols_lg=5, cols_xl=5,
@@ -852,7 +894,7 @@ def index(request, feed_id: int = None, unread: bool = True, folder_id: int = No
             # Persistent header directly (no wrapper needed with Option 2)
             MobilePersistentHeader(session_id, feed_id, unread),
             # Content area that gets replaced by HTMX - MUST be scrollable
-            Div(cls="flex-1 overflow-y-auto", id="main-content")(
+            Div(cls="flex-1 overflow-y-auto", id=ElementIDs.MAIN_CONTENT)(
                 FeedsContent(session_id, feed_id, unread, page)
             )
         ),
@@ -915,15 +957,15 @@ def show_item(item_id: int, request, unread_view: bool = False, feed_id: int = N
                 Div(id="mobile-header")(MobileHeader(session_id, show_back=True, feed_id=feed_id, unread_view=unread_view)),
                 MobileSidebar(session_id),
                 # Desktop layout (same as index)
-                Div(cls="hidden lg:grid h-screen pt-4", id="desktop-layout")(
+                Div(cls=Styling.DESKTOP_LAYOUT, id=ElementIDs.DESKTOP_LAYOUT)(
                     Grid(
-                        Div(id="sidebar", cls='col-span-1 h-screen overflow-y-auto border-r px-2')(
+                        Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
                             FeedsSidebar(session_id)
                         ),
-                        Div(cls='col-span-2 h-screen flex flex-col overflow-hidden border-r px-4', id="desktop-feeds-content")(
+                        Div(cls=Styling.DESKTOP_FEEDS_COLUMN, id="desktop-feeds-content")(
                             FeedsContent(session_id, None, True, 1, for_desktop=True)
                         ),
-                        Div(id="desktop-item-detail", cls='col-span-2 h-screen overflow-y-auto px-6')(
+                        Div(id=ElementIDs.DESKTOP_ITEM_DETAIL, cls=Styling.DESKTOP_DETAIL_COLUMN)(
                             ItemDetailView(None)
                         ),
                         cols_lg=5, cols_xl=5,
@@ -933,7 +975,7 @@ def show_item(item_id: int, request, unread_view: bool = False, feed_id: int = N
                 # Mobile layout
                 Div(cls="lg:hidden fixed inset-0 flex flex-col overflow-hidden", id="mobile-layout")(
                     Div(cls="h-20 flex-shrink-0"),
-                    Div(cls="flex-1 overflow-y-auto", id="main-content")(
+                    Div(cls="flex-1 overflow-y-auto", id=ElementIDs.MAIN_CONTENT)(
                         Container(P("Article not found", cls='text-center text-muted-foreground p-8'))
                     )
                 ),
@@ -964,15 +1006,15 @@ def show_item(item_id: int, request, unread_view: bool = False, feed_id: int = N
             Div(id="mobile-header")(MobileHeader(session_id, show_back=True, feed_id=feed_id, unread_view=unread_view)),
             MobileSidebar(session_id),
             # Desktop layout (same as index)
-            Div(cls="hidden lg:grid h-screen pt-4", id="desktop-layout")(
+            Div(cls=Styling.DESKTOP_LAYOUT, id=ElementIDs.DESKTOP_LAYOUT)(
                 Grid(
-                    Div(id="sidebar", cls='col-span-1 h-screen overflow-y-auto border-r px-2')(
+                    Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
                         FeedsSidebar(session_id)
                     ),
-                    Div(cls='col-span-2 h-screen flex flex-col overflow-hidden border-r px-4', id="desktop-feeds-content")(
+                    Div(cls=Styling.DESKTOP_FEEDS_COLUMN, id="desktop-feeds-content")(
                         FeedsContent(session_id, feed_id, unread_view, 1, for_desktop=True)
                     ),
-                    Div(id="desktop-item-detail", cls='col-span-2 h-screen overflow-y-auto px-6')(
+                    Div(id=ElementIDs.DESKTOP_ITEM_DETAIL, cls=Styling.DESKTOP_DETAIL_COLUMN)(
                         ItemDetailView(item_after, show_back=False)
                     ),
                     cols_lg=5, cols_xl=5,
@@ -984,7 +1026,7 @@ def show_item(item_id: int, request, unread_view: bool = False, feed_id: int = N
                 Div(cls="h-20 flex-shrink-0"),
                 # Add persistent header (hidden for article view, but available for back navigation)
                 MobilePersistentHeader(session_id, feed_id, unread_view, show_chrome=False),
-                Div(cls="flex-1 overflow-y-auto", id="main-content")(
+                Div(cls="flex-1 overflow-y-auto", id=ElementIDs.MAIN_CONTENT)(
                     ItemDetailView(item_after, show_back=True)
                 )
             ),
@@ -1018,7 +1060,7 @@ def show_item(item_id: int, request, unread_view: bool = False, feed_id: int = N
         back_button = Button(
             UkIcon('arrow-left'),
             hx_get=f"/?feed_id={feed_id}" if feed_id else "/",
-            hx_target="#main-content",
+            hx_target=Targets.MOBILE_CONTENT,
             hx_push_url="true",
             cls="p-2 rounded border hover:bg-secondary mr-2",
             id="mobile-nav-button",
@@ -1146,7 +1188,7 @@ def add_feed(request, new_feed_url: str = ""):
             return MobileSidebar(session_id)
         else:
             # Desktop: return sidebar container with content
-            return Div(id="sidebar", cls='col-span-1 h-screen overflow-y-auto border-r px-2')(
+            return Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
                 FeedsSidebar(session_id)
             )
         
@@ -1161,7 +1203,7 @@ def add_feed(request, new_feed_url: str = ""):
         if 'mobile-sidebar' in target_container:
             return MobileSidebar(session_id)
         else:
-            return Div(id="sidebar", cls='col-span-1 h-screen overflow-y-auto border-r px-2')(
+            return Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
                 FeedsSidebar(session_id)
             )
 
@@ -1205,7 +1247,7 @@ def add_folder(request):
         FolderModel.create_folder(session_id, name)
     
     # Return updated sidebar (this is for folder add, always from desktop sidebar)
-    return Div(id="sidebar", cls='col-span-1 h-screen overflow-y-auto border-r px-2')(
+    return Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
         FeedsSidebar(session_id)
     )
 
