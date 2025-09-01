@@ -12,4 +12,5 @@ mistletoe
 beautifulsoup4
 lxml-html-clean
 uvicorn
+gunicorn  # For production deployment with multiple workers
 aiolimiter

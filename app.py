@@ -1,4 +1,4 @@
-"""RSS Reader built with FastHTML and MonsterUI"""
+"""RSS Reader built with FastHTML and MonsterUI - with auto-reload enabled"""
 
 from fasthtml.common import *
 from monsterui.all import *
@@ -98,10 +98,33 @@ app, rt = fast_app(
         Script("""
         htmx.logAll();
         htmx.config.includeIndicatorStyles = false;
+        
+        // Close mobile sidebar when a feed link is clicked
+        document.addEventListener('click', function(e) {
+            // Check if clicked element is a feed link
+            if (e.target.closest('a[href^="/?feed_id="], a[href^="/?folder_id="], a[href="/"]')) {
+                const sidebar = document.getElementById('mobile-sidebar');
+                if (sidebar && !sidebar.hasAttribute('hidden')) {
+                    sidebar.setAttribute('hidden', 'true');
+                }
+            }
+        });
+        
         """),
         Style("""
         .htmx-indicator { display: none; }
         .htmx-request .htmx-indicator { display: flex; }
+        
+        /* Fix viewport scrolling on mobile - more specific and with !important */
+        @media (max-width: 1023px) {
+            html, body {
+                height: 100% !important;
+                max-height: 100vh !important;
+                overflow: hidden !important;
+                position: fixed !important;
+                width: 100% !important;
+            }
+        }
         """)
     ],
     live=True,
@@ -143,19 +166,20 @@ def FeedSidebarItem(feed, count=""):
     """Create sidebar item for feed (adapted from MailSbLi)"""
     last_updated = human_time_diff(feed.get('last_updated'))
     
-    # Use pure HTML links with HTMX explicitly disabled
-    # uk_toggle handles mobile sidebar auto-close
+    # Alternative: Use hx_boost="false" to prevent HTMX interception
+    # This tells HTMX to skip this link entirely, allowing normal navigation
     return Li(
         A(
             DivLAligned(
-                Span(UkIcon('rss')),
+                UkIcon('rss', cls="flex-none"),
                 Span(feed['title'] or 'Untitled Feed'),
-                P(f"updated {last_updated}", cls=TextPresets.muted_sm)
+                P(f"updated {last_updated}", cls="text-xs text-muted"),
+                cls="gap-3"
             ),
             href=f"/?feed_id={feed['id']}",
-            uk_toggle="target: #mobile-sidebar",  # Auto-close mobile sidebar when clicked
-            **{"data-hx-disable": "true"},  # Explicitly disable HTMX for this element
-            cls='hover:bg-secondary p-4'
+            # Removed uk_toggle to allow normal link navigation
+            hx_boost="false",  # Disable HTMX boost for full page navigation
+            cls='hover:bg-secondary p-4 block'
         )
     )
 
@@ -188,25 +212,33 @@ def FeedsSidebar(session_id):
         Li(
             A(
                 DivLAligned(
-                    Span(UkIcon('globe')),
+                    UkIcon('globe', cls="flex-none"),
                     Span("All Feeds"),
-                    P("", cls=TextPresets.muted_sm)
+                    P("", cls="text-xs text-muted"),
+                    cls="gap-3"
                 ),
                 href="/",
-                uk_toggle="target: #mobile-sidebar",  # Auto-close mobile sidebar when clicked
-                **{"data-hx-disable": "true"},  # Explicitly disable HTMX for this element
-                cls='hover:bg-secondary p-4'
+                # Removed uk_toggle to allow normal link navigation
+                hx_boost="false",  # Disable HTMX for full page navigation
+                cls="hover:bg-secondary p-4 block"
             )
         ),
         Div(id="feeds-list")(*[FeedSidebarItem(feed) for feed in feeds]),
         Li(Hr()),
         Li(H4("Folders"), cls='p-3'),
-        *[Li(A(DivLAligned(Span(UkIcon('folder')), Span(folder['name'])), 
-               href=f"/?folder_id={folder['id']}",
-               uk_toggle="target: #mobile-sidebar",  # Auto-close mobile sidebar when clicked
-               **{"data-hx-disable": "true"},  # Explicitly disable HTMX for this element
-               cls='hover:bg-secondary p-4')) 
-          for folder in folders],
+        *[Li(
+            A(
+                DivLAligned(
+                    UkIcon('folder', cls="flex-none"),
+                    Span(folder['name']),
+                    cls="gap-3"
+                ),
+                href=f"/?folder_id={folder['id']}",
+                # Removed uk_toggle to allow normal link navigation
+                hx_boost="false",  # Disable HTMX for full page navigation
+                cls="hover:bg-secondary p-4 block"
+            )
+        ) for folder in folders],
         Li(
             Button(
                 UkIcon('plus'),
@@ -376,10 +408,12 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
             )
         )
     else:
-        # Mobile: sticky header + scrollable content
+        # Mobile: fixed header + scrollable content
         return Div(cls='flex flex-col h-full')(
-            # Sticky header section (not affected by viewport scroll)
-            Div(cls='sticky top-0 bg-background border-b z-10')(
+            # Fixed header section at top of container - prevent scroll propagation
+            Div(cls='flex-shrink-0 bg-background border-b z-10', 
+                id='mobile-feeds-header',
+                onwheel="event.preventDefault(); event.stopPropagation(); return false;")(
                 Div(cls='flex px-4 py-2')(
                     H3(feed_name),
                     TabContainer(
@@ -397,7 +431,7 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
                     )
                 )
             ),
-            # Scrollable content area
+            # Scrollable content area that takes remaining space
             Div(cls='flex-1 overflow-y-auto', id="feeds-list-container", uk_filter="target: .js-filter")(
                 FeedsList(paginated_items, unread_only, for_desktop) if paginated_items else Div(P("No posts available"), cls='p-4 text-center text-muted-foreground'),
                 pagination_footer()
@@ -411,7 +445,10 @@ def MobileSidebar(session_id):
         cls="fixed inset-0 z-50 lg:hidden",
         hidden="true"
     )(
-        Div(cls="bg-black bg-opacity-50 absolute inset-0", uk_toggle="target: #mobile-sidebar"),
+        Div(
+            cls="bg-black bg-opacity-50 absolute inset-0",
+            onclick="document.getElementById('mobile-sidebar').setAttribute('hidden', 'true')"
+        ),
         Div(cls="bg-background w-80 h-full overflow-y-auto relative z-10")(
             Div(cls="p-4 border-b")(
                 DivFullySpaced(
@@ -419,7 +456,7 @@ def MobileSidebar(session_id):
                     Button(
                         UkIcon('x'),
                         cls="p-1 rounded hover:bg-secondary",
-                        uk_toggle="target: #mobile-sidebar"
+                        onclick="document.getElementById('mobile-sidebar').setAttribute('hidden', 'true')"
                     )
                 )
             ),
@@ -456,7 +493,7 @@ def MobileHeader(session_id, show_back=False):
                     Button(
                         UkIcon('menu'),
                         cls="p-2 rounded border hover:bg-secondary",
-                        uk_toggle="target: #mobile-sidebar"
+                        onclick="document.getElementById('mobile-sidebar').removeAttribute('hidden')"
                     ),
                     H3("RSS Reader", cls="ml-3")
                 )
@@ -551,7 +588,7 @@ def index(request, feed_id: int = None, unread: bool = True, folder_id: int = No
         # Return only the feeds content for HTMX requests
         return FeedsContent(session_id, feed_id, unread, page)
     
-    return Title("RSS Reader"), Container(
+    return Title("RSS Reader"), Body(
         Div(id="mobile-header")(MobileHeader(session_id, show_back=False)),
         MobileSidebar(session_id),
         # Desktop layout: sidebar + feeds + article detail
@@ -570,13 +607,30 @@ def index(request, feed_id: int = None, unread: bool = True, folder_id: int = No
                 gap=4, cls='h-screen gap-4'
             )
         ),
-        # Mobile layout: full height with top padding for fixed header
-        Div(cls="lg:hidden pt-20 h-screen overflow-hidden", id="main-content")(
-            FeedsContent(session_id, feed_id, unread, page)
+        # Mobile layout: full height flex container with proper header spacing
+        Div(cls="lg:hidden fixed inset-0 flex flex-col overflow-hidden", id="main-content")(
+            # Spacer for fixed header
+            Div(cls="h-20 flex-shrink-0"),
+            # Content takes remaining space
+            Div(cls="flex-1 overflow-hidden")(
+                FeedsContent(session_id, feed_id, unread, page)
+            )
         ),
         # Global update status indicator
         UpdateStatusIndicator(),
-        cls=('min-h-screen', ContainerT.xl)
+        # Mobile viewport fix - add as last element to override everything
+        Style("""
+        /* Fix viewport scrolling on mobile - placed last to override all other styles */
+        @media (max-width: 1023px) {
+            html, body {
+                height: 100% !important;
+                max-height: 100vh !important;
+                overflow: hidden !important;
+                position: fixed !important;
+                width: 100% !important;
+            }
+        }
+        """)
     )
 
 @rt('/item/{item_id}')
@@ -633,7 +687,7 @@ def show_item(item_id: int, request, unread_view: bool = False):
                         Button(
                             UkIcon('menu'),
                             cls="p-2 rounded border hover:bg-secondary",
-                            uk_toggle="target: #mobile-sidebar"
+                            onclick="document.getElementById('mobile-sidebar').removeAttribute('hidden')"
                         ),
                         H3("RSS Reader", cls="ml-3")
                     )
@@ -796,5 +850,36 @@ def UpdateStatusContent(status):
 if __name__ == "__main__":
     import uvicorn
     port = int(os.environ.get("PORT", 8080))
-    print(f"Starting server on 0.0.0.0:{port}")
-    uvicorn.run(app, host="0.0.0.0", port=port, log_level="info")
+    
+    # Check if we're in production mode (can be set via environment variable)
+    is_production = os.environ.get("PRODUCTION", "false").lower() == "true"
+    
+    if is_production:
+        # Production: Use uvicorn directly with production settings
+        print(f"Starting production server on 0.0.0.0:{port}")
+        
+        # Note: For multiple workers in production, you should run with gunicorn:
+        # gunicorn app:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8080
+        
+        # Single-process uvicorn for simple deployments
+        uvicorn.run(app, host="0.0.0.0", port=port, 
+                   log_level="info",  # Use "warning" or "error" for less verbosity
+                   access_log=False,  # Disable access logs (let nginx/reverse proxy handle it)
+                   reload=False,      # Never reload in production
+                   # Performance optimizations:
+                   limit_concurrency=1000,  # Max concurrent connections
+                   timeout_keep_alive=5,    # Keep-alive timeout in seconds
+                   server_header=False,     # Don't send server header (security)
+                   date_header=False)       # Don't send date header (slight performance gain)
+    else:
+        # Development: Use serve() for auto-reload or uvicorn with reload=True
+        print(f"Starting development server on 0.0.0.0:{port}")
+        # Option 1: Use FastHTML's serve() - it uses uvicorn internally
+        # serve(port=port, reload=True, host="0.0.0.0")
+        
+        # Option 2: Use uvicorn directly with reload (more control)
+        uvicorn.run("app:app", host="0.0.0.0", port=port, 
+                   reload=True,
+                   log_level="info",
+                   reload_dirs=["."],  # Watch current directory
+                   reload_excludes=["data/*", "*.db", "venv/*", "__pycache__/*"])

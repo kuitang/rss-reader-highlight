@@ -24,6 +24,7 @@ RUN mkdir -p /data && chmod 755 /data
 ENV PORT=8080
 ENV PYTHONUNBUFFERED=1
 ENV DATABASE_PATH=/data/rss.db
+ENV PRODUCTION=true
 
 # Expose port
 EXPOSE 8080
@@ -31,5 +32,9 @@ EXPOSE 8080
 # Initialize SQLite with WAL mode for better performance
 RUN sqlite3 /tmp/init.db "PRAGMA journal_mode=WAL; PRAGMA synchronous=1;" && rm /tmp/init.db
 
-# Run the application
-CMD ["python", "app.py"]
+# Make production script executable
+RUN chmod +x run_production.sh
+
+# Use gunicorn with multiple workers in production
+# Falls back to simple uvicorn if gunicorn fails
+CMD ["sh", "-c", "./run_production.sh || python app.py"]
