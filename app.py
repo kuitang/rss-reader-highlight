@@ -168,8 +168,30 @@ class MobileHandlers:
     @staticmethod
     def content(data):
         """Mobile content area - feeds list or article detail"""
-        return FeedsContent(data.session_id, data.feed_id, data.unread, 
-                          data.page, for_desktop=False, data=data)
+        responses = [FeedsContent(data.session_id, data.feed_id, data.unread, 
+                    data.page, for_desktop=False, data=data)]
+        
+        # Update persistent header with correct tab state for mobile
+        updated_header = Div(
+            cls='flex-shrink-0 bg-background border-b z-10 lg:hidden',
+            id='mobile-persistent-header',
+            hx_swap_oob="outerHTML",
+            onwheel="event.preventDefault(); event.stopPropagation(); return false;"
+        )(
+            Div(cls='flex px-4 py-2')(
+                H3(data.feed_name),
+                create_tab_container(data.feed_name, data.feed_id, data.unread, for_mobile=True)
+            ),
+            Div(cls='px-4 pb-2')(
+                Div(cls='uk-inline w-full')(
+                    Span(cls='uk-form-icon text-muted-foreground')(UkIcon('search')),
+                    Input(placeholder='Search posts', uk_filter_control="", id="mobile-persistent-search")
+                )
+            )
+        )
+        responses.append(updated_header)
+        
+        return tuple(responses)
     
     @staticmethod
     def sidebar(data):
