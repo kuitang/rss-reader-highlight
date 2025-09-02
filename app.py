@@ -149,38 +149,37 @@ app, rt = fast_app(
         htmx.logAll();
         htmx.config.includeIndicatorStyles = false;
         
-        // Override HTMX's scroll saving/restoration for mobile main-content element
-        htmx.on('htmx:beforeHistorySave', function(evt) {
+        // Simple URL-based scroll restoration for mobile
+        // Modify HTMX requests to add scroll position
+        htmx.on('htmx:configRequest', function(evt) {
             if (window.innerWidth < 1024) {
-                const mainContent = document.getElementById('main-content');
-                if (mainContent) {
-                    // Override the scroll position that HTMX saves
-                    const scrollPos = mainContent.scrollTop;
-                    console.log('Overriding HTMX scroll save for mobile:', scrollPos);
-                    
-                    // Store in the history item that HTMX will save
-                    if (evt.detail && evt.detail.item) {
-                        evt.detail.item.scroll = scrollPos;  // Override HTMX's window.scrollY
+                // Check if navigating to an article
+                if (evt.detail.path && evt.detail.path.includes('/item/')) {
+                    const mainContent = document.getElementById('main-content');
+                    if (mainContent) {
+                        const scrollPos = Math.round(mainContent.scrollTop);
+                        // Add scroll position as a parameter
+                        evt.detail.parameters._scroll = scrollPos;
                     }
                 }
             }
         });
         
-        // Override HTMX's scroll restoration for mobile
-        htmx.on('htmx:historyRestore', function(evt) {
-            if (window.innerWidth < 1024) {
-                const mainContent = document.getElementById('main-content');
-                if (mainContent && evt.detail && evt.detail.item && evt.detail.item.scroll !== undefined) {
-                    const scrollPos = evt.detail.item.scroll;
-                    console.log('Overriding HTMX scroll restore for mobile:', scrollPos);
-                    
-                    // Prevent HTMX from setting window scroll and set main-content instead
-                    evt.preventDefault();
-                    
-                    setTimeout(() => {
-                        mainContent.scrollTop = scrollPos;
-                        console.log('Mobile scroll restored to:', mainContent.scrollTop);
-                    }, 50);
+        // Restore scroll position after navigating back
+        htmx.on('htmx:afterSwap', function(evt) {
+            if (window.innerWidth < 1024 && evt.detail.target && evt.detail.target.id === 'main-content') {
+                // Extract scroll position from request path
+                if (evt.detail.pathInfo && evt.detail.pathInfo.requestPath) {
+                    const match = evt.detail.pathInfo.requestPath.match(/_scroll=(\d+)/);
+                    if (match) {
+                        const scrollPos = parseInt(match[1]);
+                        setTimeout(() => {
+                            const mainContent = document.getElementById('main-content');
+                            if (mainContent) {
+                                mainContent.scrollTop = scrollPos;
+                            }
+                        }, 50);
+                    }
                 }
             }
         });
@@ -822,7 +821,7 @@ def ItemDetailView(item, show_back=False):
     )
 
 @rt('/')
-def index(request, feed_id: int = None, unread: bool = True, folder_id: int = None, page: int = 1):
+def index(request, feed_id: int = None, unread: bool = True, folder_id: int = None, page: int = 1, _scroll: int = None):
     """Main page with mobile-first responsive design"""
     session_id = request.scope['session_id']
     
@@ -978,7 +977,7 @@ def index(request, feed_id: int = None, unread: bool = True, folder_id: int = No
     )
 
 @rt('/item/{item_id}')
-def show_item(item_id: int, request, unread_view: bool = False, feed_id: int = None):
+def show_item(item_id: int, request, unread_view: bool = False, feed_id: int = None, _scroll: int = None):
     """Get item detail and mark as read with mobile-responsive UI updates"""
     session_id = request.scope['session_id']
     
@@ -1113,6 +1112,11 @@ def show_item(item_id: int, request, unread_view: bool = False, feed_id: int = N
         # Add unread parameter based on the view we came from
         if unread_view is False:  # We came from "All Posts" view
             back_url += "&unread=0" if feed_id else "?unread=0"
+        
+        # Preserve scroll position if provided
+        if _scroll:
+            back_url += f"&_scroll={_scroll}" if '?' in back_url else f"?_scroll={_scroll}"
+        
             
         back_button = Button(
             UkIcon('arrow-left'),
