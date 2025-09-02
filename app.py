@@ -600,9 +600,7 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
     
     # Simple header logic for desktop only
     if feed_id:
-        feeds = FeedModel.get_user_feeds(session_id)
-        feed = next((f for f in feeds if f['id'] == feed_id), None)
-        feed_name = feed['title'] if feed else "Unknown Feed"
+        feed_name = FeedModel.get_feed_name_for_user(session_id, feed_id) or "Unknown Feed"
     else:
         feed_name = "All Feeds"
     
@@ -821,9 +819,9 @@ def ItemDetailView(item, show_back=False):
     )
 
 @rt('/')
-def index(request, feed_id: int = None, unread: bool = True, folder_id: int = None, page: int = 1, _scroll: int = None):
+def index(htmx, sess, feed_id: int = None, unread: bool = True, folder_id: int = None, page: int = 1, _scroll: int = None):
     """Main page with mobile-first responsive design"""
-    session_id = request.scope['session_id']
+    session_id = sess.get('session_id')
     
     # Check what feeds this session has
     user_feeds = FeedModel.get_user_feeds(session_id)
@@ -842,13 +840,10 @@ def index(request, feed_id: int = None, unread: bool = True, folder_id: int = No
     # This is now handled by MobileHeader function
     
     # Check if this is an HTMX request for mobile content updates
-    is_htmx = request.headers.get('HX-Request') == 'true'
-    hx_target = request.headers.get('HX-Target', 'none')
-    
-    if is_htmx:
+    if htmx:
         # HTMX request: return partial content
         # Note: HX-Target header doesn't include the # prefix
-        if hx_target == '#main-content' or hx_target == 'main-content':
+        if htmx.target == '#main-content' or htmx.target == 'main-content':
             # Mobile navigation - return content and updated header with correct tab state
             responses = [FeedsContent(session_id, feed_id, unread, page)]
             
@@ -860,7 +855,7 @@ def index(request, feed_id: int = None, unread: bool = True, folder_id: int = No
                 onwheel="event.preventDefault(); event.stopPropagation(); return false;"
             )(
                 Div(cls='flex px-4 py-2')(
-                    H3("All Feeds" if not feed_id else next((f['title'] for f in FeedModel.get_user_feeds(session_id) if f['id'] == feed_id), "Unknown Feed")),
+                    H3("All Feeds" if not feed_id else (FeedModel.get_feed_name_for_user(session_id, feed_id) or "Unknown Feed")),
                     TabContainer(
                         Li(A("All Posts", 
                              href=f"/?feed_id={feed_id}&unread=0" if feed_id else "/?unread=0", 
@@ -907,10 +902,10 @@ def index(request, feed_id: int = None, unread: bool = True, folder_id: int = No
             return tuple(responses)
         else:
             # Desktop or other targets - just return content
-            return FeedsContent(session_id, feed_id, unread, page, for_desktop=(hx_target == '#desktop-feeds-content'))
+            return FeedsContent(session_id, feed_id, unread, page, for_desktop=(htmx.target == '#desktop-feeds-content'))
     
     # Full page load: return complete page structure
-    return Title("RSS Reader"), Body(
+    return Titled("RSS Reader",
         Div(id="mobile-header")(MobileHeader(session_id, show_back=False, feed_id=feed_id, unread_view=unread)),
         MobileSidebar(session_id),
         # Desktop layout: sidebar + feeds + article detail (unchanged)
@@ -977,12 +972,12 @@ def index(request, feed_id: int = None, unread: bool = True, folder_id: int = No
     )
 
 @rt('/item/{item_id}')
-def show_item(item_id: int, request, unread_view: bool = False, feed_id: int = None, _scroll: int = None):
+def show_item(item_id: int, htmx, sess, unread_view: bool = False, feed_id: int = None, _scroll: int = None):
     """Get item detail and mark as read with mobile-responsive UI updates"""
-    session_id = request.scope['session_id']
+    session_id = sess.get('session_id')
     
     # Detect HTMX vs full page request for proper response
-    hx_target = request.headers.get('HX-Target', '')
+    hx_target = htmx.target if htmx else ''
     hx_request = request.headers.get('HX-Request', 'false')
     is_htmx = hx_request == 'true'
     
@@ -993,9 +988,9 @@ def show_item(item_id: int, request, unread_view: bool = False, feed_id: int = N
     
     if not item_before:
         print(f"🔍 MOBILE_FORM_BUG_DEBUG: show_item({item_id}) - item not found")
-        if not is_htmx:
+        if not htmx:
             # Return full page for regular requests
-            return Title("RSS Reader"), Body(
+            return Titled("RSS Reader",
                 Div(id="mobile-header")(MobileHeader(session_id, show_back=True, feed_id=feed_id, unread_view=unread_view)),
                 MobileSidebar(session_id),
                 # Desktop layout (same as index)
@@ -1035,16 +1030,13 @@ def show_item(item_id: int, request, unread_view: bool = False, feed_id: int = N
     
     was_unread = not item_before.get('is_read', 0)
     
-    # Mark item as read
-    UserItemModel.mark_read(session_id, item_id, True)
-    
-    # Get updated item details with optimized single-row query
-    item_after = FeedItemModel.get_item_for_user(session_id, item_id)
+    # Single optimized query: mark as read and get updated item
+    item_after = UserItemModel.mark_read_and_get_item(session_id, item_id, True)
     
     # Check if this is a regular browser request (not HTMX)
-    if not is_htmx:
+    if not htmx:
         # Return full page structure for shared/refreshed URLs
-        return Title("RSS Reader"), Body(
+        return Titled("RSS Reader",
             Div(id="mobile-header")(MobileHeader(session_id, show_back=True, feed_id=feed_id, unread_view=unread_view)),
             MobileSidebar(session_id),
             # Desktop layout (same as index)
@@ -1169,23 +1161,22 @@ def show_item(item_id: int, request, unread_view: bool = False, feed_id: int = N
     return tuple(responses) if len(responses) > 1 else detail_view
 
 @rt('/api/feed/add')
-def add_feed(request, new_feed_url: str = ""):
+def add_feed(htmx, sess, new_feed_url: str = ""):
     """Add new feed"""
-    session_id = request.scope['session_id']
+    session_id = sess.get('session_id')
     url = new_feed_url.strip()
     timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
     print(f"[{timestamp}] DEBUG: add_feed called with URL='{url}'")
     
     # Determine if request is from mobile or desktop based on target
-    hx_target = request.headers.get('HX-Target', '')
+    hx_target = htmx.target if htmx else ''
     print(f"[{timestamp}] DEBUG: HX-Target header: '{hx_target}'")
     
     if not url:
         return Div("Please enter a URL", cls='text-red-500 p-4')
     
     # Check if user is already subscribed to this feed
-    user_feeds = FeedModel.get_user_feeds(session_id)
-    existing_feed = next((f for f in user_feeds if f['url'] == url), None)
+    existing_feed = FeedModel.user_has_feed_url(session_id, url)
     
     if existing_feed:
         return Div(f"Already subscribed to: {existing_feed['title']}", 
@@ -1262,40 +1253,35 @@ def add_feed(request, new_feed_url: str = ""):
             )
 
 @rt('/api/item/{item_id}/star')
-def star_item(item_id: int, request):
+def star_item(item_id: int, htmx, sess):
     """Toggle star status"""
-    session_id = request.scope['session_id']
-    UserItemModel.toggle_star(session_id, item_id)
-    
-    # Return updated item detail with mobile support - optimized single query
-    item = FeedItemModel.get_item_for_user(session_id, item_id)
-    is_htmx = request.headers.get('HX-Request') == 'true'
-    return ItemDetailView(item, show_back=is_htmx)
+    session_id = sess.get('session_id')
+    # Single optimized query: toggle star and get updated item
+    item = UserItemModel.toggle_star_and_get_item(session_id, item_id)
+    return ItemDetailView(item, show_back=bool(htmx))
 
 @rt('/api/item/{item_id}/read')
-def toggle_read(item_id: int, request):
+def toggle_read(item_id: int, htmx, sess):
     """Toggle read status"""
-    session_id = request.scope['session_id']
+    session_id = sess.get('session_id')
     
-    # Get current status and toggle - optimized single query
-    item = FeedItemModel.get_item_for_user(session_id, item_id)
+    # Single optimized query: toggle read status and get updated item
+    item = UserItemModel.toggle_read_and_get_item(session_id, item_id)
     
     if item:
-        is_read = not item.get('is_read', 0)
-        UserItemModel.mark_read(session_id, item_id, is_read)
-        
-        # Return updated item detail with mobile support - optimized single query
-        item = FeedItemModel.get_item_for_user(session_id, item_id)
-        is_htmx = request.headers.get('HX-Request') == 'true'
-        return ItemDetailView(item, show_back=is_htmx)
+        return ItemDetailView(item, show_back=bool(htmx))
     
     return Div("Item not found", cls='text-red-500 p-4')
 
 @rt('/api/folder/add')
-def add_folder(request):
+def add_folder(htmx, sess):
     """Add new folder"""
-    session_id = request.scope['session_id']
-    name = request.headers.get('hx-prompt', '').strip()
+    session_id = sess.get('session_id')
+    # Access hx-prompt through htmx parameter
+    name = getattr(htmx, 'prompt', '') if htmx else ''
+    if not name and htmx:
+        name = getattr(htmx, 'hx_prompt', '') or ''
+    name = name.strip()
     
     if name:
         FolderModel.create_folder(session_id, name)

@@ -174,6 +174,30 @@ class FeedModel:
             """, (session_id,)).fetchall()]
     
     @staticmethod
+    def get_feed_name_for_user(session_id: str, feed_id: int) -> Optional[str]:
+        """Get single feed name for user - optimized single-row query"""
+        with get_db() as conn:
+            result = conn.execute("""
+                SELECT f.title
+                FROM feeds f
+                JOIN user_feeds uf ON f.id = uf.feed_id
+                WHERE uf.session_id = ? AND f.id = ?
+            """, (session_id, feed_id)).fetchone()
+            return result[0] if result else None
+    
+    @staticmethod
+    def user_has_feed_url(session_id: str, url: str) -> Optional[Dict]:
+        """Check if user is subscribed to feed with URL - optimized single-row query"""
+        with get_db() as conn:
+            result = conn.execute("""
+                SELECT f.*, uf.added_at as subscribed_at
+                FROM feeds f
+                JOIN user_feeds uf ON f.id = uf.feed_id
+                WHERE uf.session_id = ? AND f.url = ?
+            """, (session_id, url)).fetchone()
+            return dict(result) if result else None
+    
+    @staticmethod
     def feed_exists_by_url(url: str) -> bool:
         """Check if a feed with the given URL already exists"""
         with get_db() as conn:
@@ -361,6 +385,78 @@ class UserItemModel:
                     (SELECT folder_id FROM user_items WHERE session_id = ? AND item_id = ?)
                 )
             """, (session_id, item_id, session_id, item_id, session_id, item_id, session_id, item_id))
+    
+    @staticmethod
+    def toggle_star_and_get_item(session_id: str, item_id: int) -> Optional[Dict]:
+        """Toggle star status and return updated item - optimized single transaction"""
+        with get_db() as conn:
+            # Toggle star
+            conn.execute("""
+                INSERT OR REPLACE INTO user_items (session_id, item_id, starred, is_read, folder_id)
+                VALUES (?, ?, 
+                    NOT COALESCE((SELECT starred FROM user_items WHERE session_id = ? AND item_id = ?), 0),
+                    COALESCE((SELECT is_read FROM user_items WHERE session_id = ? AND item_id = ?), 0),
+                    (SELECT folder_id FROM user_items WHERE session_id = ? AND item_id = ?)
+                )
+            """, (session_id, item_id, session_id, item_id, session_id, item_id, session_id, item_id))
+            
+            # Get updated item in same transaction
+            result = conn.execute("""
+                SELECT fi.*, f.title as feed_title, 
+                       COALESCE(ui.is_read, 0) as is_read,
+                       COALESCE(ui.starred, 0) as starred,
+                       fo.name as folder_name
+                FROM feed_items fi
+                JOIN feeds f ON fi.feed_id = f.id
+                JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
+                LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
+                LEFT JOIN folders fo ON ui.folder_id = fo.id
+                WHERE fi.id = ?
+            """, (session_id, session_id, item_id)).fetchone()
+            
+            return dict(result) if result else None
+    
+    @staticmethod
+    def toggle_read_and_get_item(session_id: str, item_id: int) -> Optional[Dict]:
+        """Toggle read status and return updated item - optimized single transaction"""
+        with get_db() as conn:
+            # Get current read status and toggle it
+            current_result = conn.execute("""
+                SELECT COALESCE(ui.is_read, 0) as current_read
+                FROM feed_items fi
+                LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
+                WHERE fi.id = ?
+            """, (session_id, item_id)).fetchone()
+            
+            if not current_result:
+                return None  # Item doesn't exist
+            
+            new_read_status = not current_result[0]
+            
+            # Update read status
+            conn.execute("""
+                INSERT OR REPLACE INTO user_items (session_id, item_id, is_read, starred, folder_id)
+                VALUES (?, ?, ?, 
+                        COALESCE((SELECT starred FROM user_items WHERE session_id = ? AND item_id = ?), 0),
+                        (SELECT folder_id FROM user_items WHERE session_id = ? AND item_id = ?)
+                )
+            """, (session_id, item_id, new_read_status, session_id, item_id, session_id, item_id))
+            
+            # Get updated item in same transaction
+            result = conn.execute("""
+                SELECT fi.*, f.title as feed_title, 
+                       COALESCE(ui.is_read, 0) as is_read,
+                       COALESCE(ui.starred, 0) as starred,
+                       fo.name as folder_name
+                FROM feed_items fi
+                JOIN feeds f ON fi.feed_id = f.id
+                JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
+                LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
+                LEFT JOIN folders fo ON ui.folder_id = fo.id
+                WHERE fi.id = ?
+            """, (session_id, session_id, item_id)).fetchone()
+            
+            return dict(result) if result else None
     
     @staticmethod
     def move_to_folder(session_id: str, item_id: int, folder_id: int):
