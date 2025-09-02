@@ -166,32 +166,33 @@ class MobileHandlers:
     """Mobile uses #main-content for full-screen navigation"""
     
     @staticmethod
-    def content(data):
+    def content(data, update_header=True):
         """Mobile content area - feeds list or article detail"""
         responses = [FeedsContent(data.session_id, data.feed_id, data.unread, 
                     data.page, for_desktop=False, data=data)]
         
-        # Update persistent header with correct tab state for mobile
-        updated_header = Div(
-            cls='flex-shrink-0 bg-background border-b z-10 lg:hidden',
-            id='mobile-persistent-header',
-            hx_swap_oob="outerHTML",
-            onwheel="event.preventDefault(); event.stopPropagation(); return false;"
-        )(
-            Div(cls='flex px-4 py-2')(
-                H3(data.feed_name),
-                create_tab_container(data.feed_name, data.feed_id, data.unread, for_mobile=True)
-            ),
-            Div(cls='px-4 pb-2')(
-                Div(cls='uk-inline w-full')(
-                    Span(cls='uk-form-icon text-muted-foreground')(UkIcon('search')),
-                    Input(placeholder='Search posts', uk_filter_control="", id="mobile-persistent-search")
+        # Update persistent header with correct tab state for mobile HTMX requests
+        if update_header:
+            updated_header = Div(
+                cls='flex-shrink-0 bg-background border-b z-10 lg:hidden',
+                id='mobile-persistent-header',
+                hx_swap_oob="outerHTML",
+                onwheel="event.preventDefault(); event.stopPropagation(); return false;"
+            )(
+                Div(cls='flex px-4 py-2')(
+                    H3(data.feed_name),
+                    create_tab_container(data.feed_name, data.feed_id, data.unread, for_mobile=True)
+                ),
+                Div(cls='px-4 pb-2')(
+                    Div(cls='uk-inline w-full')(
+                        Span(cls='uk-form-icon text-muted-foreground')(UkIcon('search')),
+                        Input(placeholder='Search posts', uk_filter_control="", id="mobile-persistent-search")
+                    )
                 )
             )
-        )
-        responses.append(updated_header)
+            responses.append(updated_header)
         
-        return tuple(responses)
+        return tuple(responses) if len(responses) > 1 else responses[0]
     
     @staticmethod
     def sidebar(data):
@@ -201,29 +202,11 @@ class MobileHandlers:
     @staticmethod
     def navigation_restore(data):
         """Restore mobile navigation when returning from article"""
-        responses = [FeedsContent(data.session_id, data.feed_id, data.unread, 
-                    data.page, for_desktop=False, data=data)]
+        responses = list(MobileHandlers.content(data, update_header=True))
+        if not isinstance(responses, (list, tuple)):
+            responses = [responses]
         
-        # Update persistent header with correct tab state using hx_swap_oob
-        updated_header = Div(
-            cls='flex-shrink-0 bg-background border-b z-10 lg:hidden',
-            id='mobile-persistent-header',
-            hx_swap_oob="outerHTML",
-            onwheel="event.preventDefault(); event.stopPropagation(); return false;"
-        )(
-            Div(cls='flex px-4 py-2')(
-                H3(data.feed_name),
-                create_tab_container(data.feed_name, data.feed_id, data.unread, for_mobile=True)
-            ),
-            Div(cls='px-4 pb-2')(
-                Div(cls='uk-inline w-full')(
-                    Span(cls='uk-form-icon text-muted-foreground')(UkIcon('search')),
-                    Input(placeholder='Search posts', uk_filter_control="", id="mobile-persistent-search")
-                )
-            )
-        )
-        responses.append(updated_header)
-        
+        # Add navigation-specific elements for returning from article view
         # Remove article-view class from body to show persistent header
         body_class_script = Script("""
         document.body.classList.remove('article-view');
@@ -268,9 +251,9 @@ class DesktopHandlers:
 
 # ROUTING MAP - Explicit about which handler for which target
 HTMX_ROUTING = {
-    # Mobile targets
-    'main-content': MobileHandlers.content,
-    '#main-content': MobileHandlers.content,
+    # Mobile targets - include header updates for HTMX requests
+    'main-content': lambda data: MobileHandlers.content(data, update_header=True),
+    '#main-content': lambda data: MobileHandlers.content(data, update_header=True),
     'mobile-sidebar': MobileHandlers.sidebar,
     '#mobile-sidebar': MobileHandlers.sidebar,
     
@@ -328,7 +311,8 @@ def mobile_layout(data):
         Div(cls="h-20 flex-shrink-0"),  # Header spacer
         MobilePersistentHeader(data.session_id, data.feed_id, data.unread),
         Div(cls="flex-1 overflow-y-auto", id="main-content")(
-            MobileHandlers.content(data)
+            # Just content for initial load, no header update to avoid duplication
+            MobileHandlers.content(data, update_header=False)
         )
     )
 

@@ -402,6 +402,7 @@ class TestBlueIndicatorHTMXFlow:
 class TestSessionAndSubscriptionFlow:
     """Test the session auto-subscription flow that caused 'No posts available'"""
     
+    @pytest.mark.need_full_db  
     def test_fresh_user_auto_subscription_flow(self, page):
         """Test: Fresh browser → Auto session → Auto subscribe → Articles appear
         
