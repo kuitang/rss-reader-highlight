@@ -242,7 +242,7 @@ class DesktopHandlers:
     def sidebar_column(data):
         """Left column - feeds sidebar"""
         return Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
-            FeedsSidebar(data.session_id)
+            FeedsSidebar(data.session_id, for_mobile=False)
         )
 
 # ROUTING MAP - Explicit about which handler for which target
@@ -798,8 +798,8 @@ def FeedSidebarItem(feed, count=""):
         )
     )
 
-def FeedsSidebar(session_id):
-    """Create unified feeds sidebar that works for both mobile and desktop"""
+def FeedsSidebar(session_id, for_mobile=False):
+    """Create feeds sidebar with proper HTMX targeting based on context"""
     feeds = FeedModel.get_user_feeds(session_id)
     folders = FolderModel.get_folders(session_id)
     
@@ -820,10 +820,9 @@ def FeedsSidebar(session_id):
                     )
                 ),
                 hx_post="/api/feed/add",
-                hx_target=Targets.DESKTOP_SIDEBAR,  # Default to desktop
+                hx_target=Targets.MOBILE_SIDEBAR if for_mobile else Targets.DESKTOP_SIDEBAR,
                 hx_swap="outerHTML",
-                cls="add-feed-form",
-                hx_on_htmx_config_request="const isMobile = this.closest('#mobile-sidebar'); if (isMobile) { event.detail.target = '#mobile-sidebar'; event.detail.headers['HX-Target'] = '#mobile-sidebar'; }"
+                cls="add-feed-form"
             ),
             cls='p-4'
         ),
@@ -1151,7 +1150,7 @@ def MobileSidebar(session_id):
                     )
                 )
             ),
-            FeedsSidebar(session_id)
+            FeedsSidebar(session_id, for_mobile=True)
         )
     )
 
@@ -1392,7 +1391,7 @@ def add_feed(htmx, sess, new_feed_url: str = ""):
         else:
             # Desktop: return sidebar container with content
             return Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
-                FeedsSidebar(session_id)
+                FeedsSidebar(session_id, for_mobile=False)
             )
         
     except Exception as e:
@@ -1407,7 +1406,7 @@ def add_feed(htmx, sess, new_feed_url: str = ""):
             return MobileSidebar(session_id)
         else:
             return Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
-                FeedsSidebar(session_id)
+                FeedsSidebar(session_id, for_mobile=False)
             )
 
 @rt('/api/item/{item_id}/star')
@@ -1446,7 +1445,7 @@ def add_folder(htmx, sess):
     
     # Return updated sidebar (this is for folder add, always from desktop sidebar)
     return Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
-        FeedsSidebar(session_id)
+        FeedsSidebar(session_id, for_mobile=False)
     )
 
 @rt('/api/update-status')
