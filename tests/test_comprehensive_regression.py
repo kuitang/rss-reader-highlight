@@ -299,9 +299,9 @@ class TestComprehensiveRegression:
         feed_items = page.locator("li[id*='feed-item']")
         expect(feed_items.first).to_be_visible()
         
-        # Test tab switching
-        all_posts_tab = page.locator("a:has-text('All Posts')")
-        unread_tab = page.locator("a:has-text('Unread')")
+        # Test tab switching (desktop-specific)
+        all_posts_tab = page.locator("#desktop-feeds-content a:has-text('All Posts')")
+        unread_tab = page.locator("#desktop-feeds-content a:has-text('Unread')")
         
         # Switch to All Posts
         if all_posts_tab.is_visible():
