@@ -8,7 +8,12 @@ from contextlib import contextmanager
 
 # Database path selection based on mode
 MINIMAL_MODE = os.environ.get("MINIMAL_MODE", "false").lower() == "true"
-DB_PATH = "data/minimal.db" if MINIMAL_MODE else "data/rss.db"
+
+# Use DATABASE_PATH from environment if set, otherwise fall back to default
+if MINIMAL_MODE:
+    DB_PATH = os.environ.get("DATABASE_PATH", "data/rss.db").replace(".db", "_minimal.db")
+else:
+    DB_PATH = os.environ.get("DATABASE_PATH", "data/rss.db")
 
 def init_db():
     """Initialize database with required tables"""
