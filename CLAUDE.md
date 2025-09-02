@@ -17,8 +17,14 @@ python -m playwright install
 
 ### Running the Application
 ```bash
-# Start main application (default port 5001)
+# IMPORTANT: Always activate virtual environment first
+source venv/bin/activate
+
+# Start main application (default port 8080)
 python app.py
+
+# Fast startup for integration tests (minimal database with 2 feeds)
+MINIMAL_MODE=true python app.py
 
 # Clear and reset database
 python clear_db.py
@@ -28,6 +34,9 @@ python clear_db.py
 
 #### Quick Development Tests (Fast, Core Logic)
 ```bash
+# IMPORTANT: Activate virtual environment first
+source venv/bin/activate
+
 # Run core logic tests - always work, no browser needed
 python -m pytest tests/test_optimized_integration.py tests/test_essential_mocks.py tests/test_direct_functions.py -v
 
@@ -40,8 +49,14 @@ python -m pytest tests/test_feed_ingestion.py -v
 
 #### UI Flow Tests (Require Running Server)
 ```bash
-# Start server first in separate terminal: python app.py
-# Then run UI tests targeting specific bugs we debugged
+# FAST: Start minimal server for integration tests (separate terminal)
+# source venv/bin/activate && MINIMAL_MODE=true python app.py
+
+# FULL: Start normal server for comprehensive testing (separate terminal)
+# source venv/bin/activate && python app.py
+
+# Then run UI tests targeting specific bugs we debugged (in another terminal)
+source venv/bin/activate
 python -m pytest tests/test_critical_ui_flows.py::TestFormParameterBugFlow -v
 python -m pytest tests/test_critical_ui_flows.py::TestBBCRedirectHandlingFlow -v
 python -m pytest tests/test_critical_ui_flows.py::TestBlueIndicatorHTMXFlow -v
@@ -55,6 +70,9 @@ python -m pytest tests/test_mobile_flows.py -v
 
 #### Test Coverage
 ```bash
+# Activate virtual environment first
+source venv/bin/activate
+
 # Run with coverage reporting
 coverage run --source=. -m pytest tests/test_optimized_integration.py tests/test_essential_mocks.py -v
 coverage report --show-missing
@@ -66,8 +84,14 @@ coverage report --show-missing
 
 ### Database Management
 ```bash
+# Activate virtual environment first
+source venv/bin/activate
+
 # Reset database completely
 python clear_db.py
+
+# Create minimal seed database for fast testing (run after normal startup)
+python create_minimal_db.py
 
 # Manual database inspection
 sqlite3 data/rss.db
@@ -176,21 +200,24 @@ Tests focus on **complex workflows that broke during development**, not trivial 
 
 #### Before Making Changes
 ```bash
-# Run quick core logic tests
+# Activate virtual environment and run quick core logic tests
+source venv/bin/activate
 python -m pytest tests/test_optimized_integration.py tests/test_essential_mocks.py tests/test_direct_functions.py -v
 ```
 
 #### After Major Changes
 ```bash
-# Full coverage verification
+# Activate virtual environment and run full coverage verification
+source venv/bin/activate
 coverage run --source=. -m pytest tests/test_optimized_integration.py tests/test_essential_mocks.py -v
 coverage report --show-missing
 ```
 
 #### UI Feature Development
 ```bash
-# Start server: python app.py
-# Test specific UI flows
+# Start server: source venv/bin/activate && python app.py
+# Test specific UI flows (in another terminal)
+source venv/bin/activate
 python -m pytest tests/test_critical_ui_flows.py -v
 ```
 

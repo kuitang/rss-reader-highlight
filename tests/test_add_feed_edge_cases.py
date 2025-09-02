@@ -3,6 +3,15 @@
 from playwright.sync_api import sync_playwright
 import time
 
+# HTMX Helper Functions for Fast Testing
+def wait_for_htmx_complete(page, timeout=5000):
+    """Wait for all HTMX requests to complete - much faster than fixed timeouts"""
+    page.wait_for_function("() => !document.body.classList.contains('htmx-request')", timeout=timeout)
+
+def wait_for_page_ready(page):
+    """Fast page ready check - waits for network idle instead of fixed timeout"""
+    page.wait_for_load_state("networkidle")
+
 def test_add_feed_edge_cases():
     """Test various add feed scenarios to find issues"""
     with sync_playwright() as p:
@@ -12,17 +21,17 @@ def test_add_feed_edge_cases():
         # Set mobile viewport
         page.set_viewport_size({"width": 375, "height": 667})
         page.goto("http://localhost:8080")
-        page.wait_for_timeout(5000)
+        wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle instead of 5 seconds
         
         print("🧪 TESTING ADD FEED EDGE CASES")
         
-        # Open sidebar
-        hamburger = page.locator('#mobile-header button[onclick*="mobile-sidebar"]')
+        # Open sidebar - updated selector to match current app.py
+        hamburger = page.locator('#mobile-header button').filter(has=page.locator('uk-icon[icon="menu"]'))
         hamburger.click()
-        page.wait_for_timeout(1000)
+        page.wait_for_selector("#mobile-sidebar", state="visible")  # OPTIMIZED: Wait for sidebar to appear
         
         feed_input = page.locator('#mobile-sidebar input[name="new_feed_url"]')
-        add_button = page.locator('#mobile-sidebar button[hx-post="/api/feed/add"]')
+        add_button = page.locator('#mobile-sidebar button.add-feed-button')  # Updated selector to match current app.py
         
         test_cases = [
             ("", "Empty URL"),
@@ -43,7 +52,7 @@ def test_add_feed_edge_cases():
             
             # Click add button
             add_button.click()
-            page.wait_for_timeout(3000)
+            wait_for_htmx_complete(page, timeout=8000)  # OPTIMIZED: Wait for HTMX response instead of 3 seconds
             
             # Check for any response in sidebar
             sidebar_text = page.locator("#mobile-sidebar").inner_text()
@@ -69,7 +78,7 @@ def test_add_feed_edge_cases():
         print("All test cases completed - check individual results above")
         
         print("Browser staying open for manual testing...")
-        time.sleep(15)
+        time.sleep(3)  # OPTIMIZED: Reduced from 15 to 3 seconds for faster testing
         browser.close()
 
 if __name__ == "__main__":

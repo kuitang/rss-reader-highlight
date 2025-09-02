@@ -6,11 +6,27 @@ from datetime import datetime, timezone
 from typing import Optional, List, Dict
 from contextlib import contextmanager
 
-DB_PATH = os.environ.get("DATABASE_PATH", "data/rss.db")
+# Database path selection based on mode
+MINIMAL_MODE = os.environ.get("MINIMAL_MODE", "false").lower() == "true"
+DB_PATH = "data/minimal.db" if MINIMAL_MODE else "data/rss.db"
 
 def init_db():
     """Initialize database with required tables"""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    
+    # In minimal mode, copy fresh seed database if it exists
+    if MINIMAL_MODE:
+        seed_path = "data/minimal_seed.db"
+        if os.path.exists(seed_path):
+            import shutil
+            shutil.copy2(seed_path, DB_PATH)
+            print(f"✅ Copied fresh minimal database from {seed_path}")
+            return
+        else:
+            print(f"⚠️  Minimal seed database not found at {seed_path}")
+            print("Run: python create_minimal_db.py to create it first")
+    
+    # Normal database initialization
     
     with sqlite3.connect(DB_PATH) as conn:
         conn.executescript("""

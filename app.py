@@ -11,7 +11,7 @@ from bs4 import BeautifulSoup
 import asyncio
 from models import (
     SessionModel, FeedModel, FeedItemModel, UserItemModel, FolderModel,
-    init_db, get_db
+    init_db, get_db, MINIMAL_MODE
 )
 from feed_parser import FeedParser, setup_default_feeds
 from background_worker import initialize_worker_system, shutdown_worker_system
@@ -120,21 +120,26 @@ def before(req, sess):
 @contextlib.asynccontextmanager
 async def lifespan(app):
     """Handle app startup and shutdown with background worker"""
-    print("FastHTML app starting up...")
-    
-    # Always initialize background worker in single process
-    initialize_worker_system()
-    print("Background worker system initialized")
-    
-    # Always add default feeds - database constraints handle duplicates
-    print("Adding default feeds to database...")
-    setup_default_feeds()
+    if MINIMAL_MODE:
+        print("FastHTML app starting in MINIMAL MODE...")
+        print("⚡ Skipping background worker and default feeds for fast startup")
+    else:
+        print("FastHTML app starting up...")
+        
+        # Initialize background worker in single process
+        initialize_worker_system()
+        print("Background worker system initialized")
+        
+        # Add default feeds - database constraints handle duplicates
+        print("Adding default feeds to database...")
+        setup_default_feeds()
     
     yield  # App is running
     
-    # Shutdown: Clean up background worker
-    print("Shutting down background worker...")
-    shutdown_worker_system()
+    # Shutdown: Clean up background worker only if not in minimal mode
+    if not MINIMAL_MODE:
+        print("Shutting down background worker...")
+        shutdown_worker_system()
     print("FastHTML app shutdown complete")
 
 # FastHTML app with session support and lifespan
@@ -143,6 +148,42 @@ app, rt = fast_app(
         Script("""
         htmx.logAll();
         htmx.config.includeIndicatorStyles = false;
+        
+        // Override HTMX's scroll saving/restoration for mobile main-content element
+        htmx.on('htmx:beforeHistorySave', function(evt) {
+            if (window.innerWidth < 1024) {
+                const mainContent = document.getElementById('main-content');
+                if (mainContent) {
+                    // Override the scroll position that HTMX saves
+                    const scrollPos = mainContent.scrollTop;
+                    console.log('Overriding HTMX scroll save for mobile:', scrollPos);
+                    
+                    // Store in the history item that HTMX will save
+                    if (evt.detail && evt.detail.item) {
+                        evt.detail.item.scroll = scrollPos;  // Override HTMX's window.scrollY
+                    }
+                }
+            }
+        });
+        
+        // Override HTMX's scroll restoration for mobile
+        htmx.on('htmx:historyRestore', function(evt) {
+            if (window.innerWidth < 1024) {
+                const mainContent = document.getElementById('main-content');
+                if (mainContent && evt.detail && evt.detail.item && evt.detail.item.scroll !== undefined) {
+                    const scrollPos = evt.detail.item.scroll;
+                    console.log('Overriding HTMX scroll restore for mobile:', scrollPos);
+                    
+                    // Prevent HTMX from setting window scroll and set main-content instead
+                    evt.preventDefault();
+                    
+                    setTimeout(() => {
+                        mainContent.scrollTop = scrollPos;
+                        console.log('Mobile scroll restored to:', mainContent.scrollTop);
+                    }, 50);
+                }
+            }
+        });
         
         // Close mobile sidebar when a feed link is clicked
         document.addEventListener('click', function(e) {
@@ -177,6 +218,10 @@ app, rt = fast_app(
         .htmx-indicator { display: none; }
         .htmx-request .htmx-indicator { display: flex; }
         
+        /* Hide mobile persistent header when body has article-view class */
+        body.article-view #mobile-persistent-header {
+            display: none !important;
+        }
         
         /* Fix viewport scrolling on mobile - more specific and with !important */
         @media (max-width: 1023px) {
@@ -490,7 +535,7 @@ def MobilePersistentHeader(session_id, feed_id=None, unread_only=False, show_chr
             style='display: none;'
         )()
     
-    # Return the visible header
+    # Return the visible header - removed hx-preserve to allow tab state updates
     return Div(
         cls='flex-shrink-0 bg-background border-b z-10 lg:hidden',
         id='mobile-persistent-header',
@@ -668,13 +713,17 @@ def MobileSidebar(session_id):
 def MobileHeader(session_id, show_back=False, feed_id=None, unread_view=False):
     """Create mobile header with hamburger menu and optional back button - unified component"""
     
-    # Build return URL with feed context preserved
+    # Build return URL with feed context and toggle state preserved
     return_url = "/"
     if feed_id:
         if unread_view:
             return_url = f"/?feed_id={feed_id}"  # Unread view (default)
         else:
             return_url = f"/?feed_id={feed_id}&unread=0"  # All posts view
+    else:
+        # No specific feed - preserve global toggle state
+        if not unread_view:
+            return_url = "/?unread=0"  # All posts view
     
     # Loading spinner - hidden by default, shown during HTMX requests
     loading_spinner = Div(
@@ -783,8 +832,8 @@ def index(request, feed_id: int = None, unread: bool = True, folder_id: int = No
     # Check what items are available for this page
     items = FeedItemModel.get_items_for_user(session_id, feed_id, unread, page)
     
-    # Queue user's feeds for background updating
-    if background_worker.queue_manager:
+    # Queue user's feeds for background updating (skip in minimal mode)
+    if not MINIMAL_MODE and background_worker.queue_manager:
         try:
             background_worker.queue_manager.queue_user_feeds(session_id)
             print(f"DEBUG: Queued user feeds for background update")
@@ -801,30 +850,18 @@ def index(request, feed_id: int = None, unread: bool = True, folder_id: int = No
         # HTMX request: return partial content
         # Note: HX-Target header doesn't include the # prefix
         if hx_target == '#main-content' or hx_target == 'main-content':
-            # Mobile navigation back from article - restore list view and header
-            responses = []
+            # Mobile navigation - return content and updated header with correct tab state
+            responses = [FeedsContent(session_id, feed_id, unread, page)]
             
-            # Main content: feeds list
-            responses.append(FeedsContent(session_id, feed_id, unread, page))
-            
-            # Restore persistent header with tabs and search - replace entire element
-            # We need to manually construct the visible header with hx_swap_oob attribute
-            # Properly look up the feed name by feed_id
-            if feed_id:
-                feeds = FeedModel.get_user_feeds(session_id)
-                feed = next((f for f in feeds if f['id'] == feed_id), None)
-                feed_name = feed['title'] if feed else "Unknown Feed"
-            else:
-                feed_name = "All Feeds"
-            
-            restored_persistent_header = Div(
+            # Update persistent header with correct tab state using hx_swap_oob
+            updated_header = Div(
                 cls='flex-shrink-0 bg-background border-b z-10 lg:hidden',
                 id='mobile-persistent-header',
                 hx_swap_oob="outerHTML",
                 onwheel="event.preventDefault(); event.stopPropagation(); return false;"
             )(
                 Div(cls='flex px-4 py-2')(
-                    H3(feed_name),
+                    H3("All Feeds" if not feed_id else next((f['title'] for f in FeedModel.get_user_feeds(session_id) if f['id'] == feed_id), "Unknown Feed")),
                     TabContainer(
                         Li(A("All Posts", 
                              href=f"/?feed_id={feed_id}&unread=0" if feed_id else "/?unread=0", 
@@ -850,17 +887,23 @@ def index(request, feed_id: int = None, unread: bool = True, folder_id: int = No
                     )
                 )
             )
-            responses.append(restored_persistent_header)
+            responses.append(updated_header)
             
-            # Restore hamburger menu button only (don't replace entire header to avoid flashing)
-            restored_nav_button = Button(
+            # Remove article-view class from body to show persistent header
+            body_class_script = Script("""
+            document.body.classList.remove('article-view');
+            """)
+            responses.append(body_class_script)
+            
+            # Restore hamburger button for list view
+            hamburger_button = Button(
                 UkIcon('menu'),
-                cls="p-2 rounded border hover:bg-secondary mr-2",  # Added mr-2 for consistent spacing
+                cls="p-2 rounded border hover:bg-secondary mr-2",
                 onclick="document.getElementById('mobile-sidebar').removeAttribute('hidden')",
                 id="mobile-nav-button",
-                hx_swap_oob="outerHTML"  # Replace just the button
+                hx_swap_oob="outerHTML"
             )
-            responses.append(restored_nav_button)
+            responses.append(hamburger_button)
             
             return tuple(responses)
         else:
@@ -1054,28 +1097,33 @@ def show_item(item_id: int, request, unread_view: bool = False, feed_id: int = N
     detail_view = ItemDetailView(item_after, show_back=False)
     responses.append(detail_view)
     
-    # Update mobile UI for article view
+    # For mobile requests, update UI for article view
     if is_mobile_request:
-        # Mobile: update only the navigation button to show back arrow (avoid header flashing)
+        # Add CSS class to body to hide mobile persistent header
+        body_class_script = Script("""
+        document.body.classList.add('article-view');
+        """)
+        responses.append(body_class_script)
+        
+        # Update nav button to show chevron for article view
+        back_url = "/"
+        if feed_id:
+            back_url = f"/?feed_id={feed_id}"
+        
+        # Add unread parameter based on the view we came from
+        if unread_view is False:  # We came from "All Posts" view
+            back_url += "&unread=0" if feed_id else "?unread=0"
+            
         back_button = Button(
             UkIcon('arrow-left'),
-            hx_get=f"/?feed_id={feed_id}" if feed_id else "/",
+            hx_get=back_url,
             hx_target=Targets.MOBILE_CONTENT,
             hx_push_url="true",
             cls="p-2 rounded border hover:bg-secondary mr-2",
             id="mobile-nav-button",
-            hx_swap_oob="outerHTML"  # Replace just the button, not entire header
+            hx_swap_oob="outerHTML"
         )
         responses.append(back_button)
-        
-        # Mobile: hide persistent header - replace with hidden placeholder
-        hidden_persistent_header = Div(
-            id='mobile-persistent-header',
-            cls='hidden',
-            style='display: none;',
-            hx_swap_oob="outerHTML"  # Replace entire element
-        )()
-        responses.append(hidden_persistent_header)
         
     # Update list item appearance if it was unread
     if was_unread and item_after:
@@ -1160,8 +1208,8 @@ def add_feed(request, new_feed_url: str = ""):
             else:
                 raise
         
-        # Queue for immediate background processing
-        if background_worker.queue_manager:
+        # Queue for immediate background processing (skip in minimal mode)
+        if not MINIMAL_MODE and background_worker.queue_manager:
             feed_data = {
                 'id': feed_id,
                 'url': url,
@@ -1177,6 +1225,8 @@ def add_feed(request, new_feed_url: str = ""):
             except Exception as e:
                 print(f"WARNING: Could not queue feed immediately: {str(e)}")
                 print(f"Feed {feed_id} will be picked up by background worker automatically")
+        elif MINIMAL_MODE:
+            print(f"MINIMAL_MODE: Feed {feed_id} created without background processing")
         else:
             print(f"WARNING: Background worker not available, feed {feed_id} created without immediate queuing")
         

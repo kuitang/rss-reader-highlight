@@ -34,6 +34,7 @@ def page(browser):
     yield page
     page.close()
 
+@pytest.mark.skip(reason="All feed submission tests - skipping per user request")
 class TestAddFeedFlows:
     """Test add feed functionality across mobile and desktop interfaces"""
     
@@ -175,7 +176,7 @@ class TestAddFeedFlows:
             test_url = "https://httpbin.org/xml"
             desktop_input.fill(test_url)
             desktop_button.click()
-            wait_for_page_ready(page)
+            wait_for_htmx_complete(page)  # OPTIMIZED: Wait for HTMX response instead of page ready
             print("✓ Added test feed")
         
         # Test navigation to existing feed
@@ -231,7 +232,7 @@ class TestAddFeedFlows:
             test_url = "https://httpbin.org/xml"
             feed_input.fill(test_url)
             add_button.click()
-            wait_for_page_ready(page)
+            wait_for_htmx_complete(page)  # OPTIMIZED: Wait for HTMX response instead of page ready
             print("✓ Added test feed to mobile")
         
         # Test navigation to a feed
@@ -274,7 +275,7 @@ class TestAddFeedFlows:
         
         desktop_input.fill(duplicate_url)
         desktop_button.click()
-        wait_for_page_ready(page)
+        wait_for_htmx_complete(page)  # OPTIMIZED: Wait for HTMX response instead of page ready
         
         # Should handle gracefully - either show "already subscribed" message
         # or silently ignore, but shouldn't crash
