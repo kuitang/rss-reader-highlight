@@ -66,6 +66,76 @@ class Styling:
     BUTTON_NAV = 'p-2 rounded border hover:bg-secondary mr-2'
     SIDEBAR_ITEM = 'hover:bg-secondary p-4 block'
 
+# =============================================================================
+# DATA PREPARATION LAYER - Centralized data fetching and preparation
+# =============================================================================
+
+class PageData:
+    """Centralized data preparation - acknowledges mobile/desktop differences"""
+    def __init__(self, session_id, feed_id=None, unread=True, page=1):
+        self.session_id = session_id
+        self.feed_id = feed_id
+        self.unread = unread
+        self.page = page
+        
+        # FETCH ALL DATA ONCE
+        self.items = FeedItemModel.get_items_for_user(session_id, feed_id, unread, page)
+        self.feeds = FeedModel.get_user_feeds(session_id)
+        self.folders = FolderModel.get_folders(session_id)
+        self.feed_name = self._get_feed_name()
+        self.total_pages = self._calculate_total_pages()
+        
+        # EXPLICIT DUAL-LAYOUT SUPPORT
+        # Mobile and desktop need different configs - this is by design
+        self.mobile_config = {
+            'target': Targets.MOBILE_CONTENT,  # Full-screen content swap
+            'push_url': True,
+            'show_summary': True,
+            'layout': 'mobile',
+            'id_prefix': 'mobile-'
+        }
+        
+        self.desktop_config = {
+            'feeds_target': Targets.DESKTOP_FEEDS,  # Middle column only
+            'detail_target': Targets.DESKTOP_DETAIL,  # Right column only
+            'push_url': True, 
+            'show_summary': True,
+            'layout': 'desktop',
+            'id_prefix': 'desktop-'
+        }
+    
+    def _get_feed_name(self):
+        """Get current feed name for display"""
+        if self.feed_id:
+            # Use optimized single-row query instead of searching in collection
+            return FeedModel.get_feed_name_for_user(self.session_id, self.feed_id) or "Unknown Feed"
+        return "All Feeds"
+    
+    def _calculate_total_pages(self):
+        """Calculate pagination info"""
+        # Use same logic as FeedsContent for consistency
+        with get_db() as conn:
+            count_query = """
+                SELECT COUNT(*)
+                FROM feed_items fi
+                JOIN feeds f ON fi.feed_id = f.id
+                JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
+                LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
+            """
+            count_params = [self.session_id, self.session_id]
+            
+            if self.feed_id:
+                count_query += " WHERE fi.feed_id = ?"
+                count_params.append(self.feed_id)
+            
+            if self.unread:
+                count_query += " AND " if self.feed_id else " WHERE "
+                count_query += "COALESCE(ui.is_read, 0) = 0"
+            
+            total_items = conn.execute(count_query, count_params).fetchone()[0]
+            page_size = 20  # Match FeedItemModel.get_items_for_user
+            return (total_items + page_size - 1) // page_size if total_items else 1
+
 # Timing middleware for performance monitoring
 def timing_middleware(req, sess):
     """Add timing info to requests"""
@@ -358,6 +428,9 @@ def FeedSidebarItem(feed, count=""):
     """Create sidebar item for feed (adapted from MailSbLi)"""
     last_updated = human_time_diff(feed.get('last_updated'))
     
+    # Handle Unknown timestamp gracefully
+    update_text = last_updated if last_updated != "Unknown" else "never updated"
+    
     # Alternative: Use hx_boost="false" to prevent HTMX interception
     # This tells HTMX to skip this link entirely, allowing normal navigation
     return Li(
@@ -365,7 +438,7 @@ def FeedSidebarItem(feed, count=""):
             DivLAligned(
                 UkIcon('rss', cls="flex-none"),
                 Span(feed['title'] or 'Untitled Feed'),
-                P(f"updated {last_updated}", cls="text-xs text-muted"),
+                P(f"updated {update_text}", cls="text-xs text-muted"),
                 cls="gap-3"
             ),
             href=f"/?feed_id={feed['id']}",
@@ -568,35 +641,66 @@ def MobilePersistentHeader(session_id, feed_id=None, unread_only=False, show_chr
         )
     )
 
-def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_desktop=False):
-    """Create main feeds content area with pagination - MOBILE VERSION NO LONGER INCLUDES HEADER"""
-    # Get paginated items directly from database
-    page_size = 20
-    paginated_items = FeedItemModel.get_items_for_user(session_id, feed_id, unread_only, page, page_size)
-    print(f"DEBUG: FeedsContent got {len(paginated_items)} items for session {session_id} (page {page})")
-    print(f"🔍 MOBILE_FORM_BUG_FIX: FeedsContent() - for_desktop={for_desktop}, MOBILE header moved to persistent header")
+def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_desktop=False, data=None):
+    """Create main feeds content area with pagination - MOBILE VERSION NO LONGER INCLUDES HEADER
     
-    # Calculate total pages by getting total count
-    with get_db() as conn:
-        count_query = """
-            SELECT COUNT(*)
-            FROM feed_items fi
-            JOIN feeds f ON fi.feed_id = f.id
-            JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
-            LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
-        """
-        count_params = [session_id, session_id]
+    Args:
+        data: Optional PageData object with pre-fetched data. If provided, avoids duplicate DB queries.
+    """
+    if data:
+        # Use pre-fetched data from PageData (Step 3: avoid duplicate queries)
+        paginated_items = data.items
+        total_pages = data.total_pages
+        # Calculate total_items for pagination display 
+        with get_db() as conn:
+            count_query = """
+                SELECT COUNT(*)
+                FROM feed_items fi
+                JOIN feeds f ON fi.feed_id = f.id
+                JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
+                LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
+            """
+            count_params = [session_id, session_id]
+            
+            if feed_id:
+                count_query += " WHERE fi.feed_id = ?"
+                count_params.append(feed_id)
+            
+            if unread_only:
+                count_query += " AND " if feed_id else " WHERE "
+                count_query += "COALESCE(ui.is_read, 0) = 0"
+            
+            total_items = conn.execute(count_query, count_params).fetchone()[0]
+        print(f"DEBUG: FeedsContent using pre-fetched data: {len(paginated_items)} items, {total_pages} pages")
+    else:
+        # Fallback: fetch data directly (for routes not yet updated to use PageData)
+        page_size = 20
+        paginated_items = FeedItemModel.get_items_for_user(session_id, feed_id, unread_only, page, page_size)
+        print(f"DEBUG: FeedsContent got {len(paginated_items)} items for session {session_id} (page {page})")
         
-        if feed_id:
-            count_query += " WHERE fi.feed_id = ?"
-            count_params.append(feed_id)
-        
-        if unread_only:
-            count_query += " AND " if feed_id else " WHERE "
-            count_query += "COALESCE(ui.is_read, 0) = 0"
-        
-        total_items = conn.execute(count_query, count_params).fetchone()[0]
-        total_pages = (total_items + page_size - 1) // page_size if total_items else 1
+        # Calculate total pages by getting total count
+        with get_db() as conn:
+            count_query = """
+                SELECT COUNT(*)
+                FROM feed_items fi
+                JOIN feeds f ON fi.feed_id = f.id
+                JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
+                LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
+            """
+            count_params = [session_id, session_id]
+            
+            if feed_id:
+                count_query += " WHERE fi.feed_id = ?"
+                count_params.append(feed_id)
+            
+            if unread_only:
+                count_query += " AND " if feed_id else " WHERE "
+                count_query += "COALESCE(ui.is_read, 0) = 0"
+            
+            total_items = conn.execute(count_query, count_params).fetchone()[0]
+            total_pages = (total_items + page_size - 1) // page_size if total_items else 1
+    
+    print(f"🔍 MOBILE_FORM_BUG_FIX: FeedsContent() - for_desktop={for_desktop}, MOBILE header moved to persistent header")
     
     # Simple header logic for desktop only
     if feed_id:
@@ -823,11 +927,8 @@ def index(htmx, sess, feed_id: int = None, unread: bool = True, folder_id: int =
     """Main page with mobile-first responsive design"""
     session_id = sess.get('session_id')
     
-    # Check what feeds this session has
-    user_feeds = FeedModel.get_user_feeds(session_id)
-    
-    # Check what items are available for this page
-    items = FeedItemModel.get_items_for_user(session_id, feed_id, unread, page)
+    # STEP 3: Use centralized data preparation
+    data = PageData(session_id, feed_id, unread, page)
     
     # Queue user's feeds for background updating (skip in minimal mode)
     if not MINIMAL_MODE and background_worker.queue_manager:
@@ -837,15 +938,19 @@ def index(htmx, sess, feed_id: int = None, unread: bool = True, folder_id: int =
         except Exception as e:
             print(f"WARNING: Could not queue user feeds: {str(e)}")
     
-    # This is now handled by MobileHeader function
-    
     # Check if this is an HTMX request for mobile content updates
-    if htmx:
+    # FIXED: FastHTML may inject htmx object even for non-HTMX requests
+    # Check for actual HTMX headers/attributes to determine if it's a real HTMX request
+    is_htmx_request = (htmx and 
+                      getattr(htmx, 'request', None) and  # Has HX-Request header
+                      getattr(htmx, 'target', None))      # Has HX-Target header
+    
+    if is_htmx_request:
         # HTMX request: return partial content
         # Note: HX-Target header doesn't include the # prefix
-        if htmx.target == '#main-content' or htmx.target == 'main-content':
+        if getattr(htmx, 'target', '') in ['#main-content', 'main-content']:
             # Mobile navigation - return content and updated header with correct tab state
-            responses = [FeedsContent(session_id, feed_id, unread, page)]
+            responses = [FeedsContent(data.session_id, data.feed_id, data.unread, data.page, data=data)]
             
             # Update persistent header with correct tab state using hx_swap_oob
             updated_header = Div(
@@ -855,7 +960,7 @@ def index(htmx, sess, feed_id: int = None, unread: bool = True, folder_id: int =
                 onwheel="event.preventDefault(); event.stopPropagation(); return false;"
             )(
                 Div(cls='flex px-4 py-2')(
-                    H3("All Feeds" if not feed_id else (FeedModel.get_feed_name_for_user(session_id, feed_id) or "Unknown Feed")),
+                    H3(data.feed_name),
                     TabContainer(
                         Li(A("All Posts", 
                              href=f"/?feed_id={feed_id}&unread=0" if feed_id else "/?unread=0", 
@@ -902,7 +1007,7 @@ def index(htmx, sess, feed_id: int = None, unread: bool = True, folder_id: int =
             return tuple(responses)
         else:
             # Desktop or other targets - just return content
-            return FeedsContent(session_id, feed_id, unread, page, for_desktop=(htmx.target == '#desktop-feeds-content'))
+            return FeedsContent(data.session_id, data.feed_id, data.unread, data.page, for_desktop=(getattr(htmx, 'target', '') == '#desktop-feeds-content'), data=data)
     
     # Full page load: return complete page structure
     return Titled("RSS Reader",
@@ -915,7 +1020,7 @@ def index(htmx, sess, feed_id: int = None, unread: bool = True, folder_id: int =
                     FeedsSidebar(session_id)
                 ),
                 Div(cls=Styling.DESKTOP_FEEDS_COLUMN, id="desktop-feeds-content")(
-                    FeedsContent(session_id, feed_id, unread, page, for_desktop=True)
+                    FeedsContent(data.session_id, data.feed_id, data.unread, data.page, for_desktop=True, data=data)
                 ),
                 Div(id=ElementIDs.DESKTOP_ITEM_DETAIL, cls=Styling.DESKTOP_DETAIL_COLUMN)(
                     ItemDetailView(None)
@@ -932,7 +1037,7 @@ def index(htmx, sess, feed_id: int = None, unread: bool = True, folder_id: int =
             MobilePersistentHeader(session_id, feed_id, unread),
             # Content area that gets replaced by HTMX - MUST be scrollable
             Div(cls="flex-1 overflow-y-auto", id=ElementIDs.MAIN_CONTENT)(
-                FeedsContent(session_id, feed_id, unread, page)
+                FeedsContent(data.session_id, data.feed_id, data.unread, data.page, data=data)
             )
         ),
         # Mobile viewport fix - add as last element to override everything
@@ -977,9 +1082,9 @@ def show_item(item_id: int, htmx, sess, unread_view: bool = False, feed_id: int 
     session_id = sess.get('session_id')
     
     # Detect HTMX vs full page request for proper response
-    hx_target = htmx.target if htmx else ''
-    hx_request = request.headers.get('HX-Request', 'false')
-    is_htmx = hx_request == 'true'
+    hx_target = getattr(htmx, 'target', '') if htmx else ''
+    # Use htmx parameter for detection
+    is_htmx = bool(htmx)
     
     # Feed context is now passed as query parameter
     
@@ -1164,12 +1269,16 @@ def show_item(item_id: int, htmx, sess, unread_view: bool = False, feed_id: int 
 def add_feed(htmx, sess, new_feed_url: str = ""):
     """Add new feed"""
     session_id = sess.get('session_id')
+    if not session_id:
+        print(f"ERROR: add_feed called without session_id")
+        return Div("Session error", cls='text-red-500 p-4')
+    
     url = new_feed_url.strip()
     timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
-    print(f"[{timestamp}] DEBUG: add_feed called with URL='{url}'")
+    print(f"[{timestamp}] DEBUG: add_feed called with URL='{url}', session_id='{session_id}' [FIXED_VERSION]")
     
     # Determine if request is from mobile or desktop based on target
-    hx_target = htmx.target if htmx else ''
+    hx_target = getattr(htmx, 'target', '') if htmx else ''
     print(f"[{timestamp}] DEBUG: HX-Target header: '{hx_target}'")
     
     if not url:
@@ -1226,7 +1335,7 @@ def add_feed(htmx, sess, new_feed_url: str = ""):
             print(f"WARNING: Background worker not available, feed {feed_id} created without immediate queuing")
         
         # Return unified sidebar response - JavaScript targeting handles mobile vs desktop
-        target_container = request.headers.get('HX-Target', '')
+        target_container = getattr(htmx, 'target', '') if htmx else ''
         
         if 'mobile-sidebar' in target_container:
             # Mobile: return complete mobile sidebar structure  
@@ -1243,7 +1352,7 @@ def add_feed(htmx, sess, new_feed_url: str = ""):
         traceback.print_exc()
         
         # Return proper sidebar structure even on error
-        target_container = request.headers.get('HX-Target', '')
+        target_container = getattr(htmx, 'target', '') if htmx else ''
         
         if 'mobile-sidebar' in target_container:
             return MobileSidebar(session_id)

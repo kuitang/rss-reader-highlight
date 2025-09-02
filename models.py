@@ -459,6 +459,35 @@ class UserItemModel:
             return dict(result) if result else None
     
     @staticmethod
+    def mark_read_and_get_item(session_id: str, item_id: int, is_read: bool = True) -> Optional[Dict]:
+        """Mark item as read and return updated item - optimized single transaction"""
+        with get_db() as conn:
+            # Mark as read
+            conn.execute("""
+                INSERT OR REPLACE INTO user_items (session_id, item_id, is_read, starred, folder_id)
+                VALUES (?, ?, ?, 
+                        COALESCE((SELECT starred FROM user_items WHERE session_id = ? AND item_id = ?), 0),
+                        (SELECT folder_id FROM user_items WHERE session_id = ? AND item_id = ?)
+                )
+            """, (session_id, item_id, is_read, session_id, item_id, session_id, item_id))
+            
+            # Get updated item in same transaction
+            result = conn.execute("""
+                SELECT fi.*, f.title as feed_title, 
+                       COALESCE(ui.is_read, 0) as is_read,
+                       COALESCE(ui.starred, 0) as starred,
+                       fo.name as folder_name
+                FROM feed_items fi
+                JOIN feeds f ON fi.feed_id = f.id
+                JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
+                LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
+                LEFT JOIN folders fo ON ui.folder_id = fo.id
+                WHERE fi.id = ?
+            """, (session_id, session_id, item_id)).fetchone()
+            
+            return dict(result) if result else None
+    
+    @staticmethod
     def move_to_folder(session_id: str, item_id: int, folder_id: int):
         """Move item to folder"""
         with get_db() as conn:
