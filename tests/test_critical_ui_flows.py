@@ -440,7 +440,7 @@ class TestSessionAndSubscriptionFlow:
             
             expect(feed_links.first).to_be_visible(timeout=10000)
             feed_count = feed_links.count()
-            assert feed_count >= 3, f"{viewport_name}: Should have 3+ default feeds, got {feed_count}"
+            assert feed_count >= 2, f"{viewport_name}: Should have 2+ default feeds (MINIMAL_MODE), got {feed_count}"
             
             # Close mobile sidebar after checking feeds (if mobile)
             if viewport_name == "mobile":

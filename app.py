@@ -207,17 +207,13 @@ class MobileHandlers:
             responses = [responses]
         
         # Add navigation-specific elements for returning from article view
-        # Remove article-view class from body to show persistent header
-        body_class_script = Script("""
-        document.body.classList.remove('article-view');
-        """)
-        responses.append(body_class_script)
+        # Body class management now handled in scroll restoration event listener
         
         # Restore hamburger button for list view
         hamburger_button = Button(
             UkIcon('menu'),
             cls="p-2 rounded border hover:bg-secondary mr-2",
-            onclick="document.getElementById('mobile-sidebar').removeAttribute('hidden')",
+            hx_on_click="document.getElementById('mobile-sidebar').removeAttribute('hidden')",
             id="mobile-nav-button",
             hx_swap_oob="outerHTML"
         )
@@ -422,14 +418,8 @@ def htmx_item_response(htmx, item_data, _scroll=None):
     """HTMX item response using routing patterns"""
     responses = [ItemDetailView(item_data.item, show_back=False)]
     
-    # MOBILE UPDATES - Full article view setup
+    # MOBILE UPDATES - Full article view setup (body class now handled in ItemDetailView)
     if htmx.target in ['main-content', '#main-content']:
-        # Add CSS class to body to hide mobile persistent header
-        body_class_script = Script("""
-        document.body.classList.add('article-view');
-        """)
-        responses.append(body_class_script)
-        
         # Update nav button to show chevron for article view
         back_url = "/"
         if item_data.feed_id:
@@ -612,6 +602,15 @@ app, rt = fast_app(
         // Restore scroll position after navigating back
         htmx.on('htmx:afterSwap', function(evt) {
             if (window.innerWidth < 1024 && evt.detail.target && evt.detail.target.id === 'main-content') {
+                // Body class management for mobile article view
+                if (evt.detail.xhr && evt.detail.xhr.responseURL) {
+                    if (evt.detail.xhr.responseURL.includes('/item/')) {
+                        htmx.addClass(document.body, 'article-view');
+                    } else {
+                        htmx.removeClass(document.body, 'article-view');
+                    }
+                }
+                
                 // Extract scroll position from request path
                 if (evt.detail.pathInfo && evt.detail.pathInfo.requestPath) {
                     const match = evt.detail.pathInfo.requestPath.match(/_scroll=(\\d+)/);
@@ -628,33 +627,11 @@ app, rt = fast_app(
             }
         });
         
-        // Close mobile sidebar when a feed link is clicked
-        document.addEventListener('click', function(e) {
-            // Check if clicked element is a feed link
-            if (e.target.closest('a[href^="/?feed_id="], a[href^="/?folder_id="], a[href="/"]')) {
-                const sidebar = document.getElementById('mobile-sidebar');
-                if (sidebar && !sidebar.hasAttribute('hidden')) {
-                    sidebar.setAttribute('hidden', 'true');
-                }
-            }
-        });
+        // Mobile sidebar auto-close now handled via hx-on:click on individual feed links
         
-        // Unified responsive form targeting
-        document.addEventListener('htmx:configRequest', function(e) {
-            if (e.detail.elt.classList.contains('add-feed-form')) {
-                // Determine target based on container
-                const isMobile = e.detail.elt.closest('#mobile-sidebar');
-                
-                if (isMobile) {
-                    // Override target for mobile context
-                    e.detail.target = '#mobile-sidebar';
-                    e.detail.headers['HX-Target'] = '#mobile-sidebar';
-                }
-                // Desktop keeps default #sidebar target
-            }
-        });
+        // Form targeting now handled via hx-on:htmx:config-request on individual forms
         
-        // Removed afterSwap handler - now using CSS classes instead of hidden attribute
+        // Body class management now handled in scroll restoration handler above
         
         """),
         Style("""
@@ -816,7 +793,8 @@ def FeedSidebarItem(feed, count=""):
                 cls="gap-3"
             ),
             href=f"/?feed_id={feed['id']}",
-            cls=Styling.SIDEBAR_ITEM
+            cls=Styling.SIDEBAR_ITEM,
+            hx_on_click="const sidebar = document.getElementById('mobile-sidebar'); if (sidebar && !sidebar.hasAttribute('hidden')) { sidebar.setAttribute('hidden', 'true'); }"
         )
     )
 
@@ -842,9 +820,10 @@ def FeedsSidebar(session_id):
                     )
                 ),
                 hx_post="/api/feed/add",
-                hx_target=Targets.DESKTOP_SIDEBAR,  # Default to desktop, JS will override for mobile
+                hx_target=Targets.DESKTOP_SIDEBAR,  # Default to desktop
                 hx_swap="outerHTML",
-                cls="add-feed-form"
+                cls="add-feed-form",
+                hx_on_htmx_config_request="const isMobile = this.closest('#mobile-sidebar'); if (isMobile) { event.detail.target = '#mobile-sidebar'; event.detail.headers['HX-Target'] = '#mobile-sidebar'; }"
             ),
             cls='p-4'
         ),
@@ -857,7 +836,8 @@ def FeedsSidebar(session_id):
                     cls="gap-3"
                 ),
                 href="/",
-                cls="hover:bg-secondary p-4 block"
+                cls="hover:bg-secondary p-4 block",
+                hx_on_click="const sidebar = document.getElementById('mobile-sidebar'); if (sidebar && !sidebar.hasAttribute('hidden')) { sidebar.setAttribute('hidden', 'true'); }"
             )
         ),
         Div(cls="feeds-list")(*[FeedSidebarItem(feed) for feed in feeds]),
@@ -1158,7 +1138,7 @@ def MobileSidebar(session_id):
     )(
         Div(
             cls="bg-black bg-opacity-50 absolute inset-0",
-            onclick="document.getElementById('mobile-sidebar').setAttribute('hidden', 'true')"
+            hx_on_click="document.getElementById('mobile-sidebar').setAttribute('hidden', 'true')"
         ),
         Div(cls="bg-background w-80 h-full overflow-y-auto relative z-10")(
             Div(cls="p-4 border-b")(
@@ -1167,7 +1147,7 @@ def MobileSidebar(session_id):
                     Button(
                         UkIcon('x'),
                         cls="p-1 rounded hover:bg-secondary",
-                        onclick="document.getElementById('mobile-sidebar').setAttribute('hidden', 'true')"
+                        hx_on_click="document.getElementById('mobile-sidebar').setAttribute('hidden', 'true')"
                     )
                 )
             ),
@@ -1212,7 +1192,7 @@ def MobileHeader(session_id, show_back=False, feed_id=None, unread_view=False):
     ) if show_back else Button(
         UkIcon('menu'),
         cls="p-2 rounded border hover:bg-secondary mr-2",  # Added mr-2 for consistent spacing
-        onclick="document.getElementById('mobile-sidebar').removeAttribute('hidden')",
+        hx_on_click="document.getElementById('mobile-sidebar').removeAttribute('hidden')",
         id="mobile-nav-button"
     )
     
