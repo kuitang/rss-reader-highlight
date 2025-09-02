@@ -25,6 +25,7 @@ def parse_html(content):
 class TestCriticalHTTPWorkflows:
     """Tests for workflows that broke during development - targeting real bugs"""
     
+    @pytest.mark.need_full_db
     def test_fresh_start_complete_flow(self):
         """Test: Empty DB → Default feeds setup → Session creation → Articles display
         
@@ -119,6 +120,7 @@ class TestCriticalHTTPWorkflows:
             finally:
                 client.close()
     
+    @pytest.mark.need_full_db
     def test_pagination_with_complex_parameters(self):
         """Test: Pagination + filtering → URL parameters → Content changes
         

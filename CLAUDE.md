@@ -42,6 +42,9 @@ source venv/bin/activate
 # Run core logic tests - always work, no browser needed
 python -m pytest tests/test_optimized_integration.py tests/test_essential_mocks.py tests/test_direct_functions.py -v
 
+# Run tests excluding those that need full database (when using MINIMAL_MODE)
+python -m pytest tests/test_optimized_integration.py tests/test_essential_mocks.py tests/test_direct_functions.py -v -m "not need_full_db"
+
 # Single test for quick feedback
 python -m pytest tests/test_direct_functions.py::test_session_and_feed_workflow -v
 
@@ -183,6 +186,7 @@ Tests focus on **complex workflows that broke during development**, not trivial 
 - **`tests/test_add_feed_flows.py`** - Mobile + desktop add feed functionality, duplicate handling
 - **`tests/test_mobile_flows.py`** - Navigation, form persistence, scrolling, URL sharing
 - **`tests/test_feed_ingestion.py`** - Reddit special cases, RSS autodiscovery, format parsing
+- **`tests/test_comprehensive_regression.py`** - Comprehensive Playwright regression testing for architecture refactoring validation
 
 #### HTTP Integration Tests (`tests/test_optimized_integration.py`)
 **Black-box server testing**:
@@ -197,6 +201,11 @@ Tests focus on **complex workflows that broke during development**, not trivial 
 - Database constraint violations
 - Malformed RSS/XML handling
 - Transaction rollback scenarios
+
+#### Test Markers
+- **`@pytest.mark.need_full_db`**: Tests that require full database with substantial content
+  - Skip when using MINIMAL_MODE environment
+  - Example: `python -m pytest -v -m "not need_full_db"` to exclude these tests
 
 ### Development Workflow
 

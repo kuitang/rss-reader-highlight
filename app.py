@@ -25,6 +25,28 @@ init_db()
 # Default feeds will be set up by background worker on first startup
 
 # =============================================================================
+# ARCHITECTURAL DECISIONS
+# =============================================================================
+# This app uses different HTMX targets for mobile and desktop BY DESIGN:
+#
+# MOBILE (Single-column, full-screen navigation):
+#   - Target: #main-content (entire content area swaps)
+#   - Navigation: List view ↔ Article view (full replacement)
+#   - Tabs: Use HTMX to preserve header state
+#   - Scroll: URL-based state preservation for custom containers
+#
+# DESKTOP (Three-column email interface):
+#   - Targets: #desktop-feeds-content (middle), #desktop-item-detail (right)
+#   - Navigation: Columns update independently
+#   - Tabs: Regular links (full page navigation acceptable)
+#   - Scroll: Standard browser scroll in each column
+#
+# This is NOT accidental complexity - it reflects fundamental UX differences:
+# - Mobile users expect full-screen immersion and simple back navigation
+# - Desktop users expect persistent context and multi-column efficiency
+# =============================================================================
+
+# =============================================================================
 # CONFIGURATION - All decisions and constants visible here
 # =============================================================================
 
@@ -136,6 +158,367 @@ class PageData:
             page_size = 20  # Match FeedItemModel.get_items_for_user
             return (total_items + page_size - 1) // page_size if total_items else 1
 
+# =============================================================================
+# MOBILE/DESKTOP FRAGMENT HANDLERS - Explicit separation of layout concerns
+# =============================================================================
+
+class MobileHandlers:
+    """Mobile uses #main-content for full-screen navigation"""
+    
+    @staticmethod
+    def content(data):
+        """Mobile content area - feeds list or article detail"""
+        return FeedsContent(data.session_id, data.feed_id, data.unread, 
+                          data.page, for_desktop=False, data=data)
+    
+    @staticmethod
+    def sidebar(data):
+        """Mobile sidebar overlay"""
+        return MobileSidebar(data.session_id)
+    
+    @staticmethod
+    def navigation_restore(data):
+        """Restore mobile navigation when returning from article"""
+        responses = [FeedsContent(data.session_id, data.feed_id, data.unread, 
+                    data.page, for_desktop=False, data=data)]
+        
+        # Update persistent header with correct tab state using hx_swap_oob
+        updated_header = Div(
+            cls='flex-shrink-0 bg-background border-b z-10 lg:hidden',
+            id='mobile-persistent-header',
+            hx_swap_oob="outerHTML",
+            onwheel="event.preventDefault(); event.stopPropagation(); return false;"
+        )(
+            Div(cls='flex px-4 py-2')(
+                H3(data.feed_name),
+                create_tab_container(data.feed_name, data.feed_id, data.unread, for_mobile=True)
+            ),
+            Div(cls='px-4 pb-2')(
+                Div(cls='uk-inline w-full')(
+                    Span(cls='uk-form-icon text-muted-foreground')(UkIcon('search')),
+                    Input(placeholder='Search posts', uk_filter_control="", id="mobile-persistent-search")
+                )
+            )
+        )
+        responses.append(updated_header)
+        
+        # Remove article-view class from body to show persistent header
+        body_class_script = Script("""
+        document.body.classList.remove('article-view');
+        """)
+        responses.append(body_class_script)
+        
+        # Restore hamburger button for list view
+        hamburger_button = Button(
+            UkIcon('menu'),
+            cls="p-2 rounded border hover:bg-secondary mr-2",
+            onclick="document.getElementById('mobile-sidebar').removeAttribute('hidden')",
+            id="mobile-nav-button",
+            hx_swap_oob="outerHTML"
+        )
+        responses.append(hamburger_button)
+        
+        return tuple(responses)
+
+class DesktopHandlers:
+    """Desktop uses separate targets for each column"""
+    
+    @staticmethod
+    def feeds_column(data):
+        """Middle column - feeds list only"""
+        return FeedsContent(data.session_id, data.feed_id, data.unread,
+                          data.page, for_desktop=True, data=data)
+    
+    @staticmethod
+    def detail_column(data, item_id=None):
+        """Right column - article detail only"""
+        if item_id:
+            item = FeedItemModel.get_item_for_user(data.session_id, item_id)
+            return ItemDetailView(item, show_back=False)
+        return ItemDetailView(None)
+    
+    @staticmethod
+    def sidebar_column(data):
+        """Left column - feeds sidebar"""
+        return Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
+            FeedsSidebar(data.session_id)
+        )
+
+# ROUTING MAP - Explicit about which handler for which target
+HTMX_ROUTING = {
+    # Mobile targets
+    'main-content': MobileHandlers.content,
+    '#main-content': MobileHandlers.content,
+    'mobile-sidebar': MobileHandlers.sidebar,
+    '#mobile-sidebar': MobileHandlers.sidebar,
+    
+    # Desktop targets
+    'desktop-feeds-content': DesktopHandlers.feeds_column,
+    '#desktop-feeds-content': DesktopHandlers.feeds_column,
+    'desktop-item-detail': DesktopHandlers.detail_column,
+    '#desktop-item-detail': DesktopHandlers.detail_column,
+    'sidebar': DesktopHandlers.sidebar_column,
+    '#sidebar': DesktopHandlers.sidebar_column,
+}
+
+def route_htmx_fragment(htmx, data):
+    """Route HTMX requests using handlers from Step 4"""
+    
+    # Use the HTMX_ROUTING map from Step 4
+    handler = HTMX_ROUTING.get(htmx.target)
+    if not handler:
+        return Alert(f"Unknown target: {htmx.target}", type='error', cls='m-4')
+    
+    # Special case for mobile navigation restore
+    if htmx.target in ['main-content', '#main-content'] and is_returning_from_article(htmx):
+        return MobileHandlers.navigation_restore(data)
+    
+    # Otherwise use the mapped handler
+    return handler(data)
+
+def is_returning_from_article(htmx):
+    """Check if this is a mobile navigation back from article view"""
+    # Check if this is a navigation back scenario by looking for specific parameters
+    # This is a simplified check - could be enhanced based on specific needs
+    return hasattr(htmx, 'current_url') and '/item/' in str(getattr(htmx, 'current_url', ''))
+
+def full_page_dual_layout(data):
+    """Complete page with both mobile and desktop layouts"""
+    # Flatten the mobile_chrome list and return individual elements
+    chrome_elements = mobile_chrome(data.session_id, data.feed_id, data.unread)
+    return (
+        *chrome_elements,  # Unpack mobile chrome elements
+        desktop_layout(data),
+        mobile_layout(data), 
+        viewport_styles()
+    )
+
+def mobile_chrome(session_id, feed_id=None, unread=True):
+    """Mobile-specific chrome elements"""
+    return [
+        Div(id='mobile-header')(MobileHeader(session_id, show_back=False, feed_id=feed_id, unread_view=unread)),
+        MobileSidebar(session_id)
+    ]
+
+def mobile_layout(data):
+    """Mobile layout - single column, full-screen navigation"""
+    return Div(cls=Styling.MOBILE_LAYOUT, id="mobile-layout")(
+        Div(cls="h-20 flex-shrink-0"),  # Header spacer
+        MobilePersistentHeader(data.session_id, data.feed_id, data.unread),
+        Div(cls="flex-1 overflow-y-auto", id="main-content")(
+            MobileHandlers.content(data)
+        )
+    )
+
+def desktop_layout(data):
+    """Desktop layout - three-column email interface"""
+    return Div(cls=Styling.DESKTOP_LAYOUT, id="desktop-layout")(
+        Grid(
+            DesktopHandlers.sidebar_column(data),
+            Div(cls=Styling.DESKTOP_FEEDS_COLUMN, id="desktop-feeds-content")(
+                DesktopHandlers.feeds_column(data)
+            ),
+            Div(id="desktop-item-detail", cls=Styling.DESKTOP_DETAIL_COLUMN)(
+                ItemDetailView(None)  # Empty on initial load
+            ),
+            cols_lg=5, cols_xl=5, gap=4, cls='h-screen gap-4'
+        )
+    )
+
+def viewport_styles():
+    """Global styles for viewport management"""
+    return Style("""
+    /* Fix viewport scrolling - prevent main viewport scroll on ALL devices */
+    html, body {
+        height: 100% !important;
+        max-height: 100vh !important;
+        overflow: hidden !important;
+        position: fixed !important;
+        width: 100% !important;
+    }
+    
+    /* Ensure only designated containers can scroll */
+    .scrollable-panel {
+        overflow-y: auto !important;
+    }
+    
+    /* Unified responsive form targeting */
+    .add-feed-form {
+        /* Desktop: target parent sidebar */
+    }
+    
+    .add-feed-form.mobile-context {
+        /* Mobile: target mobile sidebar container */
+    }
+    
+    .add-feed-button {
+        /* Default desktop targeting */
+    }
+    
+    /* Mobile sidebar context gets different targeting */
+    #mobile-sidebar .add-feed-form {
+        /* Mobile-specific HTMX targeting handled via JS */
+    }
+    """)
+
+def create_tab_container(feed_name, feed_id, unread_only, for_mobile=False):
+    """Create All Posts/Unread tabs with layout-appropriate attributes
+    
+    Mobile needs HTMX attributes to preserve persistent header during navigation.
+    Desktop can use regular links since the three-column layout persists.
+    """
+    # Build base URL for navigation
+    url_params = []
+    if feed_id:
+        url_params.append(f"feed_id={feed_id}")
+    base_url = "/?" + "&".join(url_params) if url_params else "/"
+    
+    # Common tab structure with conditional HTMX attributes
+    return TabContainer(
+        Li(A("All Posts", 
+             href=f"{base_url}{'&' if url_params else '?'}unread=0" if base_url != "/" else "/?unread=0",
+             # Mobile-only: HTMX attributes for partial updates
+             **({'hx_get': f"{base_url}{'&' if url_params else '?'}unread=0" if base_url != "/" else "/?unread=0",
+                'hx_target': Targets.MOBILE_CONTENT,
+                'hx_push_url': "true"} if for_mobile else {}),
+             role='button'),
+           cls='uk-active' if not unread_only else ''),
+        Li(A("Unread",
+             href=base_url if base_url != "/" else "/",
+             # Mobile-only: HTMX attributes for partial updates
+             **({'hx_get': base_url if base_url != "/" else "/",
+                'hx_target': Targets.MOBILE_CONTENT,
+                'hx_push_url': "true"} if for_mobile else {}),
+             role='button'),
+           cls='uk-active' if unread_only else ''),
+        alt=True, cls='ml-auto max-w-40'
+    )
+
+def prepare_item_data(session_id, item_id, feed_id, unread_view):
+    """Centralized item data preparation"""
+    class ItemData:
+        def __init__(self):
+            self.item = FeedItemModel.get_item_for_user(session_id, item_id)
+            self.was_unread = not self.item.get('is_read', 0) if self.item else False
+            self.feed_id = feed_id
+            self.unread_view = unread_view
+            self.session_id = session_id
+            self.item_id = item_id
+        
+        def mark_read_and_refresh(self):
+            """Mark item as read and refresh data"""
+            if self.item:
+                self.item = UserItemModel.mark_read_and_get_item(self.session_id, self.item_id, True)
+    
+    return ItemData()
+
+def htmx_item_response(htmx, item_data, _scroll=None):
+    """HTMX item response using routing patterns"""
+    responses = [ItemDetailView(item_data.item, show_back=False)]
+    
+    # MOBILE UPDATES - Full article view setup
+    if htmx.target in ['main-content', '#main-content']:
+        # Add CSS class to body to hide mobile persistent header
+        body_class_script = Script("""
+        document.body.classList.add('article-view');
+        """)
+        responses.append(body_class_script)
+        
+        # Update nav button to show chevron for article view
+        back_url = "/"
+        if item_data.feed_id:
+            back_url = f"/?feed_id={item_data.feed_id}"
+        
+        # Add unread parameter based on the view we came from
+        if item_data.unread_view is False:  # We came from "All Posts" view
+            back_url += "&unread=0" if item_data.feed_id else "?unread=0"
+        
+        # Preserve scroll position if provided
+        if _scroll:
+            back_url += f"&_scroll={_scroll}" if '?' in back_url else f"?_scroll={_scroll}"
+        
+        back_button = Button(
+            UkIcon('arrow-left'),
+            hx_get=back_url,
+            hx_target=Targets.MOBILE_CONTENT,
+            hx_push_url="true",
+            cls="p-2 rounded border hover:bg-secondary mr-2",
+            id="mobile-nav-button",
+            hx_swap_oob="outerHTML"
+        )
+        responses.append(back_button)
+    
+    # DESKTOP UPDATES - Update list item appearance if it was unread
+    elif htmx.target in ['desktop-item-detail', '#desktop-item-detail'] and item_data.was_unread:
+        updated_item_attrs = {
+            "cls": f"relative rounded-lg border border-border p-3 text-sm hover:bg-secondary space-y-2 cursor-pointer bg-muted tag-read",
+            "id": f"desktop-feed-item-{item_data.item['id']}",
+            "hx_get": f"/item/{item_data.item['id']}?unread_view={item_data.unread_view}",
+            "hx_target": "#desktop-item-detail",
+            "hx_trigger": "click",
+            "hx_swap_oob": "true"
+        }
+        
+        updated_item = Li(
+            # Title row with no blue dot (read state)
+            DivLAligned(
+                Span(item_data.item['title']),  # Unbolded title for read items
+                # No blue dot for read items
+            ),
+            # Source and time row - source left, time right
+            DivFullySpaced(
+                Small(item_data.item.get('feed_title', 'Unknown Feed'), cls=TextPresets.muted_sm),
+                Time(human_time_diff(item_data.item.get('published')), cls='text-xs text-muted-foreground')
+            ),
+            **updated_item_attrs
+        )
+        responses.append(updated_item)
+    
+    return responses[0] if len(responses) == 1 else tuple(responses)
+
+def full_page_item_response(item_data):
+    """Full page response for item with proper layout"""
+    # Create PageData for consistency
+    page_data = PageData(item_data.session_id, item_data.feed_id, item_data.unread_view, 1)
+    
+    # Modify desktop layout to show the item in detail column
+    def desktop_layout_with_item(data, item):
+        return Div(cls=Styling.DESKTOP_LAYOUT, id="desktop-layout")(
+            Grid(
+                DesktopHandlers.sidebar_column(data),
+                Div(cls=Styling.DESKTOP_FEEDS_COLUMN, id="desktop-feeds-content")(
+                    FeedsContent(data.session_id, data.feed_id, data.unread, 1, for_desktop=True)
+                ),
+                Div(id="desktop-item-detail", cls=Styling.DESKTOP_DETAIL_COLUMN)(
+                    ItemDetailView(item, show_back=False)
+                ),
+                cols_lg=5, cols_xl=5, gap=4, cls='h-screen gap-4'
+            )
+        )
+    
+    # Modify mobile layout to show the item
+    def mobile_layout_with_item(data, item):
+        return Div(cls=Styling.MOBILE_LAYOUT, id="mobile-layout")(
+            Div(cls="h-20 flex-shrink-0"),  # Header spacer
+            MobilePersistentHeader(data.session_id, data.feed_id, data.unread, show_chrome=False),
+            Div(cls="flex-1 overflow-y-auto", id="main-content")(
+                ItemDetailView(item, show_back=True)
+            )
+        )
+    
+    return (
+        # Chrome elements for item view
+        Div(id='mobile-header')(MobileHeader(item_data.session_id, show_back=True, feed_id=item_data.feed_id, unread_view=item_data.unread_view)),
+        MobileSidebar(item_data.session_id),
+        
+        # BOTH LAYOUTS with item content
+        mobile_layout_with_item(page_data, item_data.item),
+        desktop_layout_with_item(page_data, item_data.item),
+        
+        # Global styles
+        viewport_styles()
+    )
+
 # Timing middleware for performance monitoring
 def timing_middleware(req, sess):
     """Add timing info to requests"""
@@ -219,28 +602,13 @@ app, rt = fast_app(
         htmx.logAll();
         htmx.config.includeIndicatorStyles = false;
         
-        // Simple URL-based scroll restoration for mobile
-        // Modify HTMX requests to add scroll position
-        htmx.on('htmx:configRequest', function(evt) {
-            if (window.innerWidth < 1024) {
-                // Check if navigating to an article
-                if (evt.detail.path && evt.detail.path.includes('/item/')) {
-                    const mainContent = document.getElementById('main-content');
-                    if (mainContent) {
-                        const scrollPos = Math.round(mainContent.scrollTop);
-                        // Add scroll position as a parameter
-                        evt.detail.parameters._scroll = scrollPos;
-                    }
-                }
-            }
-        });
-        
+        // Scroll restoration using hx-vals (configured per FeedItem)
         // Restore scroll position after navigating back
         htmx.on('htmx:afterSwap', function(evt) {
             if (window.innerWidth < 1024 && evt.detail.target && evt.detail.target.id === 'main-content') {
                 // Extract scroll position from request path
                 if (evt.detail.pathInfo && evt.detail.pathInfo.requestPath) {
-                    const match = evt.detail.pathInfo.requestPath.match(/_scroll=(\d+)/);
+                    const match = evt.detail.pathInfo.requestPath.match(/_scroll=(\\d+)/);
                     if (match) {
                         const scrollPos = parseInt(match[1]);
                         setTimeout(() => {
@@ -513,7 +881,15 @@ def FeedsSidebar(session_id):
     )
 
 def FeedItem(item, unread_view=False, for_desktop=False, feed_id=None):
-    """Create feed item with consistent HTMX approach and feed context preservation"""
+    """Feed item component
+    
+    Args:
+        for_desktop: True for desktop layout (targets #desktop-item-detail),
+                    False for mobile (targets #main-content)
+    
+    The different targets are architectural - mobile swaps full screen,
+    desktop updates only the detail column.
+    """
     cls_base = Styling.FEED_ITEM_BASE
     is_read = item.get('is_read', 0) == 1
     
@@ -546,6 +922,10 @@ def FeedItem(item, unread_view=False, for_desktop=False, feed_id=None):
     
     if push_url:
         attrs["hx_push_url"] = push_url
+    
+    # Add scroll position capture for mobile using hx-vals
+    if not for_desktop:  # Mobile only
+        attrs["hx_vals"] = 'js:{_scroll: window.innerWidth < 1024 ? (document.getElementById("main-content")?.scrollTop || 0) : 0}'
     
     return Li(
         # Title row with blue dot
@@ -615,23 +995,7 @@ def MobilePersistentHeader(session_id, feed_id=None, unread_only=False, show_chr
     )(
         Div(cls='flex px-4 py-2')(
             H3(feed_name),
-            TabContainer(
-                Li(A("All Posts", 
-                     href=f"{base_url}{'&' if url_params else '?'}unread=0" if base_url != "/" else "/?unread=0", 
-                     hx_get=f"{base_url}{'&' if url_params else '?'}unread=0" if base_url != "/" else "/?unread=0",
-                     hx_target=Targets.MOBILE_CONTENT,
-                     hx_push_url="true",
-                     role='button'),
-                   cls='uk-active' if not unread_only else ''),
-                Li(A("Unread", 
-                     href=base_url if base_url != "/" else "/",
-                     hx_get=base_url if base_url != "/" else "/", 
-                     hx_target=Targets.MOBILE_CONTENT,
-                     hx_push_url="true",
-                     role='button'),
-                   cls='uk-active' if unread_only else ''),
-                alt=True, cls='ml-auto max-w-40'
-            )
+            create_tab_container(feed_name, feed_id, unread_only, for_mobile=True)
         ),
         Div(cls='px-4 pb-2')(
             Div(cls='uk-inline w-full')(
@@ -757,13 +1121,7 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
             Div(cls='sticky top-0 bg-background border-b z-10')(
                 Div(cls='flex px-4 py-3')(
                     H3(feed_name),
-                    TabContainer(
-                        Li(A("All Posts", href=f"{base_url}{'&' if url_params else '?'}unread=0" if base_url != "/" else "/?unread=0", role='button'),
-                           cls='uk-active' if not unread_only else ''),
-                        Li(A("Unread", href=base_url if base_url != "/" else "/", role='button'),
-                           cls='uk-active' if unread_only else ''),
-                        alt=True, cls='ml-auto max-w-40'
-                    )
+                    create_tab_container(feed_name, feed_id, unread_only, for_mobile=False)
                 ),
                 Div(cls='px-4 pb-3')(
                     Div(cls='uk-inline w-full')(
@@ -938,332 +1296,37 @@ def index(htmx, sess, feed_id: int = None, unread: bool = True, folder_id: int =
         except Exception as e:
             print(f"WARNING: Could not queue user feeds: {str(e)}")
     
-    # Check if this is an HTMX request for mobile content updates
-    # FIXED: FastHTML may inject htmx object even for non-HTMX requests
-    # Check for actual HTMX headers/attributes to determine if it's a real HTMX request
-    is_htmx_request = (htmx and 
-                      getattr(htmx, 'request', None) and  # Has HX-Request header
-                      getattr(htmx, 'target', None))      # Has HX-Target header
+    # HTMX - Use routing from Step 5
+    if htmx and getattr(htmx, 'request', None) and getattr(htmx, 'target', None):
+        return route_htmx_fragment(htmx, data)
     
-    if is_htmx_request:
-        # HTMX request: return partial content
-        # Note: HX-Target header doesn't include the # prefix
-        if getattr(htmx, 'target', '') in ['#main-content', 'main-content']:
-            # Mobile navigation - return content and updated header with correct tab state
-            responses = [FeedsContent(data.session_id, data.feed_id, data.unread, data.page, data=data)]
-            
-            # Update persistent header with correct tab state using hx_swap_oob
-            updated_header = Div(
-                cls='flex-shrink-0 bg-background border-b z-10 lg:hidden',
-                id='mobile-persistent-header',
-                hx_swap_oob="outerHTML",
-                onwheel="event.preventDefault(); event.stopPropagation(); return false;"
-            )(
-                Div(cls='flex px-4 py-2')(
-                    H3(data.feed_name),
-                    TabContainer(
-                        Li(A("All Posts", 
-                             href=f"/?feed_id={feed_id}&unread=0" if feed_id else "/?unread=0", 
-                             hx_get=f"/?feed_id={feed_id}&unread=0" if feed_id else "/?unread=0",
-                             hx_target=Targets.MOBILE_CONTENT,
-                             hx_push_url="true",
-                             role='button'),
-                           cls='uk-active' if not unread else ''),
-                        Li(A("Unread", 
-                             href=f"/?feed_id={feed_id}" if feed_id else "/",
-                             hx_get=f"/?feed_id={feed_id}" if feed_id else "/", 
-                             hx_target=Targets.MOBILE_CONTENT,
-                             hx_push_url="true",
-                             role='button'),
-                           cls='uk-active' if unread else ''),
-                        alt=True, cls='ml-auto max-w-40'
-                    )
-                ),
-                Div(cls='px-4 pb-2')(
-                    Div(cls='uk-inline w-full')(
-                        Span(cls='uk-form-icon text-muted-foreground')(UkIcon('search')),
-                        Input(placeholder='Search posts', uk_filter_control="", id="mobile-persistent-search")
-                    )
-                )
-            )
-            responses.append(updated_header)
-            
-            # Remove article-view class from body to show persistent header
-            body_class_script = Script("""
-            document.body.classList.remove('article-view');
-            """)
-            responses.append(body_class_script)
-            
-            # Restore hamburger button for list view
-            hamburger_button = Button(
-                UkIcon('menu'),
-                cls="p-2 rounded border hover:bg-secondary mr-2",
-                onclick="document.getElementById('mobile-sidebar').removeAttribute('hidden')",
-                id="mobile-nav-button",
-                hx_swap_oob="outerHTML"
-            )
-            responses.append(hamburger_button)
-            
-            return tuple(responses)
-        else:
-            # Desktop or other targets - just return content
-            return FeedsContent(data.session_id, data.feed_id, data.unread, data.page, for_desktop=(getattr(htmx, 'target', '') == '#desktop-feeds-content'), data=data)
-    
-    # Full page load: return complete page structure
-    return Titled("RSS Reader",
-        Div(id="mobile-header")(MobileHeader(session_id, show_back=False, feed_id=feed_id, unread_view=unread)),
-        MobileSidebar(session_id),
-        # Desktop layout: sidebar + feeds + article detail (unchanged)
-        Div(cls=Styling.DESKTOP_LAYOUT, id=ElementIDs.DESKTOP_LAYOUT)(
-            Grid(
-                Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
-                    FeedsSidebar(session_id)
-                ),
-                Div(cls=Styling.DESKTOP_FEEDS_COLUMN, id="desktop-feeds-content")(
-                    FeedsContent(data.session_id, data.feed_id, data.unread, data.page, for_desktop=True, data=data)
-                ),
-                Div(id=ElementIDs.DESKTOP_ITEM_DETAIL, cls=Styling.DESKTOP_DETAIL_COLUMN)(
-                    ItemDetailView(None)
-                ),
-                cols_lg=5, cols_xl=5,
-                gap=4, cls='h-screen gap-4'
-            )
-        ),
-        # Mobile layout: NEW STRUCTURE with persistent header
-        Div(cls="lg:hidden fixed inset-0 flex flex-col overflow-hidden", id="mobile-layout")(
-            # Spacer for fixed mobile header (hamburger menu)
-            Div(cls="h-20 flex-shrink-0"),
-            # Persistent header directly (no wrapper needed with Option 2)
-            MobilePersistentHeader(session_id, feed_id, unread),
-            # Content area that gets replaced by HTMX - MUST be scrollable
-            Div(cls="flex-1 overflow-y-auto", id=ElementIDs.MAIN_CONTENT)(
-                FeedsContent(data.session_id, data.feed_id, data.unread, data.page, data=data)
-            )
-        ),
-        # Mobile viewport fix - add as last element to override everything
-        Style("""
-        /* Fix viewport scrolling - prevent main viewport scroll on ALL devices */
-        html, body {
-            height: 100% !important;
-            max-height: 100vh !important;
-            overflow: hidden !important;
-            position: fixed !important;
-            width: 100% !important;
-        }
-        
-        /* Ensure only designated containers can scroll */
-        .scrollable-panel {
-            overflow-y: auto !important;
-        }
-        
-        /* Unified responsive form targeting */
-        .add-feed-form {
-            /* Desktop: target parent sidebar */
-        }
-        
-        .add-feed-form.mobile-context {
-            /* Mobile: target mobile sidebar container */
-        }
-        
-        .add-feed-button {
-            /* Default desktop targeting */
-        }
-        
-        /* Mobile sidebar context gets different targeting */
-        #mobile-sidebar .add-feed-form {
-            /* Mobile-specific HTMX targeting handled via JS */
-        }
-        """)
-    )
+    # FULL PAGE - From Step 5
+    return Titled("RSS Reader", *full_page_dual_layout(data))
 
 @rt('/item/{item_id}')
 def show_item(item_id: int, htmx, sess, unread_view: bool = False, feed_id: int = None, _scroll: int = None):
-    """Get item detail and mark as read with mobile-responsive UI updates"""
+    """Item detail route following same pattern"""
     session_id = sess.get('session_id')
     
-    # Detect HTMX vs full page request for proper response
-    hx_target = getattr(htmx, 'target', '') if htmx else ''
-    # Use htmx parameter for detection
-    is_htmx = bool(htmx)
+    # Prepare item data
+    item_data = prepare_item_data(session_id, item_id, feed_id, unread_view)
     
-    # Feed context is now passed as query parameter
+    if not item_data.item:
+        if htmx and getattr(htmx, 'request', None) and getattr(htmx, 'target', None):
+            return Alert("Item not found", type='error', cls='m-4')
+        else:
+            # Create empty PageData for not found case
+            page_data = PageData(session_id, feed_id, True, 1)
+            return Titled("RSS Reader", *full_page_dual_layout(page_data))
     
-    # Get specific item with optimized single-row query
-    item_before = FeedItemModel.get_item_for_user(session_id, item_id)
+    # Mark as read
+    item_data.mark_read_and_refresh()
     
-    if not item_before:
-        print(f"🔍 MOBILE_FORM_BUG_DEBUG: show_item({item_id}) - item not found")
-        if not htmx:
-            # Return full page for regular requests
-            return Titled("RSS Reader",
-                Div(id="mobile-header")(MobileHeader(session_id, show_back=True, feed_id=feed_id, unread_view=unread_view)),
-                MobileSidebar(session_id),
-                # Desktop layout (same as index)
-                Div(cls=Styling.DESKTOP_LAYOUT, id=ElementIDs.DESKTOP_LAYOUT)(
-                    Grid(
-                        Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
-                            FeedsSidebar(session_id)
-                        ),
-                        Div(cls=Styling.DESKTOP_FEEDS_COLUMN, id="desktop-feeds-content")(
-                            FeedsContent(session_id, None, True, 1, for_desktop=True)
-                        ),
-                        Div(id=ElementIDs.DESKTOP_ITEM_DETAIL, cls=Styling.DESKTOP_DETAIL_COLUMN)(
-                            ItemDetailView(None)
-                        ),
-                        cols_lg=5, cols_xl=5,
-                        gap=4, cls='h-screen gap-4'
-                    )
-                ),
-                # Mobile layout
-                Div(cls="lg:hidden fixed inset-0 flex flex-col overflow-hidden", id="mobile-layout")(
-                    Div(cls="h-20 flex-shrink-0"),
-                    Div(cls="flex-1 overflow-y-auto", id=ElementIDs.MAIN_CONTENT)(
-                        Container(P("Article not found", cls='text-center text-muted-foreground p-8'))
-                    )
-                ),
-                Style("""
-                html, body {
-                    height: 100% !important;
-                    max-height: 100vh !important;
-                    overflow: hidden !important;
-                    position: fixed !important;
-                    width: 100% !important;
-                }
-                """)
-            )
-        return ItemDetailView(None, show_back=False)  # HTMX request won't show back in detail view
-    
-    was_unread = not item_before.get('is_read', 0)
-    
-    # Single optimized query: mark as read and get updated item
-    item_after = UserItemModel.mark_read_and_get_item(session_id, item_id, True)
-    
-    # Check if this is a regular browser request (not HTMX)
-    if not htmx:
-        # Return full page structure for shared/refreshed URLs
-        return Titled("RSS Reader",
-            Div(id="mobile-header")(MobileHeader(session_id, show_back=True, feed_id=feed_id, unread_view=unread_view)),
-            MobileSidebar(session_id),
-            # Desktop layout (same as index)
-            Div(cls=Styling.DESKTOP_LAYOUT, id=ElementIDs.DESKTOP_LAYOUT)(
-                Grid(
-                    Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
-                        FeedsSidebar(session_id)
-                    ),
-                    Div(cls=Styling.DESKTOP_FEEDS_COLUMN, id="desktop-feeds-content")(
-                        FeedsContent(session_id, feed_id, unread_view, 1, for_desktop=True)
-                    ),
-                    Div(id=ElementIDs.DESKTOP_ITEM_DETAIL, cls=Styling.DESKTOP_DETAIL_COLUMN)(
-                        ItemDetailView(item_after, show_back=False)
-                    ),
-                    cols_lg=5, cols_xl=5,
-                    gap=4, cls='h-screen gap-4'
-                )
-            ),
-            # Mobile layout with article content - include persistent header for back navigation
-            Div(cls="lg:hidden fixed inset-0 flex flex-col overflow-hidden", id="mobile-layout")(
-                Div(cls="h-20 flex-shrink-0"),
-                # Add persistent header (hidden for article view, but available for back navigation)
-                MobilePersistentHeader(session_id, feed_id, unread_view, show_chrome=False),
-                Div(cls="flex-1 overflow-y-auto", id=ElementIDs.MAIN_CONTENT)(
-                    ItemDetailView(item_after, show_back=True)
-                )
-            ),
-            Style("""
-            html, body {
-                height: 100% !important;
-                max-height: 100vh !important;
-                overflow: hidden !important;
-                position: fixed !important;
-                width: 100% !important;
-            }
-            """),
-        )
-    
-    # HTMX request: return fragment (existing behavior)
-    # Check the target to determine mobile vs desktop  
-    is_mobile_request = hx_target in ['#main-content', 'main-content']
-    is_desktop_request = hx_target in ['#desktop-item-detail', 'desktop-item-detail']
-    
-    print(f"🔍 MOBILE_FORM_BUG_DEBUG: show_item({item_id}) - HTMX request - is_mobile={is_mobile_request}, is_desktop={is_desktop_request}")
-    
-    responses = []
-    
-    # Main response: Item detail view (no back button in detail view itself for HTMX)
-    detail_view = ItemDetailView(item_after, show_back=False)
-    responses.append(detail_view)
-    
-    # For mobile requests, update UI for article view
-    if is_mobile_request:
-        # Add CSS class to body to hide mobile persistent header
-        body_class_script = Script("""
-        document.body.classList.add('article-view');
-        """)
-        responses.append(body_class_script)
-        
-        # Update nav button to show chevron for article view
-        back_url = "/"
-        if feed_id:
-            back_url = f"/?feed_id={feed_id}"
-        
-        # Add unread parameter based on the view we came from
-        if unread_view is False:  # We came from "All Posts" view
-            back_url += "&unread=0" if feed_id else "?unread=0"
-        
-        # Preserve scroll position if provided
-        if _scroll:
-            back_url += f"&_scroll={_scroll}" if '?' in back_url else f"?_scroll={_scroll}"
-        
-            
-        back_button = Button(
-            UkIcon('arrow-left'),
-            hx_get=back_url,
-            hx_target=Targets.MOBILE_CONTENT,
-            hx_push_url="true",
-            cls="p-2 rounded border hover:bg-secondary mr-2",
-            id="mobile-nav-button",
-            hx_swap_oob="outerHTML"
-        )
-        responses.append(back_button)
-        
-    # Update list item appearance if it was unread
-    if was_unread and item_after:
-        if is_desktop_request:
-            # Desktop: update the list item appearance with correct attributes
-            updated_item_attrs = {
-                "cls": f"relative rounded-lg border border-border p-3 text-sm hover:bg-secondary space-y-2 cursor-pointer bg-muted tag-read",
-                "id": f"desktop-feed-item-{item_after['id']}",
-                "hx_get": f"/item/{item_after['id']}?unread_view={unread_view}",
-                "hx_target": "#desktop-item-detail",
-                "hx_trigger": "click",
-                "hx_swap_oob": "true"
-            }
-            
-            updated_item = Li(
-                # Title row with no blue dot (read state)
-                DivLAligned(
-                    Span(item_after['title']),  # Unbolded title for read items
-                    # No blue dot for read items
-                ),
-                # Source and time row - source left, time right
-                DivFullySpaced(
-                    Small(item_after.get('feed_title', 'Unknown Feed'), cls=TextPresets.muted_sm),
-                    Time(human_time_diff(item_after.get('published')), cls='text-xs text-muted-foreground')
-                ),
-                # Summary with smart HTML truncation that preserves images
-                Div(
-                    NotStr(
-                        smart_truncate_html(item_after.get('description', ''), max_length=300) 
-                        if item_after.get('description') 
-                        else 'No summary available'
-                    ), 
-                    cls='text-sm text-muted-foreground mt-2 prose prose-sm max-w-none'
-                ),
-                **updated_item_attrs
-            )
-            responses.append(updated_item)
-    
-    return tuple(responses) if len(responses) > 1 else detail_view
+    # Route response
+    if htmx and getattr(htmx, 'request', None) and getattr(htmx, 'target', None):
+        return htmx_item_response(htmx, item_data, _scroll)
+    else:
+        return Titled("RSS Reader", *full_page_item_response(item_data))
 
 @rt('/api/feed/add')
 def add_feed(htmx, sess, new_feed_url: str = ""):
@@ -1337,7 +1400,7 @@ def add_feed(htmx, sess, new_feed_url: str = ""):
         # Return unified sidebar response - JavaScript targeting handles mobile vs desktop
         target_container = getattr(htmx, 'target', '') if htmx else ''
         
-        if 'mobile-sidebar' in target_container:
+        if target_container and 'mobile-sidebar' in target_container:
             # Mobile: return complete mobile sidebar structure  
             return MobileSidebar(session_id)
         else:
@@ -1354,7 +1417,7 @@ def add_feed(htmx, sess, new_feed_url: str = ""):
         # Return proper sidebar structure even on error
         target_container = getattr(htmx, 'target', '') if htmx else ''
         
-        if 'mobile-sidebar' in target_container:
+        if target_container and 'mobile-sidebar' in target_container:
             return MobileSidebar(session_id)
         else:
             return Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
