@@ -423,24 +423,31 @@ class FeedParser:
         if hasattr(self, 'client'):
             self.client.close()
 
-def setup_default_feeds():
+def setup_default_feeds(minimal_mode=False):
     """Set up default RSS feeds - FAST database records only, background worker handles content"""
-    default_feeds = [
-        ("https://feeds.feedburner.com/reuters/businessNews", "BizToc"),
-        ("https://feeds.bloomberg.com/economics/news.rss", "Bloomberg Economics"),
-        ("https://feeds.bloomberg.com/markets/news.rss", "Bloomberg Markets"),
-        ("https://www.ft.com/rss/home", "Financial Times"),
-        ("https://hnrss.org/frontpage", "Hacker News"),
-        ("https://www.reddit.com/r/ClaudeAI/.rss", "ClaudeAI"),
-        ("https://www.reddit.com/r/MicroSaaS/.rss", "MicroSaaS"),
-        ("https://www.reddit.com/r/OpenAI/.rss", "OpenAI"),
-        ("https://www.reddit.com/r/all/.rss", "Reddit All"),
-        ("https://www.reddit.com/r/vibecoding/.rss", "VibeCoding"),
-        ("https://feeds.content.dowjones.io/public/rss/RSSMarketsMain", "WSJ Markets"),
-        ("https://techcrunch.com/feed/", "TechCrunch"),
-        ("https://stackoverflow.com/feeds/tag?tagnames=python&sort=newest", "Python Q&A"),
-        ("https://reddit.com/r/Python/.rss", "Python")
-    ]
+    if minimal_mode:
+        # Minimal set for testing - just 2 feeds
+        default_feeds = [
+            ("https://hnrss.org/frontpage", "Hacker News: Front Page"),
+            ("https://www.reddit.com/r/ClaudeAI/.rss", "ClaudeAI")
+        ]
+    else:
+        # Full set for production
+        default_feeds = [
+            ("https://feeds.bloomberg.com/economics/news.rss", "Bloomberg Economics"),
+            ("https://feeds.bloomberg.com/markets/news.rss", "Bloomberg Markets"),
+            ("https://www.ft.com/rss/home", "Financial Times"),
+            ("https://hnrss.org/frontpage", "Hacker News"),
+            ("https://www.reddit.com/r/ClaudeAI/.rss", "ClaudeAI"),
+            ("https://www.reddit.com/r/MicroSaaS/.rss", "MicroSaaS"),
+            ("https://www.reddit.com/r/OpenAI/.rss", "OpenAI"),
+            ("https://www.reddit.com/r/all/.rss", "Reddit All"),
+            ("https://www.reddit.com/r/vibecoding/.rss", "VibeCoding"),
+            ("https://feeds.content.dowjones.io/public/rss/RSSMarketsMain", "WSJ Markets"),
+            ("https://techcrunch.com/feed/", "TechCrunch"),
+            ("https://stackoverflow.com/feeds/tag?tagnames=python&sort=newest", "Python Q&A"),
+            ("https://reddit.com/r/Python/.rss", "Python")
+        ]
     
     results = []
     feeds_created = 0
@@ -461,10 +468,11 @@ def setup_default_feeds():
             logger.error(f"Failed to create default feed {title}: {str(e)}")
             results.append({'success': False, 'url': url, 'title': title, 'error': str(e)})
     
+    mode_text = "minimal mode" if minimal_mode else "normal mode"
     if feeds_created > 0:
-        logger.info(f"Fast startup: Created {feeds_created} default feed records (background worker will fetch content)")
+        logger.info(f"Fast startup ({mode_text}): Created {feeds_created} default feed records (background worker will fetch content)")
     else:
-        logger.info("Fast startup: All default feeds already exist")
+        logger.info(f"Fast startup ({mode_text}): All default feeds already exist")
     
     return results
 

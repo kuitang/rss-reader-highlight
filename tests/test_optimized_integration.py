@@ -1,4 +1,7 @@
-"""Optimized integration tests: HTTP-only, targeting workflows that broke during development"""
+"""Integration tests requiring manually started server on port 8080.
+
+Database setup and startup tests have been moved to test_application_startup.py.
+These tests focus on UI workflows that broke during development and require a full database."""
 
 import pytest
 import httpx
@@ -25,11 +28,11 @@ def parse_html(content):
 class TestCriticalHTTPWorkflows:
     """Tests for workflows that broke during development - targeting real bugs"""
     
-    @pytest.mark.need_full_db
     def test_fresh_start_complete_flow(self):
-        """Test: Empty DB → Default feeds setup → Session creation → Articles display
+        """Test: Fresh DB → Seed content → Session creation → Articles display
         
         This was the core issue: 'No posts available' despite feeds existing.
+        Works with both minimal mode (seed database) and normal mode (full database).
         """
         with test_server() as server_url:
             client = httpx.Client(timeout=30)
@@ -50,15 +53,15 @@ class TestCriticalHTTPWorkflows:
                     soup = parse_html(resp.text)
                     
                     feed_links = soup.find_all('a', href=lambda h: h and 'feed_id' in h)
-                    if len(feed_links) >= 3:  # 3 default feeds
+                    if len(feed_links) >= 2:  # 2+ feeds (works with minimal mode)
                         feeds_loaded = True
                         break
                 
                 assert feeds_loaded, "Default feeds should be created and visible"
                 
-                # 3. Should have substantial articles (not "No posts available")
-                articles = soup.find_all('li', id=lambda x: x and x.startswith('feed-item-'))
-                assert len(articles) >= 15, f"Should have 15+ articles, got {len(articles)}"
+                # 3. Should have articles (not "No posts available")
+                articles = soup.find_all('li', id=lambda x: x and 'feed-item-' in x)
+                assert len(articles) >= 10, f"Should have 10+ articles, got {len(articles)} (works with minimal mode's 20 articles)"
                 
             finally:
                 client.close()
@@ -120,7 +123,6 @@ class TestCriticalHTTPWorkflows:
             finally:
                 client.close()
     
-    @pytest.mark.need_full_db
     def test_pagination_with_complex_parameters(self):
         """Test: Pagination + filtering → URL parameters → Content changes
         
@@ -130,17 +132,21 @@ class TestCriticalHTTPWorkflows:
             client = httpx.Client(timeout=30)
             
             try:
-                # Test pagination with feed filter
-                resp = client.get(f"{server_url}/?feed_id=1&page=2&unread=0")
+                # Test pagination on feed 5 (26 articles = 2 pages) 
+                resp = client.get(f"{server_url}/?feed_id=5&page=2&unread=0")
                 assert resp.status_code == 200
                 
                 soup = parse_html(resp.text)
-                # Should find pagination elements
-                page_elements = soup.find_all('button', {'hx-get': lambda x: x and 'page=' in x})
-                assert len(page_elements) > 0, "Should have pagination buttons"
-                
                 # Should NOT have "No posts available" (indicates parameter processing worked)
                 assert 'No posts available' not in soup.get_text()
+                
+                # Should have articles on page 2 (verifies pagination worked)
+                articles = soup.find_all('li', id=lambda x: x and 'feed-item-' in x)
+                assert len(articles) > 0, f"Should have articles on page 2 of feed 5, got {len(articles)}"
+                
+                # Should have pagination buttons (since feed 5 has 26 articles = 2 pages)
+                page_elements = soup.find_all('button', attrs={'hx-get': lambda x: x and 'page=' in x})
+                assert len(page_elements) > 0, f"Should have pagination buttons with 26 articles per feed, got {len(page_elements)}"
                 
             finally:
                 client.close()
@@ -158,12 +164,12 @@ class TestCriticalHTTPWorkflows:
                 resp = client.get(f"{server_url}/")
                 soup = parse_html(resp.text)
                 
-                # Find first article link
-                articles = soup.find_all('a', href=lambda h: h and '/item/' in h)
+                # Find first article (HTMX-enabled li element, not href link)
+                articles = soup.find_all('li', attrs={'hx-get': lambda x: x and '/item/' in x})
                 if len(articles) == 0:
                     pytest.skip("No articles available for reading state test")
                 
-                article_url = articles[0]['href']
+                article_url = articles[0]['hx-get']
                 
                 # Visit the article (should mark as read)
                 article_resp = client.get(f"{server_url}{article_url}")

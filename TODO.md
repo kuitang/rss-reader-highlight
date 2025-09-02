@@ -23,6 +23,19 @@ The feed submission tests are failing primarily due to:
 ### test_add_feed_edge_cases.py
 - [x] **WORKING** (standalone test, not pytest-based)
 
+## Conditionally Skipped Tests (Runtime-Based)
+These tests skip when certain conditions aren't met and may need to become unconditional:
+
+### test_optimized_integration.py
+- [ ] Reading state test - skips when `len(articles) == 0`
+
+### test_critical_ui_flows.py  
+- [ ] `test_blue_indicator_removal_after_click` - skips when `initial_blue_count == 0`
+- [ ] `test_unread_view_item_disappears_after_click` - skips when `initial_unread_count == 0`
+
+### test_mobile_url_navigation.py
+- [ ] Scroll position test - skips when `main-content` element unavailable
+
 ## Implementation Tasks
 
 ### 1. Fix HTMX DOM Replacement Issues
@@ -51,6 +64,12 @@ The feed submission tests are failing primarily due to:
 - [ ] Add test fixtures for common feed URLs
 - [ ] Implement test database seeding for consistent test data
 - [ ] Add better error reporting for HTMX failures
+
+### 6. Make Conditionally Skipped Tests Unconditional
+- [ ] Investigate why tests skip due to empty data conditions
+- [ ] Ensure test database has sufficient seed data for all test scenarios
+- [ ] Make tests create their own test data instead of depending on existing data
+- [ ] Convert runtime skips to proper test setup/fixtures
 
 ## Priority Order
 1. **High**: Fix mobile sidebar state management consistency

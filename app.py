@@ -571,7 +571,7 @@ async def lifespan(app):
     """Handle app startup and shutdown with background worker"""
     if MINIMAL_MODE:
         print("FastHTML app starting in MINIMAL MODE...")
-        print("⚡ Skipping background worker and default feeds for fast startup")
+        print("⚡ Using pre-populated seed database (no network calls, no background worker)")
     else:
         print("FastHTML app starting up...")
         
@@ -581,7 +581,7 @@ async def lifespan(app):
         
         # Add default feeds - database constraints handle duplicates
         print("Adding default feeds to database...")
-        setup_default_feeds()
+        setup_default_feeds(minimal_mode=False)
     
     yield  # App is running
     
