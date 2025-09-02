@@ -25,6 +25,8 @@ python app.py
 
 # Fast startup for integration tests (minimal database with 2 feeds)
 MINIMAL_MODE=true python app.py
+# OR use the helper script:
+python quick_start.py
 
 # Clear and reset database
 python clear_db.py

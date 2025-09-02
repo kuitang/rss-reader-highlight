@@ -38,9 +38,9 @@ def create_minimal_seed_database():
             schema_query = "SELECT sql FROM sqlite_master WHERE type='table' OR type='index'"
             schema_statements = [row[0] for row in main_conn.execute(schema_query).fetchall() if row[0]]
             
-            # Create tables and indexes
+            # Create tables and indexes (skip internal sqlite objects)
             for statement in schema_statements:
-                if statement:  # Skip None statements
+                if statement and 'sqlite_sequence' not in statement:  # Skip internal sqlite objects
                     minimal_conn.execute(statement)
     
     # Copy specific feeds and their data
