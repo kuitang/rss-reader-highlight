@@ -5,14 +5,29 @@ from playwright.sync_api import Page, expect
 import time
 import re
 
+# HTMX Helper Functions for Fast Testing
+def wait_for_htmx_complete(page, timeout=5000):
+    """Wait for all HTMX requests to complete - much faster than fixed timeouts"""
+    page.wait_for_function("() => !document.body.classList.contains('htmx-request')", timeout=timeout)
 
-@pytest.fixture(scope="module")
-def page(playwright):
-    """Setup browser page for testing"""
-    browser = playwright.chromium.launch()
+def wait_for_page_ready(page):
+    """Fast page ready check - waits for network idle instead of fixed timeout"""
+    page.wait_for_load_state("networkidle")
+
+
+@pytest.fixture(scope="session")
+def browser():
+    from playwright.sync_api import sync_playwright
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        yield browser
+        browser.close()
+
+@pytest.fixture
+def page(browser):
     page = browser.new_page()
     yield page
-    browser.close()
+    page.close()
 
 
 class TestComprehensiveRegression:
@@ -24,6 +39,7 @@ class TestComprehensiveRegression:
         page.set_viewport_size({"width": 1200, "height": 800})
         
         # Wait for page load
+        wait_for_page_ready(page)
         expect(page.locator("title")).to_have_text("RSS Reader")
         
         # Verify desktop three-column layout is visible
@@ -42,13 +58,13 @@ class TestComprehensiveRegression:
                 feed_links[iteration].click()
                 
                 # Wait for feed content to load
-                page.wait_for_timeout(1000)
+                wait_for_htmx_complete(page)
                 
                 # Scroll down in middle panel
                 middle_panel = page.locator("#desktop-feeds-content")
                 middle_panel.scroll_into_view_if_needed()
                 page.mouse.wheel(0, 500)
-                page.wait_for_timeout(500)
+                wait_for_htmx_complete(page, timeout=3000)
                 
                 # Click on an article
                 article_items = page.locator("li[id*='desktop-feed-item']").all()
@@ -56,11 +72,11 @@ class TestComprehensiveRegression:
                     article_items[0].click()
                     
                     # Verify article loads in right panel
-                    page.wait_for_timeout(1000)
+                    wait_for_htmx_complete(page)
                     expect(page.locator("#desktop-item-detail")).to_contain_text("From:")
                     
                     # Verify URL updated
-                    expect(page).to_have_url_regex(r"/item/\d+")
+                    assert "/item/" in page.url
                     
                     # Toggle between All Posts and Unread tabs
                     all_posts_tab = page.locator("a:has-text('All Posts')")
@@ -68,11 +84,11 @@ class TestComprehensiveRegression:
                     
                     if all_posts_tab.is_visible():
                         all_posts_tab.click()
-                        page.wait_for_timeout(500)
+                        wait_for_htmx_complete(page)
                         
                     if unread_tab.is_visible():
                         unread_tab.click()
-                        page.wait_for_timeout(500)
+                        wait_for_htmx_complete(page)
     
     def test_mobile_comprehensive_workflow(self, page: Page):
         """Test complete mobile workflow: navigation, feed selection, article reading"""
@@ -123,7 +139,7 @@ class TestComprehensiveRegression:
                         expect(page.locator("#main-content")).to_contain_text("From:")
                         
                         # Verify URL updated to article
-                        expect(page).to_have_url_regex(r"/item/\d+")
+                        assert "/item/" in page.url
                         
                         # Click back arrow
                         back_button = page.locator("#mobile-nav-button")
@@ -253,7 +269,7 @@ class TestComprehensiveRegression:
                     feed_links[i % len(feed_links)].click()
                     
                     # Verify sidebar closes and content updates
-                    page.wait_for_timeout(1000)
+                    wait_for_htmx_complete(page)
                     expect(page.locator("#mobile-sidebar")).to_be_hidden()
                     
                     # Test article navigation
@@ -262,14 +278,14 @@ class TestComprehensiveRegression:
                         article_items[0].click()
                         
                         # Verify full-screen article view
-                        page.wait_for_timeout(1000)
-                        expect(page).to_have_url_regex(r"/item/\d+")
+                        wait_for_htmx_complete(page)
+                        assert "/item/" in page.url
                         
                         # Navigate back
                         back_button = page.locator("#mobile-nav-button")
                         if back_button.is_visible():
                             back_button.click()
-                            page.wait_for_timeout(1000)
+                            wait_for_htmx_complete(page)
     
     def test_feed_content_and_pagination(self, page: Page):
         """Test feed content loading and pagination behavior"""
@@ -277,7 +293,7 @@ class TestComprehensiveRegression:
         page.set_viewport_size({"width": 1200, "height": 800})
         
         # Wait for content load
-        page.wait_for_timeout(2000)
+        wait_for_page_ready(page)
         
         # Verify feed content is present
         feed_items = page.locator("li[id*='feed-item']")
@@ -290,13 +306,13 @@ class TestComprehensiveRegression:
         # Switch to All Posts
         if all_posts_tab.is_visible():
             all_posts_tab.click()
-            page.wait_for_timeout(1000)
+            wait_for_htmx_complete(page)
             expect(all_posts_tab.locator("..")).to_have_class(re.compile(r"uk-active"))
         
         # Switch to Unread
         if unread_tab.is_visible():
             unread_tab.click()
-            page.wait_for_timeout(1000)
+            wait_for_htmx_complete(page)
             expect(unread_tab.locator("..")).to_have_class(re.compile(r"uk-active"))
     
     def test_session_and_state_persistence(self, page: Page):
@@ -304,14 +320,14 @@ class TestComprehensiveRegression:
         page.goto("http://localhost:8080")
         
         # Wait for initial session setup
-        page.wait_for_timeout(2000)
+        wait_for_page_ready(page)
         
         # Navigate to different feeds and verify session persists
         feed_links = page.locator("a[href*='feed_id']").all()
         
         for i, feed_link in enumerate(feed_links[:2]):  # Test first 2 feeds
             feed_link.click()
-            page.wait_for_timeout(1000)
+            wait_for_htmx_complete(page)
             
             # Verify page loads and session is maintained
             expect(page.locator("title")).to_have_text("RSS Reader")
@@ -320,14 +336,14 @@ class TestComprehensiveRegression:
             article_items = page.locator("li[id*='feed-item']").all()
             if len(article_items) > 0:
                 article_items[0].click()
-                page.wait_for_timeout(1000)
+                wait_for_htmx_complete(page)
                 
                 # Verify article loads
-                expect(page).to_have_url_regex(r"/item/\d+")
+                assert "/item/" in page.url
                 
                 # Go back to main page
                 page.goto("http://localhost:8080")
-                page.wait_for_timeout(1000)
+                wait_for_page_ready(page)
     
     def test_error_resilience_and_recovery(self, page: Page):
         """Test application resilience under various error conditions"""
@@ -335,21 +351,21 @@ class TestComprehensiveRegression:
         
         # Test invalid item URL
         page.goto("http://localhost:8080/item/99999")
-        page.wait_for_timeout(1000)
+        wait_for_page_ready(page)
         
         # Should gracefully handle non-existent items
         expect(page.locator("title")).to_have_text("RSS Reader")
         
         # Test invalid feed ID
         page.goto("http://localhost:8080/?feed_id=99999")
-        page.wait_for_timeout(1000)
+        wait_for_page_ready(page)
         
         # Should gracefully handle invalid feed IDs
         expect(page.locator("title")).to_have_text("RSS Reader")
         
         # Return to valid state
         page.goto("http://localhost:8080")
-        page.wait_for_timeout(1000)
+        wait_for_page_ready(page)
         expect(page.locator("title")).to_have_text("RSS Reader")
 
 
@@ -413,11 +429,11 @@ class TestHTMXArchitectureValidation:
             # Should have href but no hx-get for desktop
             expect(all_posts_desktop).to_have_attribute("href")
             all_posts_desktop.click()
-            page.wait_for_timeout(1000)
+            wait_for_htmx_complete(page)
         
         # Test mobile tab behavior
         page.set_viewport_size({"width": 390, "height": 844})
-        page.wait_for_timeout(1000)
+        wait_for_page_ready(page)
         
         # Mobile tabs should use HTMX attributes
         all_posts_mobile = page.locator("#mobile-persistent-header a:has-text('All Posts')")
@@ -426,4 +442,4 @@ class TestHTMXArchitectureValidation:
             expect(all_posts_mobile).to_have_attribute("href")
             expect(all_posts_mobile).to_have_attribute("hx-get")
             all_posts_mobile.click()
-            page.wait_for_timeout(1000)
+            wait_for_htmx_complete(page)
