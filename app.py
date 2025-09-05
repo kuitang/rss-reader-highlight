@@ -1334,40 +1334,17 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
             )
         )
     
-    # Different layouts for mobile vs desktop
-    if for_desktop:
-        # Desktop: simplified header + scrollable content
-        return Div(cls='flex flex-col h-full')(
-            # Simplified header section - no tabs, just title and search
-            Div(cls='sticky top-0 bg-background border-b z-10')(
-                Div(cls='flex justify-between items-center px-4 py-3')(
-                    H3(feed_name),
-                    Div(cls='flex items-center space-x-3')(
-                        A("All Posts", href=f"/?feed_id={feed_id}&unread=0" if feed_id else "/?unread=0", 
-                          cls="px-3 py-1 rounded text-sm hover:bg-secondary"),
-                        A("Unread", href=f"/?feed_id={feed_id}" if feed_id else "/",
-                          cls="px-3 py-1 rounded text-sm hover:bg-secondary")
-                    )
-                ),
-                Div(cls='px-4 pb-3')(
-                    Div(cls='uk-inline w-full')(
-                        Span(cls='uk-form-icon text-muted-foreground')(UkIcon('search')),
-                        Input(placeholder='Search posts', uk_filter_control="")
-                    )
-                )
-            ),
-            # Scrollable content area
-            Div(cls='flex-1 overflow-y-auto', id="feeds-list-container", uk_filter="target: .js-filter")(
-                FeedsList(paginated_items, unread_only, for_desktop, feed_id) if paginated_items else Div(P("No posts available"), cls='p-4 text-center text-muted-foreground'),
-                pagination_footer()
-            )
-        )
-    else:
-        # Mobile: ONLY content (header moved to persistent header, parent handles scrolling)
-        return Div(cls='p-0', id="feeds-list-container", uk_filter="target: .js-filter")(
-            FeedsList(paginated_items, unread_only, for_desktop, feed_id) if paginated_items else Div(P("No posts available"), cls='p-4 text-center text-muted-foreground'),
-            pagination_footer()
-        )
+    # Unified layout for both mobile and desktop - same simple content structure
+    # Add feed name as title at the top of content area
+    content_elements = [
+        H3(feed_name, cls='px-4 pt-4 pb-2'),  # Feed title at top of content
+        FeedsList(paginated_items, unread_only, for_desktop, feed_id) if paginated_items else Div(P("No posts available"), cls='p-4 text-center text-muted-foreground'),
+        pagination_footer()
+    ]
+    
+    return Div(cls='p-0', id="feeds-list-container", uk_filter="target: .js-filter")(
+        *content_elements
+    )
 
 def MobileSidebar(session_id):
     """Create mobile sidebar overlay"""

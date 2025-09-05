@@ -745,30 +745,21 @@ class TestTabSizeAndAlignment:
                             f"{config['name']} icon bar not close enough to right edge: {distance_from_right:.1f}px away (max: 30px)"
                         
                     else:
-                        # Desktop: links in header (simplified design)
-                        desktop_header = page.locator('.sticky.top-0')
-                        expect(desktop_header).to_be_visible(timeout=5000)
+                        # Desktop: unified layout - no more sticky header, content same as mobile
+                        # Check that desktop layout container exists
+                        desktop_layout = page.locator('#desktop-layout')
+                        expect(desktop_layout).to_be_visible(timeout=5000)
                         
-                        all_posts_link = desktop_header.locator('a').filter(has_text='All Posts')
-                        unread_link = desktop_header.locator('a').filter(has_text='Unread')
+                        # Desktop content should have feed title (unified structure)
+                        feed_title = page.locator('#desktop-feeds-content h3')
+                        expect(feed_title).to_be_visible()
                         
-                        expect(all_posts_link).to_be_visible()
-                        expect(unread_link).to_be_visible()
+                        feed_title_box = feed_title.bounding_box()
+                        print(f"  Desktop feed title: {feed_title.text_content()}")
+                        print(f"  Feed title width: {feed_title_box['width']:.1f}px")
                         
-                        # Get measurements
-                        all_posts_box = all_posts_link.bounding_box()
-                        unread_box = unread_link.bounding_box()
-                        viewport_width = page.viewport_size['width']
-                        
-                        all_posts_width = all_posts_box['width']
-                        unread_width = unread_box['width']
-                        
-                        print(f"  All Posts link: {all_posts_width:.1f}px")
-                        print(f"  Unread link: {unread_width:.1f}px")
-                        
-                        # Desktop links should be reasonably sized
-                        assert all_posts_width <= 100, f"Desktop All Posts link too wide: {all_posts_width:.1f}px"
-                        assert unread_width <= 100, f"Desktop Unread link too wide: {unread_width:.1f}px"
+                        # Desktop should have consistent content structure (no special header navigation)
+                        assert feed_title_box['width'] <= 500, f"Desktop feed title too wide: {feed_title_box['width']:.1f}px"
                         
                     print(f"✅ {config['name']}: Navigation elements are properly sized and positioned")
                 
