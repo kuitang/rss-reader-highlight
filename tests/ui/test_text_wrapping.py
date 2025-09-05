@@ -102,13 +102,5 @@ class TestTextWrapping:
         
         print("✓ MonsterUI components are used correctly")
 
-@pytest.fixture(scope="session")
-def browser():
-    """Session-scoped browser fixture"""
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True)
-        yield browser
-        browser.close()
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

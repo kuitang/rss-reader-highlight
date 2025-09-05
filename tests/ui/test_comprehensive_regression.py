@@ -15,20 +15,6 @@ def wait_for_page_ready(page):
     page.wait_for_load_state("networkidle")
 
 
-@pytest.fixture(scope="session")
-def browser():
-    from playwright.sync_api import sync_playwright
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        yield browser
-        browser.close()
-
-@pytest.fixture
-def page(browser):
-    page = browser.new_page()
-    yield page
-    page.close()
-
 
 class TestComprehensiveRegression:
     """Comprehensive testing to detect regressions from HTMX architecture refactoring"""

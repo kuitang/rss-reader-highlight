@@ -13,19 +13,6 @@ def wait_for_page_ready(page):
     """Fast page ready check - waits for network idle instead of fixed timeout"""
     page.wait_for_load_state("networkidle")
 
-@pytest.fixture(scope="session")
-def browser():
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        yield browser
-        browser.close()
-
-@pytest.fixture
-def page(browser):
-    page = browser.new_page()
-    yield page
-    page.close()
-
 def test_add_feed_edge_cases(page):
     """Test various add feed scenarios to find issues"""
         

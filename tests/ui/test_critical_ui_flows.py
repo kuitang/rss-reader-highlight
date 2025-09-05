@@ -45,19 +45,6 @@ def existing_server():
     except Exception as e:
         raise Exception(f"Server not available at {TEST_URL}. Start server first: python app.py")
 
-@pytest.fixture(scope="session")
-def browser():
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        yield browser
-        browser.close()
-
-@pytest.fixture
-def page(browser):
-    page = browser.new_page()
-    yield page
-    page.close()
-
 class TestFormParameterBugFlow:
     """Test the form parameter bug we debugged extensively"""
     

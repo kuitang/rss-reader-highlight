@@ -13,20 +13,6 @@ def wait_for_page_ready(page):
     """Fast page ready check - waits for network idle instead of fixed timeout"""
     page.wait_for_load_state("networkidle")
 
-@pytest.fixture(scope="session")
-def browser():
-    from playwright.sync_api import sync_playwright
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        yield browser
-        browser.close()
-
-@pytest.fixture
-def page(browser):
-    page = browser.new_page()
-    yield page
-    page.close()
-
 
 @pytest.mark.asyncio_mode("off")
 def test_mobile_tab_active_style_updates(page: Page):

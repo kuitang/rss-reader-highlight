@@ -248,13 +248,5 @@ class TestSpacingValidation:
             except Exception as e:
                 assert True, f"Browser test failed ({e}), but spacing CSS structure is validated"
 
-@pytest.fixture(scope="session")
-def browser():
-    """Session-scoped browser fixture"""
-    with sync_playwright() as playwright:
-        browser = playwright.chromium.launch(headless=True)
-        yield browser
-        browser.close()
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

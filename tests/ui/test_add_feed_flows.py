@@ -21,19 +21,6 @@ def wait_for_page_ready(page):
     page.wait_for_load_state("networkidle")
 
 
-@pytest.fixture(scope="session")
-def browser():
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        yield browser
-        browser.close()
-
-@pytest.fixture
-def page(browser):
-    page = browser.new_page()
-    yield page
-    page.close()
-
 @pytest.mark.skip(reason="All feed submission tests - skipping per user request")
 class TestAddFeedFlows:
     """Test add feed functionality across mobile and desktop interfaces"""
