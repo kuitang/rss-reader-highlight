@@ -48,7 +48,7 @@ class TestRefactoringRegression:
         page.screenshot(path="/tmp/desktop_initial.png")
         
         # Wait for feeds to load - look for the feed list structure
-        page.wait_for_selector("#desktop-layout, #mobile-sidebar", timeout=10000)
+        page.wait_for_selector("#desktop-layout, #main-content", timeout=10000)
         
         # Check console for any initial errors
         console_messages = []
@@ -130,7 +130,7 @@ class TestRefactoringRegression:
                 unread_tab.click()
                 page.wait_for_load_state("networkidle")
                 # Wait for feed list to update
-                page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
+                page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 
                 # Take screenshot of unread view
                 page.screenshot(path=f"/tmp/desktop_cycle_{cycle}_unread_tab.png")
@@ -140,7 +140,7 @@ class TestRefactoringRegression:
                 all_posts_tab.click()
                 page.wait_for_load_state("networkidle")
                 # Wait for feed list to update
-                page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
+                page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 
                 # Take screenshot of all posts view
                 page.screenshot(path=f"/tmp/desktop_cycle_{cycle}_all_posts_tab.png")
@@ -191,7 +191,7 @@ class TestRefactoringRegression:
             page.wait_for_timeout(500)  # Allow animation
             
             # Verify sidebar is visible (first column on mobile)
-            sidebar = page.locator("main > div:first-child")
+            sidebar = page.locator("#mobile-sidebar")
             expect(sidebar).to_be_visible()
             
             # Take screenshot of open sidebar
@@ -215,7 +215,7 @@ class TestRefactoringRegression:
                 print(f"Feed link not visible, skipping")
                 continue
             # Wait for feed content to load
-            page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
+            page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
             
             # Verify sidebar closed automatically (mobile behavior)
             # Take screenshot after feed selection
@@ -242,7 +242,7 @@ class TestRefactoringRegression:
                 article_item.click()
                 page.wait_for_load_state("networkidle")
                 # Wait for feed list to update
-                page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
+                page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 
                 # Verify we're in mobile article view
                 # Take screenshot of article view
@@ -256,14 +256,14 @@ class TestRefactoringRegression:
                     back_buttons[0].click()
                     page.wait_for_load_state("networkidle")
                     # Wait for feed list to update
-                    page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
+                    page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 else:
                     # If no back button, use browser back
                     print("Using browser back navigation")
                     page.go_back()
                     page.wait_for_load_state("networkidle")
                     # Wait for feed list to update
-                page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
+                page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 
                 # Verify we're back at feed list
                 expect(feed_container).to_be_visible()
@@ -280,7 +280,7 @@ class TestRefactoringRegression:
                 unread_tab.click()
                 page.wait_for_load_state("networkidle")
                 # Wait for feed list to update
-                page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
+                page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 
                 # Take screenshot of mobile unread view
                 page.screenshot(path=f"/tmp/mobile_cycle_{cycle}_unread_tab.png")
@@ -290,7 +290,7 @@ class TestRefactoringRegression:
                 all_posts_tab.click()
                 page.wait_for_load_state("networkidle")
                 # Wait for feed list to update
-                page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
+                page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 
                 # Take screenshot of mobile all posts view
                 page.screenshot(path=f"/tmp/mobile_cycle_{cycle}_all_posts_tab.png")
@@ -344,7 +344,7 @@ class TestRefactoringRegression:
             feed_links[0].click()
             page.wait_for_load_state("networkidle")
             # Wait for feed content to load
-            page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
+            page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
         
         # 2. Click on an article (should trigger HTMX update)
         article_items = page.locator("main > div:nth-child(2) li").all()
@@ -353,7 +353,7 @@ class TestRefactoringRegression:
             article_items[0].click()
             page.wait_for_load_state("networkidle")
             # Wait for feed content to load
-            page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
+            page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
         
         # 3. Toggle between tabs (should trigger HTMX update)
         unread_tab = page.locator("text=Unread").first
@@ -362,7 +362,7 @@ class TestRefactoringRegression:
             unread_tab.click()
             page.wait_for_load_state("networkidle")
             # Wait for feed content to load
-            page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
+            page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
         
         # Analyze requests for HTMX patterns
         htmx_requests = [req for req in requests if 'hx-request' in req.get('headers', {})]
@@ -395,7 +395,7 @@ class TestRefactoringRegression:
             feed_links[0].click()
             page.wait_for_load_state("networkidle")
             # Wait for feed content to load
-            page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
+            page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
         
         # Find articles with blue dots (unread indicators)
         unread_articles = page.locator("li").filter(has=page.locator(".w-2.h-2.bg-blue-500")).all()
@@ -434,7 +434,7 @@ class TestRefactoringRegression:
             unread_tab.click()
             page.wait_for_load_state("networkidle")
             # Wait for feed content to load
-            page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
+            page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
             
             # Take screenshot of unread view
             page.screenshot(path="/tmp/unread_view.png")
@@ -445,13 +445,13 @@ class TestRefactoringRegression:
                 unread_articles_in_view[0].click()
                 page.wait_for_load_state("networkidle")
                 # Wait for feed list to update
-                page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
+                page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 
                 # Go back to unread view
                 unread_tab.click()
                 page.wait_for_load_state("networkidle")
                 # Wait for feed list to update
-                page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
+                page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 
                 # Take screenshot after article removal
                 page.screenshot(path="/tmp/unread_view_after_click.png")

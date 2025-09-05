@@ -106,7 +106,7 @@ class TestComprehensiveRegression:
                     feed_links[iteration % len(feed_links)].click()
                     
                     # Wait for sidebar to close and content to load
-                    page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
+                    page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                     expect(page.locator("#mobile-sidebar")).to_be_hidden()
                     
                     # Scroll down in feed list

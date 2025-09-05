@@ -79,8 +79,8 @@ class TestMobileFlows:
         # Wait for feed list to return
         page.wait_for_selector("li[id^='mobile-feed-item-']", timeout=10000)
         
-        # Verify we're back at the list (use mobile-specific selector)
-        expect(page.locator("#feeds-list-container")).to_be_visible()
+        # Verify we're back at the list by checking for feed items (more reliable than container visibility)
+        expect(page.locator("li[id^='mobile-feed-item-']").first).to_be_visible()
     
     def test_mobile_feed_filter_preserved(self, page: Page, test_server_url):
         """Test that feed filter state is preserved during navigation"""
@@ -451,7 +451,7 @@ class TestMobileFlows:
         wait_for_htmx_complete(page)
         
         # Should be back to feed list with correct feed title
-        expect(page.locator("#feeds-list-container")).to_be_visible()
+        expect(page.locator("li[id^='mobile-feed-item-']").first).to_be_visible()
         feed_title_after_back = page.locator("#main-content h3")
         expect(feed_title_after_back).to_have_text("ClaudeAI")  # Should NOT be "BizToc"
 

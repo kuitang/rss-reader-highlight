@@ -516,7 +516,7 @@ def htmx_item_response(htmx, item_data, _scroll=None):
 def full_page_item_response(item_data):
     """Full page response for item with proper layout"""
     # Create PageData for consistency
-    page_data = PageData(item_data.session_id, item_data.feed_id, item_data.unread_view, 1)
+    page_data = PageData(item_data.session_id, item_data.feed_id, item_data.unread_view, item_data.page)
     
     # Modify desktop layout to show the item in detail column
     def desktop_layout_with_item(data, item):
@@ -1671,7 +1671,7 @@ HTMX Target: {getattr(htmx, 'target', None) if htmx else None}""")
             )
         else:
             # Create empty PageData for not found case
-            page_data = PageData(session_id, feed_id, True, 1)
+            page_data = PageData(session_id, feed_id, True, page)
             return full_page_dual_layout(page_data)
     
     # Mark as read
