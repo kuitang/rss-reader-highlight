@@ -213,19 +213,15 @@ class TestComprehensiveRegression:
         
         # Rapid clicking test
         for i in range(5):
-            # Quick feed selections - ensure mobile sidebar is open if needed
-            mobile_nav_button = page.locator("button#mobile-nav-button")
-            if mobile_nav_button.is_visible():
-                mobile_nav_button.click()
-                page.wait_for_timeout(200)
-                
-            feed_links = page.locator("a[href*='feed_id']").all()
+            # In desktop mode (1200x800), feed links are in the sidebar
+            # No need to open mobile sidebar in desktop mode
+            feed_links = page.locator("#sidebar a[href*='feed_id']").all()
             if len(feed_links) > 0:
                 feed_links[i % len(feed_links)].click()
                 page.wait_for_timeout(200)
             
-            # Quick article clicks
-            article_items = page.locator("li[id*='feed-item']").all()
+            # Quick article clicks (desktop layout)
+            article_items = page.locator("li[id^='desktop-feed-item-']").all()
             if len(article_items) > 0:
                 article_items[0].click()
                 page.wait_for_timeout(200)
@@ -254,6 +250,7 @@ class TestComprehensiveRegression:
             hamburger = page.locator("#mobile-nav-button")
             if hamburger.is_visible():
                 hamburger.click()
+                page.wait_for_timeout(300)  # Wait for sidebar animation
                 expect(page.locator("#mobile-sidebar")).to_be_visible()
                 
                 # Select different feed each iteration
@@ -272,6 +269,7 @@ class TestComprehensiveRegression:
                         
                         # Verify full-screen article view
                         wait_for_htmx_complete(page)
+                        page.wait_for_timeout(500)  # Additional wait for URL update
                         assert "/item/" in page.url
                         
                         # Navigate back
@@ -316,31 +314,38 @@ class TestComprehensiveRegression:
         wait_for_page_ready(page)
         
         # Navigate to different feeds and verify session persists
-        # Ensure mobile sidebar is open if needed
+        # Handle both desktop and mobile layouts
         mobile_nav_button = page.locator("button#mobile-nav-button")
-        if mobile_nav_button.is_visible():
+        is_mobile = mobile_nav_button.is_visible()
+        
+        if is_mobile:
+            # Mobile: open sidebar and get mobile feed links
             mobile_nav_button.click()
             page.wait_for_timeout(300)
-            
-        feed_links = page.locator("a[href*='feed_id']").all()
+            feed_links = page.locator("#mobile-sidebar a[href*='feed_id']").all()
+        else:
+            # Desktop: get sidebar feed links directly
+            feed_links = page.locator("#sidebar a[href*='feed_id']").all()
         
         for i, feed_link in enumerate(feed_links[:2]):  # Test first 2 feeds
-            # Reopen sidebar before each feed click if mobile
-            if mobile_nav_button.is_visible():
+            # Reopen mobile sidebar before each feed click if mobile
+            if is_mobile and not page.locator("#mobile-sidebar").is_visible():
                 mobile_nav_button.click()
                 page.wait_for_timeout(300)
                 
             feed_link.click()
             wait_for_htmx_complete(page)
             
-            # Verify page loads and session is maintained
+            # Verify feed page loads and session is maintained
             assert page.title() == "RSS Reader"
+            assert "feed_id" in page.url
             
             # Click an article to test state management
             article_items = page.locator("li[id*='feed-item']").all()
             if len(article_items) > 0:
                 article_items[0].click()
                 wait_for_htmx_complete(page)
+                page.wait_for_timeout(500)  # Additional wait for URL update
                 
                 # Verify article loads
                 assert "/item/" in page.url

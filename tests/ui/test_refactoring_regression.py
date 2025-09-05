@@ -30,7 +30,7 @@ def get_feed_links(page: Page):
         return page.locator("#mobile-sidebar a[href*='feed_id']")
     
     # Fall back to desktop sidebar links
-    return page.locator("main > div:first-child a").filter(has_not=page.locator("text=All Feeds"))
+    return page.locator("#sidebar a[href*='feed_id']")
 
 
 class TestRefactoringRegression:
@@ -109,8 +109,8 @@ class TestRefactoringRegression:
                 page.wait_for_load_state("networkidle")
                 time.sleep(1)  # Allow HTMX updates
                 
-                # Verify right panel shows article (third column)
-                detail_panel = page.locator("main > div:nth-child(3)")  # Third column - article detail
+                # Verify right panel shows article (desktop detail panel)
+                detail_panel = page.locator("#desktop-item-detail")  # Desktop detail panel
                 expect(detail_panel).to_be_visible()
                 
                 # Take screenshot after article click
@@ -144,8 +144,10 @@ class TestRefactoringRegression:
             
             print(f"Completed desktop cycle {cycle + 1}")
         
-        # Check for any console errors
-        error_messages = [msg for msg in console_messages if "error" in msg.lower()]
+        # Check for actual console errors (not debug logs or known development warnings)
+        error_messages = [msg for msg in console_messages 
+                         if msg.startswith("error:") or 
+                         (msg.startswith("warning:") and "tailwindcss.com" not in msg)]
         if error_messages:
             print(f"Console errors detected: {error_messages}")
         
@@ -216,7 +218,7 @@ class TestRefactoringRegression:
             page.screenshot(path=f"/tmp/mobile_cycle_{cycle}_feed_selected.png")
             
             # 3. Scroll down in the feed list
-            feed_container = page.locator("main > div:nth-child(2)")  # Second column contains feed items
+            feed_container = page.locator("#main-content")  # Mobile content area
             expect(feed_container).to_be_visible()
             
             print("Scrolling in mobile feed list")
@@ -226,7 +228,7 @@ class TestRefactoringRegression:
                 time.sleep(0.5)
             
             # 4. Click on an article (should navigate to full-screen view)
-            article_links = feed_container.locator("li").all()
+            article_links = feed_container.locator("li[id^='mobile-feed-item-']").all()
             if article_links:
                 article_index = cycle % len(article_links)
                 article_item = article_links[article_index]
@@ -286,8 +288,10 @@ class TestRefactoringRegression:
             
             print(f"Completed mobile cycle {cycle + 1}")
         
-        # Check for any console errors
-        error_messages = [msg for msg in console_messages if "error" in msg.lower()]
+        # Check for actual console errors (not debug logs or known development warnings)
+        error_messages = [msg for msg in console_messages 
+                         if msg.startswith("error:") or 
+                         (msg.startswith("warning:") and "tailwindcss.com" not in msg)]
         if error_messages:
             print(f"Console errors detected: {error_messages}")
         

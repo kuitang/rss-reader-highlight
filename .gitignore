@@ -100,3 +100,4 @@ docs/build/
 # Local configuration
 config.local.py
 local_settings.py
+*.tmp*

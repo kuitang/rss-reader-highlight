@@ -181,7 +181,8 @@ class TestMobileNavigationComplete:
         # Click the specific article by ID (more reliable than CSS selectors)
         feed_item = page.locator(f"#{first_article_id}")
         feed_item.click()
-        wait_for_page_ready(page)
+        wait_for_htmx_complete(page)
+        page.wait_for_timeout(200)  # Additional wait for out-of-band button swap
         
         # Verify chevron button appears (arrow-left icon)
         chevron_icon = page.evaluate("""() => {
