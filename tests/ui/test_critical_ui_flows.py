@@ -863,19 +863,23 @@ class TestPaginationButtonDuplication:
         This test prevents regression of the duplicate mobile pagination buttons
         bug where both mobile and desktop button sets were rendered simultaneously.
         """
-        page.goto(test_server_url)
-        wait_for_page_ready(page)
+        # Navigate directly to feed with pagination (bypass hidden sidebar links)
+        page.goto(f"{test_server_url}/?feed_id=5")  # ClaudeAI feed typically has multiple pages
         
-        # Navigate to a feed with enough items to trigger pagination
-        # Look for any feed link and click it
-        feed_links = page.locator('a[href*="feed_id="]')
-        if feed_links.count() > 0:
-            feed_links.first.click()
-            wait_for_htmx_complete(page)
+        # Wait for specific content to load (not arbitrary time)
+        page.wait_for_selector("#feeds-list-container", state="visible", timeout=10000)
         
-        # Check if pagination exists (only test if pagination is present)
-        pagination_container = page.locator('.p-4.border-t')  # Pagination footer container
-        if pagination_container.is_visible():
+        # Wait for pagination container specifically (event-based, not time-based)
+        pagination_container = page.locator('.p-4.border-t')  
+        
+        # Check if pagination exists with explicit wait
+        try:
+            pagination_container.wait_for(state="visible", timeout=5000)
+            pagination_exists = True
+        except:
+            pagination_exists = False
+            
+        if pagination_exists:
             # Count all chevron navigation buttons in pagination
             chevrons_left_count = pagination_container.locator('uk-icon[icon="chevrons-left"]').count()
             chevron_left_count = pagination_container.locator('uk-icon[icon="chevron-left"]').count()  
