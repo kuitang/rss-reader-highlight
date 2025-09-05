@@ -36,13 +36,13 @@ def get_feed_links(page: Page):
 class TestRefactoringRegression:
     """Comprehensive regression tests for desktop and mobile workflows."""
     
-    def test_desktop_repetitive_workflow(self, page: Page):
+    def test_desktop_repetitive_workflow(self, page: Page, test_server_url):
         """
         Desktop workflow: Click feeds, scroll, view articles, toggle tabs - 3 cycles.
         Tests the core three-panel layout functionality.
         """
         # Navigate to app
-        page.goto("http://localhost:8080")
+        page.goto(test_server_url)
         page.wait_for_load_state("networkidle")
         
         # Take initial screenshot
@@ -85,7 +85,7 @@ class TestRefactoringRegression:
             page.screenshot(path=f"/tmp/desktop_cycle_{cycle}_feed_clicked.png")
             
             # 2. Scroll down in middle feed panel
-            middle_panel = page.locator("main > div:nth-child(2)")  # Second column - feed items
+            middle_panel = page.locator("#desktop-feeds-content")  # Desktop feeds content column
             expect(middle_panel).to_be_visible()
             
             print("Scrolling in middle panel")
@@ -98,7 +98,7 @@ class TestRefactoringRegression:
                 time.sleep(0.5)
             
             # 3. Click on an article to view details in right panel
-            article_links = middle_panel.locator("li").all()  # Each article is in a listitem
+            article_links = middle_panel.locator("#feeds-list-container .js-filter li").all()  # Each article is in a listitem
             if article_links:
                 article_index = cycle % len(article_links)
                 article_item = article_links[article_index]
@@ -155,7 +155,7 @@ class TestRefactoringRegression:
         # Assert no critical errors
         assert len(error_messages) == 0, f"Console errors detected: {error_messages}"
 
-    def test_mobile_repetitive_workflow(self, page: Page):
+    def test_mobile_repetitive_workflow(self, page: Page, test_server_url):
         """
         Mobile workflow: Hamburger menu, feeds, scroll, articles, back navigation - 3 cycles.
         Tests mobile-specific navigation and layout.
@@ -164,7 +164,7 @@ class TestRefactoringRegression:
         page.set_viewport_size({"width": 390, "height": 844})
         
         # Navigate to app
-        page.goto("http://localhost:8080")
+        page.goto(test_server_url)
         page.wait_for_load_state("networkidle")
         
         # Take initial mobile screenshot
@@ -297,12 +297,12 @@ class TestRefactoringRegression:
         # Assert no critical errors
         assert len(error_messages) == 0, f"Console errors detected: {error_messages}"
 
-    def test_htmx_request_monitoring(self, page: Page):
+    def test_htmx_request_monitoring(self, page: Page, test_server_url):
         """
         Monitor HTMX requests and responses for any failures or incorrect targets.
         This test focuses on the HTMX functionality that could break from refactoring.
         """
-        page.goto("http://localhost:8080")
+        page.goto(test_server_url)
         page.wait_for_load_state("networkidle")
         
         # Monitor network requests
@@ -364,12 +364,12 @@ class TestRefactoringRegression:
         # Assert no failed requests
         assert len(failed_responses) == 0, f"Found {len(failed_responses)} failed HTTP responses"
 
-    def test_read_unread_state_management(self, page: Page):
+    def test_read_unread_state_management(self, page: Page, test_server_url):
         """
         Test that read/unread state is properly managed after refactoring.
         This is critical functionality that could break with database changes.
         """
-        page.goto("http://localhost:8080")
+        page.goto(test_server_url)
         page.wait_for_load_state("networkidle")
         
         # Click on a feed

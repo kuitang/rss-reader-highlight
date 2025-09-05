@@ -13,7 +13,7 @@ def wait_for_page_ready(page):
     """Fast page ready check - waits for network idle instead of fixed timeout"""
     page.wait_for_load_state("networkidle")
 
-def test_add_feed_empty_url_both_viewports(page):
+def test_add_feed_empty_url_both_viewports(page, test_server_url):
     """Test empty URL handling on both desktop and mobile"""
     
     print("🧪 TESTING EMPTY URL HANDLING (BOTH VIEWPORTS)")
@@ -24,7 +24,7 @@ def test_add_feed_empty_url_both_viewports(page):
     ]:
         print(f"\n--- Testing {viewport_name} empty URL ---")
         page.set_viewport_size(viewport_size)
-        page.goto("http://localhost:8080")
+        page.goto(test_server_url)
         wait_for_page_ready(page)
         
         # Set up viewport-specific selectors

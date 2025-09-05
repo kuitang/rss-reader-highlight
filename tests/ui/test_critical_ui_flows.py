@@ -162,11 +162,11 @@ class TestFormParameterBugFlow:
         expect(page.locator("#sidebar")).to_be_visible()
         
         # 2. Navigate to feed URL directly (simulates feed link behavior)
-        page.goto("http://localhost:8080/?feed_id=2")
+        page.goto(f"{test_server_url}/?feed_id=2")
         wait_for_page_ready(page)  # OPTIMIZED: Wait for page load
         
         # 3. Verify URL updated correctly
-        expect(page).to_have_url("http://localhost:8080/?feed_id=2")
+        expect(page).to_have_url(f"{test_server_url}/?feed_id=2")
         
         # 4. Verify desktop layout is still working
         expect(page.locator("#desktop-layout")).to_be_visible()
@@ -435,7 +435,7 @@ class TestSessionAndSubscriptionFlow:
             expect(page.locator(content_selector)).to_be_visible()
             print(f"  ✓ {viewport_name} auto-subscription test passed")
     
-    def test_second_browser_tab_independent_session(self, browser):
+    def test_second_browser_tab_independent_session(self, browser, test_server_url):
         """Test: Multiple browser contexts → Independent sessions → No interference"""
 
         # Tab 1: Regular browsing
@@ -657,7 +657,7 @@ class TestComplexNavigationFlows:
 class TestTabSizeAndAlignment:
     """Test that tabs are correctly sized and aligned after touch target CSS fix"""
     
-    def test_tabs_correct_size_and_alignment(self, browser):
+    def test_tabs_correct_size_and_alignment(self, browser, test_server_url):
         """Verify tabs are compact and right-aligned, with strict pixel-width measurements for both mobile and desktop"""
         
         # Test configurations for both mobile and desktop viewports
@@ -681,30 +681,29 @@ class TestTabSizeAndAlignment:
         for config in test_configs:
             print(f"\n=== TESTING {config['name'].upper()} BUTTON SIZES ===")
             
-            with existing_server():
-                context = browser.new_context(
-                    viewport=config['viewport'],
-                    user_agent=config['user_agent']
-                )
-                page = context.new_page()
+            context = browser.new_context(
+                viewport=config['viewport'],
+                user_agent=config['user_agent']
+            )
+            page = context.new_page()
+            
+            try:
+                # Navigate to the app
+                page.goto(test_server_url, wait_until='networkidle')
+                wait_for_page_ready(page)
                 
-                try:
-                    # Navigate to the app
-                    page.goto(test_server_url, wait_until='networkidle')
-                    wait_for_page_ready(page)
-                    
-                    # Find tab container - mobile vs desktop
-                    if config['name'] == 'mobile':
-                        # Mobile: tabs in persistent header
-                        mobile_header = page.locator('#mobile-persistent-header')
-                        if mobile_header.count() > 0:
-                            tab_container = mobile_header.locator('.uk-tab-alt').first
-                        else:
-                            # Fallback to any tab container
-                            tab_container = page.locator('.uk-tab-alt').first
+                # Find tab container - mobile vs desktop
+                if config['name'] == 'mobile':
+                    # Mobile: tabs in persistent header
+                    mobile_header = page.locator('#mobile-persistent-header')
+                    if mobile_header.count() > 0:
+                        tab_container = mobile_header.locator('.uk-tab-alt').first
                     else:
-                        # Desktop: tabs with ml-auto class
-                        tab_container = page.locator('.uk-tab-alt.ml-auto').first
+                        # Fallback to any tab container
+                        tab_container = page.locator('.uk-tab-alt').first
+                else:
+                    # Desktop: tabs with ml-auto class
+                    tab_container = page.locator('.uk-tab-alt.ml-auto').first
                     
                     # Wait for tab container to be visible
                     expect(tab_container).to_be_visible(timeout=5000)
@@ -802,8 +801,8 @@ class TestTabSizeAndAlignment:
                     else:
                         print(f"  ✓ {config['name']} positioning: within viewport bounds")
                     
-                finally:
-                    context.close()
+            finally:
+                context.close()
             
         print("\n✅ All viewport button size tests passed!")
 

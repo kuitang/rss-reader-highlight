@@ -13,7 +13,7 @@ def wait_for_page_ready(page):
     """Fast page ready check - waits for network idle instead of fixed timeout"""
     page.wait_for_load_state("networkidle")
 
-def test_add_feed_edge_cases(page: Page):
+def test_add_feed_edge_cases(page: Page, test_server_url):
     """Test various add feed scenarios to find issues on both mobile and desktop"""
     
     print("🧪 TESTING ADD FEED EDGE CASES")
@@ -24,7 +24,7 @@ def test_add_feed_edge_cases(page: Page):
     ]:
         print(f"\n--- Testing {viewport_name} add feed edge cases ---")
         page.set_viewport_size(viewport_size)
-        page.goto("http://localhost:8080")
+        page.goto(test_server_url)
         wait_for_page_ready(page)
         
         # Debug: Check if correct layout is visible

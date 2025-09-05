@@ -14,9 +14,9 @@ def wait_for_page_ready(page):
     page.wait_for_load_state("networkidle")
 
 
-def test_mobile_tab_active_style_updates(page: Page):
+def test_mobile_tab_active_style_updates(page: Page, test_server_url):
     """Test that mobile tab styles update correctly when switching between All Posts and Unread"""
-    page.goto("http://localhost:8080")
+    page.goto(test_server_url)
     page.set_viewport_size({"width": 390, "height": 844})
     
     # Wait for page load

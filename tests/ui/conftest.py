@@ -17,29 +17,108 @@ from playwright.sync_api import sync_playwright
 
 @pytest.fixture(scope="session")
 def test_server_url():
-    """Verify server is running and return URL for UI tests
+    """Auto-start test server or use existing server for UI tests
     
-    This fixture enforces server dependency for UI tests.
+    This fixture automatically starts a test server in minimal mode,
+    or uses an existing server if TEST_SERVER_URL is set.
     
-    To run UI tests:
-    1. Start server: python app.py (or MINIMAL_MODE=true python app.py)  
-    2. Run tests: pytest tests/ui/
-    
-    Or skip server-dependent tests: pytest -m "not needs_server"
+    Environment variables:
+    - TEST_SERVER_URL: Use existing server (e.g., http://localhost:8080)
+    - TEST_AUTO_SERVER: Set to 'false' to disable auto server startup
     """
-    server_url = os.environ.get('TEST_SERVER_URL', 'http://localhost:8080')
+    import socket
+    import subprocess
+    import tempfile
+    import time
+    import atexit
     
-    # Verify server is accessible
-    try:
-        response = httpx.get(server_url, timeout=5)
-        if response.status_code != 200:
-            pytest.skip(f"Test server not running: returned status {response.status_code}. "
-                       f"Start server with: python app.py")
-    except httpx.RequestError as e:
-        pytest.skip(f"Test server not accessible at {server_url}: {e}. "
-                   f"Start server with: python app.py")
+    # Check if user wants to use existing server
+    existing_server = os.environ.get('TEST_SERVER_URL')
+    if existing_server:
+        try:
+            response = httpx.get(existing_server, timeout=5)
+            if response.status_code == 200:
+                return existing_server
+        except httpx.RequestError:
+            pass
     
-    return server_url
+    # Check if auto server startup is disabled
+    if os.environ.get('TEST_AUTO_SERVER', 'true').lower() == 'false':
+        pytest.skip("Test server auto-startup disabled. Set TEST_SERVER_URL or start server manually.")
+    
+    def get_free_port():
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(('', 0))
+            s.listen(1)
+            port = s.getsockname()[1]
+        return port
+    
+    # Ensure minimal seed database exists for MINIMAL_MODE
+    minimal_seed_path = os.path.join('data', 'minimal_seed.db')
+    if not os.path.exists(minimal_seed_path):
+        pytest.skip(f"Minimal seed database not found at {minimal_seed_path}. Run: python create_minimal_db.py")
+    
+    # Start test server with minimal mode
+    port = get_free_port()
+    server_url = f"http://localhost:{port}"
+    
+    # Ensure data directory exists
+    os.makedirs('data', exist_ok=True)
+    
+    # Start server process with MINIMAL_MODE
+    # Note: MINIMAL_MODE ignores DATABASE_PATH and uses PID-specific database
+    env = os.environ.copy()
+    env.update({
+        'MINIMAL_MODE': 'true',
+        'PORT': str(port)
+    })
+    
+    server_process = subprocess.Popen([
+        'python', 'app.py'
+    ], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=os.getcwd())
+    
+    # Register cleanup function
+    def cleanup_server():
+        if server_process:
+            # Get PID of the server process to clean up its database
+            server_pid = server_process.pid
+            
+            server_process.terminate()
+            try:
+                server_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                server_process.kill()
+                
+            # Clean up the PID-specific database created by models.py in MINIMAL_MODE
+            pid_specific_db = os.path.join('data', f'minimal.{server_pid}.db')
+            try:
+                if os.path.exists(pid_specific_db):
+                    os.unlink(pid_specific_db)
+                # Also clean up any journal files
+                journal_file = f"{pid_specific_db}-journal"
+                if os.path.exists(journal_file):
+                    os.unlink(journal_file)
+            except OSError:
+                pass
+    
+    atexit.register(cleanup_server)
+    
+    # Wait for server to start
+    for _ in range(30):  # 30 seconds timeout
+        try:
+            response = httpx.get(server_url, timeout=2)
+            if response.status_code == 200:
+                break
+        except httpx.RequestError:
+            time.sleep(1)
+    else:
+        cleanup_server()
+        pytest.skip(f"Failed to start test server on {server_url}")
+    
+    yield server_url
+    
+    # Cleanup
+    cleanup_server()
 
 
 @pytest.fixture(scope="module")  # One browser per test file/module
