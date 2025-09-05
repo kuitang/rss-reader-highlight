@@ -692,114 +692,90 @@ class TestTabSizeAndAlignment:
                 page.goto(test_server_url, wait_until='networkidle')
                 wait_for_page_ready(page)
                 
-                # Find tab container - mobile vs desktop
-                if config['name'] == 'mobile':
-                    # Mobile: tabs in persistent header
-                    mobile_header = page.locator('#mobile-persistent-header')
-                    if mobile_header.count() > 0:
-                        tab_container = mobile_header.locator('.uk-tab-alt').first
-                    else:
-                        # Fallback to any tab container
-                        tab_container = page.locator('.uk-tab-alt').first
-                else:
-                    # Desktop: tabs with ml-auto class
-                    tab_container = page.locator('.uk-tab-alt.ml-auto').first
-                    
-                    # Wait for tab container to be visible
-                    expect(tab_container).to_be_visible(timeout=5000)
-                    
-                    # Find the "All Posts" and "Unread" tab links
-                    all_posts_tab = tab_container.locator('a').filter(has_text='All Posts')
-                    unread_tab = tab_container.locator('a').filter(has_text='Unread')
-                    
-                    expect(all_posts_tab).to_be_visible()
-                    expect(unread_tab).to_be_visible()
-                    
-                    # Get pixel measurements
-                    all_posts_box = all_posts_tab.bounding_box()
-                    unread_box = unread_tab.bounding_box()
-                    tab_container_box = tab_container.bounding_box()
-                    viewport_width = page.viewport_size['width']
-                    
-                    # STRICT PIXEL WIDTH MEASUREMENTS (addressing user's requirement)
-                    all_posts_width = all_posts_box['width']
-                    unread_width = unread_box['width']
-                    total_tab_width = tab_container_box['width']
-                    width_percent = (total_tab_width / viewport_width) * 100
-                    
-                    print(f"  All Posts button: {all_posts_width:.1f}px")
-                    print(f"  Unread button: {unread_width:.1f}px") 
-                    print(f"  Total tab width: {total_tab_width:.1f}px ({width_percent:.1f}% of viewport)")
-                    
-                    # Test 1: Individual button width constraints
-                    assert all_posts_width <= config['max_individual_button_width'], \
-                        f"{config['name']} 'All Posts' button too wide: {all_posts_width:.1f}px (max: {config['max_individual_button_width']}px)"
-                    
-                    assert unread_width <= config['max_individual_button_width'], \
-                        f"{config['name']} 'Unread' button too wide: {unread_width:.1f}px (max: {config['max_individual_button_width']}px)"
-                    
-                    # Test 2: Total width percentage constraint
-                    assert width_percent <= config['max_total_width_percent'], \
-                        f"{config['name']} tab container too wide: {width_percent:.1f}% of viewport (max: {config['max_total_width_percent']}%)"
-                    
-                    # Test 3: Height should be compact (not affected by 44px touch target rule)
-                    assert all_posts_box['height'] < 40, f"{config['name']} All Posts tab too tall: {all_posts_box['height']}px (should be < 40px)"
-                    assert unread_box['height'] < 40, f"{config['name']} Unread tab too tall: {unread_box['height']}px (should be < 40px)"
-                    
-                    # Test 4: Right alignment (different expectations for mobile vs desktop)
-                    container_right_edge = tab_container_box['x'] + tab_container_box['width']
-                    distance_from_right = viewport_width - container_right_edge
-                    
+                # Find navigation buttons - new icon-based design
+                try:
                     if config['name'] == 'mobile':
-                        # Mobile: tabs should be reasonably close to right edge
-                        assert distance_from_right < 50, f"{config['name']} tabs not right-aligned: {distance_from_right}px from edge (should be < 50px)"
+                        # Mobile: icon buttons in top header
+                        icon_bar = page.locator('#icon-bar')
+                        expect(icon_bar).to_be_visible(timeout=5000)
+                        
+                        all_posts_btn = icon_bar.locator('button[title="All Posts"]')
+                        unread_btn = icon_bar.locator('button[title="Unread"]')
+                        
+                        expect(all_posts_btn).to_be_visible()
+                        expect(unread_btn).to_be_visible()
+                        
+                        # Get pixel measurements for mobile icon buttons
+                        all_posts_box = all_posts_btn.bounding_box()
+                        unread_box = unread_btn.bounding_box()
+                        icon_bar_box = icon_bar.bounding_box()
+                        viewport_width = page.viewport_size['width']
+                        
+                        # STRICT PIXEL WIDTH MEASUREMENTS (addressing user's requirement)
+                        all_posts_width = all_posts_box['width']
+                        unread_width = unread_box['width']
+                        total_nav_width = icon_bar_box['width']
+                        width_percent = (total_nav_width / viewport_width) * 100
+                        
+                        print(f"  All Posts button: {all_posts_width:.1f}px")
+                        print(f"  Unread button: {unread_width:.1f}px") 
+                        print(f"  Total navigation width: {total_nav_width:.1f}px ({width_percent:.1f}% of viewport)")
+                        
+                        # Test 1: Individual button width constraints (icon buttons should be compact)
+                        assert all_posts_width <= 60, \
+                            f"{config['name']} 'All Posts' button too wide: {all_posts_width:.1f}px (max: 60px for icon)"
+                        
+                        assert unread_width <= 60, \
+                            f"{config['name']} 'Unread' button too wide: {unread_width:.1f}px (max: 60px for icon)"
+                        
+                        # Test 2: Total width percentage constraint (should be reasonable for icon bar)
+                        assert width_percent <= 50, \
+                            f"{config['name']} icon bar too wide: {width_percent:.1f}% of viewport (max: 50%)"
+                        
+                        # Test 3: Height should meet touch target requirements (44px minimum)
+                        assert all_posts_box['height'] >= 44, f"{config['name']} All Posts button too short: {all_posts_box['height']}px (should be >= 44px)"
+                        assert unread_box['height'] >= 44, f"{config['name']} Unread button too short: {unread_box['height']}px (should be >= 44px)"
+                        
+                        # Test 4: Right alignment (icon bar should be on the right)
+                        container_right_edge = icon_bar_box['x'] + icon_bar_box['width']
+                        distance_from_right = viewport_width - container_right_edge
+                        
+                        # Mobile: icon bar should be reasonably close to right edge
+                        assert distance_from_right <= 30, \
+                            f"{config['name']} icon bar not close enough to right edge: {distance_from_right:.1f}px away (max: 30px)"
+                        
                     else:
-                        # Desktop: tabs may be positioned anywhere as long as they're compact
-                        # Just ensure they're within the viewport and not overflowing
-                        assert container_right_edge <= viewport_width, f"{config['name']} tabs overflow viewport: {container_right_edge}px > {viewport_width}px"
-                        # Log positioning for debugging
-                        print(f"  Desktop tabs position: {distance_from_right:.1f}px from right edge")
-                    
-                    # Test 5: CSS override verification
-                    all_posts_styles = all_posts_tab.evaluate("""
-                        element => {
-                            const styles = window.getComputedStyle(element);
-                            return {
-                                minHeight: styles.minHeight,
-                                minWidth: styles.minWidth,
-                                maxWidth: styles.maxWidth,
-                                display: styles.display
-                            };
-                        }
-                    """)
-                    
-                    # Ensure 44px touch target rule is not applied
-                    assert all_posts_styles['minHeight'] != '44px', \
-                        f"{config['name']} tab has 44px min-height (touch target rule not overridden)"
-                    
-                    # For mobile, ensure our CSS override is working
-                    if config['name'] == 'mobile':
-                        # Should have max-width constraint from our CSS fix
-                        max_width = all_posts_styles['maxWidth']
-                        if max_width != 'none':
-                            # Convert rem/px values to pixels for comparison
-                            if 'rem' in max_width:
-                                # 5rem should be ~80px (16px base font size)
-                                expected_max = 80
-                            else:
-                                # Extract pixel value
-                                expected_max = float(max_width.replace('px', ''))
-                            
-                            assert all_posts_width <= expected_max + 5, \
-                                f"{config['name']} button width {all_posts_width:.1f}px exceeds CSS max-width {max_width}"
-                    
-                    print(f"  ✓ {config['name']} button widths within limits")
-                    print(f"  ✓ {config['name']} total width: {width_percent:.1f}% (limit: {config['max_total_width_percent']}%)")
-                    print(f"  ✓ {config['name']} height constraint: {all_posts_box['height']}px")
-                    if config['name'] == 'mobile':
-                        print(f"  ✓ {config['name']} right alignment: {distance_from_right}px from edge")
-                    else:
-                        print(f"  ✓ {config['name']} positioning: within viewport bounds")
+                        # Desktop: links in header (simplified design)
+                        desktop_header = page.locator('.sticky.top-0')
+                        expect(desktop_header).to_be_visible(timeout=5000)
+                        
+                        all_posts_link = desktop_header.locator('a').filter(has_text='All Posts')
+                        unread_link = desktop_header.locator('a').filter(has_text='Unread')
+                        
+                        expect(all_posts_link).to_be_visible()
+                        expect(unread_link).to_be_visible()
+                        
+                        # Get measurements
+                        all_posts_box = all_posts_link.bounding_box()
+                        unread_box = unread_link.bounding_box()
+                        viewport_width = page.viewport_size['width']
+                        
+                        all_posts_width = all_posts_box['width']
+                        unread_width = unread_box['width']
+                        
+                        print(f"  All Posts link: {all_posts_width:.1f}px")
+                        print(f"  Unread link: {unread_width:.1f}px")
+                        
+                        # Desktop links should be reasonably sized
+                        assert all_posts_width <= 100, f"Desktop All Posts link too wide: {all_posts_width:.1f}px"
+                        assert unread_width <= 100, f"Desktop Unread link too wide: {unread_width:.1f}px"
+                        
+                    print(f"✅ {config['name']}: Navigation elements are properly sized and positioned")
+                
+                except Exception as e:
+                    print(f"❌ {config['name']}: {str(e)}")
+                    page.screenshot(path=f'/tmp/tab_test_error_{config["name"]}.png')
+                    raise
                     
             finally:
                 context.close()
