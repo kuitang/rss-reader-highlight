@@ -854,7 +854,7 @@ def process_urls_in_content(content):
         return content
     
     # URL regex pattern - matches http/https URLs
-    url_pattern = r'(?<!href=["\''])(?<!src=["\''])(https?://[^\s<>"\']+)'
+    url_pattern = r'(?<!href=["\'])(?<!src=["\'])(https?://[^\s<>"\']+)'
     
     def replace_url(match):
         url = match.group(1)
