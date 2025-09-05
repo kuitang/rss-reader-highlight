@@ -1,15 +1,10 @@
 #!/bin/bash
 
-# RSS Reader - Optimized Test Suite Runner
-# 72% reduction: 4,315 → 1,186 lines
-# Focus: Complex workflows that broke during development
+# RSS Reader Test Suite Runner
 
 set -e  # Exit on any error
 
-echo "🧪 RSS Reader - Optimized Test Suite"
-echo "=================================================="
-echo "📊 72% reduction: 4,315 → 1,186 lines"
-echo "🎯 Focus: Complex workflows that broke during development"
+echo "🧪 RSS Reader Test Suite"
 echo "=================================================="
 
 # Ensure we're in the right directory
@@ -41,16 +36,16 @@ run_test() {
 
 # Test Suite
 run_test "Essential Mock Tests (Dangerous scenarios)" \
-    "python -m pytest test_essential_mocks.py -v"
+    "python -m pytest tests/core/test_essential_mocks.py -v"
 
 run_test "Direct Function Tests (Database logic)" \
-    "python -m pytest test_direct_functions.py -v"
+    "python -m pytest tests/core/test_direct_functions.py -v"
 
 run_test "HTTP Integration Tests (Black-box server testing)" \
-    "python -m pytest test_optimized_integration.py -v --tb=short || echo 'Note: HTTP tests may fail due to subprocess server issues'"
+    "python -m pytest tests/core/test_optimized_integration.py -v --tb=short || echo 'Note: HTTP tests may fail due to subprocess server issues'"
 
 run_test "Critical UI Flow Tests (UI bugs we debugged)" \
-    "python -m pytest test_critical_ui_flows.py::TestFormParameterBugFlow -v --tb=short || echo 'Note: UI tests require display - run manually with: python -m pytest test_critical_ui_flows.py -v'"
+    "python -m pytest tests/ui/test_critical_ui_flows.py::TestFormParameterBugFlow -v --tb=short || echo 'Note: UI tests require display - run manually with: python -m pytest tests/ui/test_critical_ui_flows.py -v'"
 
 run_test "Application Setup Verification" \
     "python -c 'from models import init_db; from feed_parser import FeedParser; import app; init_db(); FeedParser(); print(\"All imports: OK\")'"
