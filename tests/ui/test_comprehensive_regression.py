@@ -238,11 +238,14 @@ class TestComprehensiveRegression:
     
     def test_mobile_sidebar_and_navigation_flow(self, page: Page, test_server_url):
         """Test mobile-specific navigation patterns"""
-        page.goto(test_server_url)
         page.set_viewport_size({"width": 390, "height": 844})
+        page.goto(test_server_url)
+        wait_for_page_ready(page)
         
-        # Wait for mobile layout
+        # Ensure mobile layout and JavaScript are ready
         expect(page.locator("#mobile-layout")).to_be_visible()
+        expect(page.locator("#mobile-nav-button")).to_be_visible()
+        page.wait_for_timeout(500)  # Ensure JS is loaded
         
         # Test sidebar open/close cycle
         for i in range(3):
@@ -250,8 +253,7 @@ class TestComprehensiveRegression:
             hamburger = page.locator("#mobile-nav-button")
             if hamburger.is_visible():
                 hamburger.click()
-                page.wait_for_timeout(300)  # Wait for sidebar animation
-                expect(page.locator("#mobile-sidebar")).to_be_visible()
+                page.wait_for_selector("#mobile-sidebar", state="visible")  # Wait for sidebar to become visible
                 
                 # Select different feed each iteration
                 feed_links = page.locator("#mobile-sidebar a[href*='feed_id']").all()
