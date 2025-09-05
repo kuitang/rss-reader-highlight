@@ -134,7 +134,7 @@ class TestMobileFlows:
     
     # Form Persistence Tests (from test_mobile_form_bar_bug.py)  
     def test_mobile_persistent_header_visibility(self, page: Page, test_server_url):
-        """Test that mobile persistent header shows/hides correctly during navigation"""
+        """Test mobile header search functionality (moved from persistent header to main header)"""
         
         # Verify we're in mobile mode
         desktop_layout = page.locator("#desktop-layout")
@@ -143,13 +143,17 @@ class TestMobileFlows:
         expect(desktop_layout).to_be_hidden()
         expect(mobile_content).to_be_visible()
         
-        # Check for persistent header with search form - should be visible initially
-        persistent_header = page.locator("#mobile-persistent-header")
-        expect(persistent_header).to_be_visible()
-        expect(persistent_header).not_to_have_class("hidden")
+        # Check for main header with icon bar (new structure)
+        mobile_top_bar = page.locator("#mobile-top-bar")
+        expect(mobile_top_bar).to_be_visible()
         
-        # Find search input in persistent header
-        search_input = persistent_header.locator('input[placeholder="Search posts"]')
+        # Click search button to expand search
+        search_button = page.locator('button[title="Search"]')
+        expect(search_button).to_be_visible()
+        search_button.click()
+        
+        # Find search input in expanded search bar
+        search_input = page.locator('#mobile-search-input')
         expect(search_input).to_be_visible()
         
         # Enter some search text to create state
@@ -160,32 +164,36 @@ class TestMobileFlows:
         filled_value = search_input.input_value()
         assert filled_value == test_search, f"Expected '{test_search}', got '{filled_value}'"
         
-        # Click on an article - persistent header should be hidden in article view
+        # Close search to return to icon bar
+        close_button = page.locator('button[title="Close search"]')
+        expect(close_button).to_be_visible()
+        close_button.click()
+        
+        # Click on an article - should navigate to article view
         first_post = page.locator("li[id^='mobile-feed-item-']").first
         if first_post.is_visible():
             first_post.click()
             wait_for_htmx_complete(page)
             
-            # Persistent header should be hidden during article reading (via CSS)
-            header_hidden = page.evaluate("""() => {
-                const header = document.getElementById('mobile-persistent-header');
-                const style = window.getComputedStyle(header);
-                return style.display === 'none';
-            }""")
-            assert header_hidden, "Persistent header should be hidden in article view"
-            
-            # Click back button
+            # Should be in article view - verify back button appears
             back_button = page.locator("#mobile-nav-button")
+            expect(back_button).to_be_visible()
+            
+            # Click back button to return to list
             back_button.click()
             wait_for_htmx_complete(page)
             
-            # Persistent header should be visible again
-            expect(persistent_header).to_be_visible()
-            expect(persistent_header).not_to_have_class("hidden")
+            # Should be back in list view - verify hamburger button appears
+            hamburger_button = page.locator("#mobile-nav-button")
+            expect(hamburger_button).to_be_visible()
             
-            # Search form should be back (may or may not preserve state - that's the bug)
-            restored_search_input = persistent_header.locator('input[placeholder="Search posts"]')
-            expect(restored_search_input).to_be_visible()
+            # Main header should be back to icon bar view
+            icon_bar = page.locator('#icon-bar')
+            expect(icon_bar).to_be_visible()
+            
+            # Search functionality should be accessible again
+            search_button = page.locator('button[title="Search"]')
+            expect(search_button).to_be_visible()
     
     def test_mobile_search_form_functionality(self, page: Page, test_server_url):
         """Test that mobile search form works correctly"""
