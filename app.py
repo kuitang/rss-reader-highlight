@@ -432,7 +432,7 @@ def create_tab_container(feed_name, feed_id, unread_only, for_mobile=False):
         alt=True, cls='ml-auto max-w-40'
     )
 
-def prepare_item_data(session_id, item_id, feed_id, unread_view):
+def prepare_item_data(session_id, item_id, feed_id, unread_view, page=1):
     """Centralized item data preparation"""
     class ItemData:
         def __init__(self):
@@ -442,6 +442,7 @@ def prepare_item_data(session_id, item_id, feed_id, unread_view):
             self.unread_view = unread_view
             self.session_id = session_id
             self.item_id = item_id
+            self.page = page
         
         def mark_read_and_refresh(self):
             """Mark item as read and refresh data"""
@@ -464,6 +465,10 @@ def htmx_item_response(htmx, item_data, _scroll=None):
         # Add unread parameter based on the view we came from
         if item_data.unread_view is False:  # We came from "All Posts" view
             back_url += "&unread=0" if item_data.feed_id else "?unread=0"
+        
+        # Add page parameter if we came from a page other than 1
+        if item_data.page > 1:
+            back_url += f"&page={item_data.page}" if '?' in back_url else f"?page={item_data.page}"
         
         # Preserve scroll position if provided
         if _scroll:
@@ -1137,7 +1142,7 @@ def FeedsSidebar(session_id, for_mobile=False):
         cls='mt-3'
     )
 
-def FeedItem(item, unread_view=False, for_desktop=False, feed_id=None):
+def FeedItem(item, unread_view=False, for_desktop=False, feed_id=None, page=1):
     """Feed item component
     
     Args:
@@ -1157,6 +1162,8 @@ def FeedItem(item, unread_view=False, for_desktop=False, feed_id=None):
     item_url = f"/item/{item['id']}?unread_view={unread_view}"
     if feed_id:
         item_url += f"&feed_id={feed_id}"
+    if page > 1:
+        item_url += f"&page={page}"
     
     # Simple consistent approach: same HTMX pattern, just different targets
     if for_desktop:
@@ -1212,9 +1219,9 @@ def FeedItem(item, unread_view=False, for_desktop=False, feed_id=None):
         **attrs
     )
 
-def FeedsList(items, unread_view=False, for_desktop=False, feed_id=None):
+def FeedsList(items, unread_view=False, for_desktop=False, feed_id=None, page=1):
     """Create list of feed items (adapted from MailList)"""
-    return Ul(cls='js-filter space-y-2 p-4 pt-0')(*[FeedItem(item, unread_view, for_desktop, feed_id) for item in items])
+    return Ul(cls='js-filter space-y-2 p-4 pt-0')(*[FeedItem(item, unread_view, for_desktop, feed_id, page) for item in items])
 
 def MobilePersistentHeader(session_id, feed_id=None, unread_only=False, show_chrome=True):
     """Create persistent mobile header - simplified since icons moved to main header"""
@@ -1333,7 +1340,7 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
     # Add feed name as title at the top of content area
     content_elements = [
         H3(feed_name, cls='px-4 pt-4 pb-2'),  # Feed title at top of content
-        FeedsList(paginated_items, unread_only, for_desktop, feed_id) if paginated_items else Div(P("No posts available"), cls='p-4 text-center text-muted-foreground'),
+        FeedsList(paginated_items, unread_only, for_desktop, feed_id, page) if paginated_items else Div(P("No posts available"), cls='p-4 text-center text-muted-foreground'),
         pagination_footer()
     ]
     
@@ -1415,20 +1422,48 @@ def MobileHeader(session_id, show_back=False, feed_id=None, unread_view=False):
     # Check if search is expanded (we'll use a simple approach)
     search_expanded = False  # Default state
     
+    # JavaScript for click-outside handler
+    click_outside_script = Script("""
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchBar = document.getElementById('search-bar');
+            const iconBar = document.getElementById('icon-bar');
+            const searchInput = document.getElementById('mobile-search-input');
+            const mobileTopBar = document.getElementById('mobile-top-bar');
+            
+            // Click outside handler
+            document.addEventListener('click', function(event) {
+                if (searchBar && iconBar) {
+                    const isSearchVisible = searchBar.style.display !== 'none';
+                    const clickedInsideSearch = searchBar.contains(event.target);
+                    const clickedSearchButton = event.target.closest('button[title="Search"]');
+                    
+                    if (isSearchVisible && !clickedInsideSearch && !clickedSearchButton) {
+                        // Clicked outside search bar - close it
+                        searchBar.style.display = 'none';
+                        iconBar.style.display = 'flex';
+                    }
+                }
+            });
+        });
+    """)
+    
     return Div(
         # Fixed header bar with new icon-based design
         Div(
             cls="lg:hidden fixed top-0 left-0 right-0 bg-background border-b p-4 z-40",
             id="mobile-top-bar"
         )(
-            DivFullySpaced(
-                # Left side: nav button (hamburger/back)
+            Div(
+                cls="flex items-center",
+                id="mobile-header-container"
+            )(
+                # Nav button is always visible on the left
                 nav_button,
-                # Right side: icon bar (All Posts, Unread, Search)
+                # Icon bar (All Posts, Unread, Search) - shown when search is closed
                 Div(
-                    cls="flex items-center space-x-3",
+                    cls="flex items-center space-x-3 ml-auto",
                     id="icon-bar",
-                    style="display: block;" if not search_expanded else "display: none;"
+                    style="display: flex;" if not search_expanded else "display: none;"
                 )(
                     Button(
                         UkIcon('list'),
@@ -1448,27 +1483,27 @@ def MobileHeader(session_id, show_back=False, feed_id=None, unread_view=False):
                     ),
                     Button(
                         UkIcon('search'),
-                        hx_on_click="document.getElementById('icon-bar').style.display='none'; document.getElementById('search-bar').style.display='block'; document.getElementById('mobile-search-input').focus();",
+                        hx_on_click="document.getElementById('icon-bar').style.display='none'; document.getElementById('search-bar').style.display='flex'; document.getElementById('mobile-search-input').focus();",
                         cls="p-2 rounded hover:bg-secondary",
                         title="Search"
                     )
                 ),
-                # Expandable search bar with X inside input (height invariant)
+                # Expandable search bar - takes full width when shown
                 Div(
-                    cls="flex items-center flex-1",
+                    cls="flex items-center flex-1 ml-4",
                     id="search-bar",
                     style="display: none;"
                 )(
-                    Div(cls="uk-inline flex-1")(
+                    Div(cls="uk-inline w-full")(
                         Input(
                             placeholder="Search posts",
-                            cls="flex-1 w-full pr-8",
+                            cls="w-full pr-8",
                             id="mobile-search-input",
                             uk_filter_control=""
                         ),
                         Button(
                             UkIcon('x', cls="w-4 h-4"),
-                            hx_on_click="document.getElementById('search-bar').style.display='none'; document.getElementById('icon-bar').style.display='block';",
+                            hx_on_click="document.getElementById('search-bar').style.display='none'; document.getElementById('icon-bar').style.display='flex';",
                             cls="uk-form-icon uk-form-icon-flip p-1 hover:text-red-500 cursor-pointer absolute right-1 top-1/2 -translate-y-1/2",
                             title="Close search"
                         )
@@ -1476,7 +1511,8 @@ def MobileHeader(session_id, show_back=False, feed_id=None, unread_view=False):
                 )
             )
         ),
-        loading_spinner
+        loading_spinner,
+        click_outside_script
     )
 
 def ItemDetailView(item, show_back=False):
@@ -1561,12 +1597,12 @@ def index(htmx, sess, feed_id: int = None, unread: bool = True, folder_id: int =
     return full_page_dual_layout(data)
 
 @rt('/item/{item_id}')
-def show_item(item_id: int, htmx, sess, unread_view: bool = False, feed_id: int = None, _scroll: int = None):
+def show_item(item_id: int, htmx, sess, unread_view: bool = False, feed_id: int = None, page: int = 1, _scroll: int = None):
     """Item detail route following same pattern"""
     session_id = sess.get('session_id')
     
     # Prepare item data
-    item_data = prepare_item_data(session_id, item_id, feed_id, unread_view)
+    item_data = prepare_item_data(session_id, item_id, feed_id, unread_view, page)
     
     if not item_data.item:
         if htmx and getattr(htmx, 'request', None) and getattr(htmx, 'target', None):

@@ -810,24 +810,46 @@ class TestSearchBarHeightInvariant:
         expect(search_button).to_be_visible()
         search_button.click()
         
-        # Measure expanded height
+        # Measure expanded height and width
         expanded_measurements = page.evaluate("""() => {
             const topBar = document.getElementById('mobile-top-bar');
+            const searchBar = document.getElementById('search-bar');
+            const searchInput = document.getElementById('mobile-search-input');
+            const navButton = document.getElementById('mobile-nav-button');
+            const container = document.getElementById('mobile-header-container');
+            
             return {
                 height: topBar.offsetHeight,
                 boundingRect: topBar.getBoundingClientRect(),
                 iconBarVisible: document.getElementById('icon-bar').style.display !== 'none',
-                searchBarVisible: document.getElementById('search-bar').style.display !== 'none'
+                searchBarVisible: document.getElementById('search-bar').style.display !== 'none',
+                // Width measurements
+                topBarWidth: topBar.offsetWidth,
+                searchBarWidth: searchBar ? searchBar.offsetWidth : 0,
+                searchInputWidth: searchInput ? searchInput.offsetWidth : 0,
+                navButtonWidth: navButton ? navButton.offsetWidth : 0,
+                containerWidth: container ? container.offsetWidth : 0,
+                availableWidth: topBar.offsetWidth - (navButton ? navButton.offsetWidth : 0) - 32  // 32px for padding/margins
             };
         }""")
         
         print(f"Expanded header height: {expanded_measurements['height']}px")
         print(f"Icon bar visible: {expanded_measurements['iconBarVisible']}")
         print(f"Search bar visible: {expanded_measurements['searchBarVisible']}")
+        print(f"Search bar width: {expanded_measurements['searchBarWidth']}px")
+        print(f"Search input width: {expanded_measurements['searchInputWidth']}px")
+        print(f"Available width: {expanded_measurements['availableWidth']}px")
+        print(f"Top bar width: {expanded_measurements['topBarWidth']}px")
         
         # HEIGHT INVARIANT: Header height must remain exactly the same
         assert initial_measurements['height'] == expanded_measurements['height'], \
             f"Height invariant violated: {initial_measurements['height']}px → {expanded_measurements['height']}px"
+        
+        # WIDTH TEST: Search bar should take most of the available horizontal space
+        # Allow for some padding/margins (within 50px tolerance)
+        width_utilization = expanded_measurements['searchBarWidth'] / expanded_measurements['availableWidth']
+        assert width_utilization > 0.85, \
+            f"Search bar not taking full width: {expanded_measurements['searchBarWidth']}px of {expanded_measurements['availableWidth']}px available ({width_utilization:.1%})"
         
         # State should be correctly toggled
         assert not expanded_measurements['iconBarVisible'], "Icon bar should be hidden when search expands"
@@ -857,6 +879,52 @@ class TestSearchBarHeightInvariant:
         assert not final_measurements['searchBarVisible'], "Search bar should be hidden after close"
         
         print("✅ Search height invariant test passed!")
+    
+    def test_search_click_outside_closes(self, page: Page, test_server_url):
+        """Test that clicking outside the search bar closes it"""
+        
+        # Set mobile viewport
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.goto(test_server_url)
+        wait_for_page_ready(page)
+        
+        # Click search button to expand
+        search_button = page.locator('button[title="Search"]')
+        expect(search_button).to_be_visible()
+        search_button.click()
+        
+        # Verify search is expanded
+        search_state = page.evaluate("""() => {
+            return {
+                searchBarVisible: document.getElementById('search-bar').style.display !== 'none',
+                iconBarVisible: document.getElementById('icon-bar').style.display !== 'none'
+            };
+        }""")
+        assert search_state['searchBarVisible'], "Search bar should be visible after clicking search button"
+        assert not search_state['iconBarVisible'], "Icon bar should be hidden when search is expanded"
+        
+        # Click outside the search bar (on the main content area which should exist)
+        # First wait for content to be present
+        content = page.locator('#main-content').first
+        expect(content).to_be_visible(timeout=5000)
+        
+        # Click on the content area to trigger click-outside
+        content.click(position={'x': 100, 'y': 200})
+        
+        # Small wait for JavaScript event handler
+        page.wait_for_timeout(200)
+        
+        # Verify search closed
+        final_state = page.evaluate("""() => {
+            return {
+                searchBarVisible: document.getElementById('search-bar').style.display !== 'none',
+                iconBarVisible: document.getElementById('icon-bar').style.display !== 'none'
+            };
+        }""")
+        assert not final_state['searchBarVisible'], "Search bar should be hidden after clicking outside"
+        assert final_state['iconBarVisible'], "Icon bar should be visible after search closes"
+        
+        print("✅ Click-outside test passed!")
 
 
 class TestPaginationButtonDuplication:
