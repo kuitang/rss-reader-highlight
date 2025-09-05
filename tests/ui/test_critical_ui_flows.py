@@ -12,7 +12,7 @@ import subprocess
 import time
 import os
 import sys
-from playwright.sync_api import sync_playwright, expect
+from playwright.sync_api import sync_playwright, expect, Page
 from contextlib import contextmanager
 
 pytestmark = pytest.mark.needs_server
@@ -772,6 +772,86 @@ class TestTabSizeAndAlignment:
                 context.close()
             
         print("\n✅ All viewport button size tests passed!")
+
+
+class TestSearchBarHeightInvariant:
+    """Test search bar expansion height invariant behavior"""
+    
+    def test_search_expansion_height_invariant(self, page: Page, test_server_url):
+        """Test search icon expansion doesn't change chrome height - requested feature"""
+        
+        # Set mobile viewport to test mobile chrome
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.goto(test_server_url)
+        wait_for_page_ready(page)
+        
+        # Measure initial header height
+        initial_measurements = page.evaluate("""() => {
+            const topBar = document.getElementById('mobile-top-bar');
+            return {
+                height: topBar.offsetHeight,
+                boundingRect: topBar.getBoundingClientRect(),
+                iconBarVisible: document.getElementById('icon-bar').style.display !== 'none',
+                searchBarVisible: document.getElementById('search-bar').style.display !== 'none'
+            };
+        }""")
+        
+        print(f"Initial header height: {initial_measurements['height']}px")
+        print(f"Icon bar visible: {initial_measurements['iconBarVisible']}")
+        print(f"Search bar visible: {initial_measurements['searchBarVisible']}")
+        
+        # Click search button to expand
+        search_button = page.locator('button[title="Search"]')
+        expect(search_button).to_be_visible()
+        search_button.click()
+        
+        # Measure expanded height
+        expanded_measurements = page.evaluate("""() => {
+            const topBar = document.getElementById('mobile-top-bar');
+            return {
+                height: topBar.offsetHeight,
+                boundingRect: topBar.getBoundingClientRect(),
+                iconBarVisible: document.getElementById('icon-bar').style.display !== 'none',
+                searchBarVisible: document.getElementById('search-bar').style.display !== 'none'
+            };
+        }""")
+        
+        print(f"Expanded header height: {expanded_measurements['height']}px")
+        print(f"Icon bar visible: {expanded_measurements['iconBarVisible']}")
+        print(f"Search bar visible: {expanded_measurements['searchBarVisible']}")
+        
+        # HEIGHT INVARIANT: Header height must remain exactly the same
+        assert initial_measurements['height'] == expanded_measurements['height'], \
+            f"Height invariant violated: {initial_measurements['height']}px → {expanded_measurements['height']}px"
+        
+        # State should be correctly toggled
+        assert not expanded_measurements['iconBarVisible'], "Icon bar should be hidden when search expands"
+        assert expanded_measurements['searchBarVisible'], "Search bar should be visible when expanded"
+        
+        # Test close functionality
+        close_button = page.locator('button[title="Close search"]')
+        expect(close_button).to_be_visible()
+        close_button.click()
+        
+        # Verify return to initial state  
+        final_measurements = page.evaluate("""() => {
+            const topBar = document.getElementById('mobile-top-bar');
+            return {
+                height: topBar.offsetHeight,
+                iconBarVisible: document.getElementById('icon-bar').style.display !== 'none',
+                searchBarVisible: document.getElementById('search-bar').style.display !== 'none'
+            };
+        }""")
+        
+        # HEIGHT INVARIANT: Should return to original height
+        assert final_measurements['height'] == initial_measurements['height'], \
+            f"Height invariant violated on close: {initial_measurements['height']}px → {final_measurements['height']}px"
+        
+        # State should be back to initial
+        assert final_measurements['iconBarVisible'], "Icon bar should be visible after close"
+        assert not final_measurements['searchBarVisible'], "Search bar should be hidden after close"
+        
+        print("✅ Search height invariant test passed!")
 
 
 if __name__ == "__main__":
