@@ -14,7 +14,6 @@ def wait_for_page_ready(page):
     page.wait_for_load_state("networkidle")
 
 
-@pytest.mark.asyncio_mode("off")
 def test_mobile_tab_active_style_updates(page: Page):
     """Test that mobile tab styles update correctly when switching between All Posts and Unread"""
     page.goto("http://localhost:8080")

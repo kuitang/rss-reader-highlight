@@ -10,6 +10,7 @@ import mistletoe
 from bs4 import BeautifulSoup
 import asyncio
 import re
+import logging
 from models import (
     SessionModel, FeedModel, FeedItemModel, UserItemModel, FolderModel,
     init_db, get_db, MINIMAL_MODE
@@ -19,6 +20,9 @@ from background_worker import initialize_worker_system, shutdown_worker_system
 import background_worker
 from dateutil.relativedelta import relativedelta
 import contextlib
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 # Initialize database and setup default feeds if needed
 init_db()
@@ -389,11 +393,16 @@ def viewport_styles():
         }
         
         /* Override for tab buttons to keep them compact */
+        .uk-tab-alt {
+            max-width: 10rem !important; /* 160px - preserve max-w-40 constraint */
+        }
+        
         .uk-tab-alt a {
             min-height: auto !important;
             min-width: auto !important;
             height: auto !important;
             display: block !important;
+            max-width: 5rem !important; /* 80px per button - keep mobile compact */
         }
     }
     
@@ -756,7 +765,7 @@ Step 3 - JOIN with user_feeds (session={session_id}): {diagnostics['step3_with_u
         logger.error(f"INVARIANT VIOLATION: Session {session_id} sees 0 items!")
         
         # Return 500 error with diagnostic HTML
-        raise Response(
+        return Response(
             str(error_html),
             status_code=500,
             headers={"Content-Type": "text/html"}

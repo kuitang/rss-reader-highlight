@@ -8,12 +8,13 @@ Combines functionality from:
 """
 
 import pytest
+import unittest
 from unittest.mock import patch, MagicMock
 import httpx
 from feed_parser import FeedParser
 
 
-class TestFeedIngestion:
+class TestFeedIngestion(unittest.TestCase):
     """Test feed ingestion including Reddit special cases and RSS autodiscovery"""
     
     @pytest.fixture(autouse=True)
@@ -53,14 +54,14 @@ class TestFeedIngestion:
                     # Verify it contains RSS content
                     feed_data = fetch_result['data']
                     assert hasattr(feed_data, 'entries'), f"Should have entries: {reddit_feed_url}"
-                    self.assertGreater(len(feed_data.entries), 0, f"Should have at least one entry: {reddit_feed_url}")
+                    assert len(feed_data.entries) > 0, f"Should have at least one entry: {reddit_feed_url}"
                 else:
                     print(f"  ✗ No RSS found")
-                    self.fail(f"Expected to find RSS feed for {url}")
+                    pytest.fail(f"Expected to find RSS feed for {url}")
                     
             except Exception as e:
                 print(f"  ✗ Exception: {str(e)}")
-                self.fail(f"Exception testing {url}: {str(e)}")
+                pytest.fail(f"Exception testing {url}: {str(e)}")
     
     # RSS Auto-discovery Tests (from test_rss_autodiscovery.py)
     def test_rss_autodiscovery_success_cases(self):
@@ -170,7 +171,7 @@ class TestFeedIngestion:
             
             assert result['updated']
             assert result['status'] == 200
-            self.assertIn('data', result)
+            assert 'data' in result
             # feedparser should parse the RSS content
             assert hasattr(result['data'], 'entries')
             assert result['data'].feed.title == "Test RSS Feed"
@@ -197,7 +198,7 @@ class TestFeedIngestion:
             
             assert result['updated']
             assert result['status'] == 200
-            self.assertIn('data', result)
+            assert 'data' in result
             # feedparser should parse the Atom content
             assert hasattr(result['data'], 'entries')
             assert result['data'].feed.title == "Test Atom Feed"
@@ -241,8 +242,8 @@ class TestFeedIngestion:
             # Should handle gracefully
             assert not result['updated']
             assert result.get('status') == 0
-            self.assertIsNone(result.get('data'))
-            self.assertIn('error', result)
+            assert result.get('data') is None
+            assert 'error' in result
     
     def test_fetch_feed_with_http_error(self):
         """Test handling of HTTP errors (404, 500, etc.) with real FeedParser method"""

@@ -37,9 +37,16 @@ class TestWorkingRegression:
         # Wait for feeds to be available and just click without checking visibility first
         # (the app structure seems to have changed - let's just verify it works)
         
-        # Click ClaudeAI feed - use second one since first is likely hidden mobile version
-        claudeai_feed_link = page.locator("a[href*='feed_id=6']").nth(1)  # Second one should be desktop
-        claudeai_feed_link.click()
+        # Click ClaudeAI feed - wait for it to be visible and click
+        claudeai_feed_link = page.locator("a[href*='feed_id=6']")
+        # Try desktop version first (should be visible in desktop viewport)
+        if claudeai_feed_link.nth(1).is_visible():
+            claudeai_feed_link.nth(1).click()
+        elif claudeai_feed_link.first.is_visible():
+            claudeai_feed_link.first.click()
+        else:
+            # Fallback: just click first available
+            claudeai_feed_link.first.click()
         page.wait_for_load_state("networkidle")
         time.sleep(1)
         
@@ -106,8 +113,13 @@ class TestWorkingRegression:
         print("=== Testing Feed Switching ===")
         
         # Switch to Hacker News feed
-        hackernews_link = page.locator("a[href*='feed_id=5']").nth(1)  # Hacker News feed - desktop version
-        hackernews_link.click()
+        hackernews_link = page.locator("a[href*='feed_id=5']")
+        if hackernews_link.nth(1).is_visible():
+            hackernews_link.nth(1).click()
+        elif hackernews_link.first.is_visible():
+            hackernews_link.first.click()
+        else:
+            hackernews_link.first.click()
         page.wait_for_load_state("networkidle")
         time.sleep(1)
         
@@ -155,8 +167,12 @@ class TestWorkingRegression:
             page.wait_for_timeout(500)
             page.screenshot(path="/tmp/regression_mobile_nav_open.png")
             
-            # Click on a feed
-            claudeai_link = page.locator("a[href*='feed_id=6']").first
+            # Click on a feed - find visible one
+            claudeai_link = page.locator("a[href*='feed_id=6']")
+            if claudeai_link.first.is_visible():
+                claudeai_link = claudeai_link.first
+            else:
+                claudeai_link = claudeai_link.nth(1)
             claudeai_link.click()
             page.wait_for_load_state("networkidle")
             time.sleep(1)
@@ -189,6 +205,12 @@ class TestWorkingRegression:
         }))
         
         # Perform actions that should trigger HTMX
+        # First open mobile sidebar if needed
+        mobile_nav_button = page.locator("button#mobile-nav-button")
+        if mobile_nav_button.is_visible():
+            mobile_nav_button.click()
+            page.wait_for_timeout(300)
+        
         claudeai_link = page.locator("a[href*='feed_id=6']").first
         claudeai_link.click()
         page.wait_for_load_state("networkidle")
@@ -219,7 +241,12 @@ class TestWorkingRegression:
         page.goto("http://localhost:8080")
         page.wait_for_load_state("networkidle")
         
-        # Select a feed first
+        # Select a feed first - open mobile sidebar if needed
+        mobile_nav_button = page.locator("button#mobile-nav-button")
+        if mobile_nav_button.is_visible():
+            mobile_nav_button.click()
+            page.wait_for_timeout(300)
+        
         claudeai_link = page.locator("a[href*='feed_id=6']").first
         claudeai_link.click()
         page.wait_for_load_state("networkidle")

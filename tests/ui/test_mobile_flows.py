@@ -23,7 +23,6 @@ def wait_for_page_ready(page):
     page.wait_for_load_state("networkidle")
 
 
-@pytest.mark.asyncio_mode("off") 
 class TestMobileFlows:
     """Test mobile-specific UI flows and behaviors"""
     

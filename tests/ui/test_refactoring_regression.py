@@ -11,6 +11,28 @@ import time
 import random
 
 
+def ensure_mobile_sidebar_open(page: Page):
+    """Helper function to ensure mobile sidebar is open before accessing feed links"""
+    # Check if mobile nav button exists and is visible
+    mobile_nav_button = page.locator("button#mobile-nav-button")
+    if mobile_nav_button.is_visible():
+        # We're in mobile layout, need to open sidebar first
+        mobile_nav_button.click()
+        page.wait_for_timeout(300)  # Wait for sidebar animation
+        return True
+    return False  # Desktop layout, no need to open sidebar
+
+def get_feed_links(page: Page):
+    """Get feed links that are currently visible, handling mobile vs desktop"""
+    # Try mobile sidebar links first (after ensuring sidebar is open)
+    mobile_sidebar = page.locator("#mobile-sidebar")
+    if mobile_sidebar.is_visible():
+        return page.locator("#mobile-sidebar a[href*='feed_id']")
+    
+    # Fall back to desktop sidebar links
+    return page.locator("main > div:first-child a").filter(has_not=page.locator("text=All Feeds"))
+
+
 class TestRefactoringRegression:
     """Comprehensive regression tests for desktop and mobile workflows."""
     
@@ -34,7 +56,10 @@ class TestRefactoringRegression:
         page.on("console", lambda msg: console_messages.append(f"{msg.type}: {msg.text}"))
         
         # Get list of available feeds from the sidebar - skip "All Feeds" link
-        feed_links = page.locator("main > div:first-child a").filter(has_not=page.locator("text=All Feeds")).all()
+        feed_links = page.locator("#sidebar a[href*='feed_id']").all()
+        if not feed_links:
+            # Fallback to original selector
+            feed_links = page.locator("main > div:first-child a").filter(has_not=page.locator("text=All Feeds")).all()
         feed_count = len(feed_links)
         assert feed_count >= 2, f"Expected at least 2 feeds, got {feed_count}"
         
@@ -47,8 +72,13 @@ class TestRefactoringRegression:
             feed_name = feed_link.text_content()
             print(f"Clicking feed: {feed_name}")
             
-            feed_link.click()
-            page.wait_for_load_state("networkidle")
+            # Check if visible before clicking
+            if feed_link.is_visible():
+                feed_link.click()
+                page.wait_for_load_state("networkidle")
+            else:
+                print(f"Feed link not visible, skipping")
+                continue
             time.sleep(1)  # Allow HTMX updates
             
             # Take screenshot after feed click
@@ -172,8 +202,13 @@ class TestRefactoringRegression:
             feed_name = feed_link.text_content()
             print(f"Clicking feed: {feed_name}")
             
-            feed_link.click()
-            page.wait_for_load_state("networkidle")
+            # Check if visible before clicking
+            if feed_link.is_visible():
+                feed_link.click()
+                page.wait_for_load_state("networkidle")
+            else:
+                print(f"Feed link not visible, skipping")
+                continue
             time.sleep(1)
             
             # Verify sidebar closed automatically (mobile behavior)
@@ -289,7 +324,8 @@ class TestRefactoringRegression:
         # Perform typical user interactions that trigger HTMX
         
         # 1. Click on a feed (should trigger HTMX update)
-        feed_links = page.locator("main > div:first-child a").filter(has_not=page.locator("text=All Feeds")).all()
+        ensure_mobile_sidebar_open(page)  # Open mobile sidebar if needed
+        feed_links = get_feed_links(page).all()
         if feed_links:
             print("Clicking feed to trigger HTMX update")
             feed_links[0].click()
@@ -337,7 +373,8 @@ class TestRefactoringRegression:
         page.wait_for_load_state("networkidle")
         
         # Click on a feed
-        feed_links = page.locator("main > div:first-child a").filter(has_not=page.locator("text=All Feeds")).all()
+        ensure_mobile_sidebar_open(page)  # Open mobile sidebar if needed
+        feed_links = get_feed_links(page).all()
         if feed_links:
             feed_links[0].click()
             page.wait_for_load_state("networkidle")

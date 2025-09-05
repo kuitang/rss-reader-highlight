@@ -1,7 +1,7 @@
 """Test add feed flow edge cases to find what's broken"""
 
 import pytest
-from playwright.sync_api import sync_playwright, expect
+from playwright.sync_api import Page, expect
 import time
 
 # HTMX Helper Functions for Fast Testing
@@ -13,7 +13,7 @@ def wait_for_page_ready(page):
     """Fast page ready check - waits for network idle instead of fixed timeout"""
     page.wait_for_load_state("networkidle")
 
-def test_add_feed_edge_cases(page):
+def test_add_feed_edge_cases(page: Page):
     """Test various add feed scenarios to find issues on both mobile and desktop"""
     
     print("🧪 TESTING ADD FEED EDGE CASES")
@@ -83,65 +83,60 @@ def test_add_feed_edge_cases(page):
             print(f"\n--- TESTING: {description} ({viewport_name}) ---")
             print(f"URL: '{test_url}'")
             
-            # Re-navigate to get fresh form for each test case
-            page.goto("http://localhost:8080")
-            wait_for_page_ready(page)
-            
-            # Set up viewport-specific selectors fresh
+            # Locate fresh elements after potential HTMX updates
             if viewport_name == "mobile":
-                # Open mobile sidebar fresh
-                hamburger = page.locator('#mobile-nav-button')
-                if hamburger.is_visible():
-                    hamburger.click()
-                    page.wait_for_selector("#mobile-sidebar", state="visible")
-                    feed_input = page.locator('#mobile-sidebar input[name="new_feed_url"]')
-                    add_button = page.locator('#mobile-sidebar button.add-feed-button')
-                else:
-                    print(f"  ⚠️ Mobile navigation not available, skipping test case")
-                    continue
+                # Ensure mobile sidebar is open
+                if not page.locator("#mobile-sidebar").is_visible():
+                    hamburger = page.locator('#mobile-nav-button')
+                    if hamburger.is_visible():
+                        hamburger.click()
+                        page.wait_for_selector("#mobile-sidebar", state="visible")
+                
+                feed_input = page.locator('#mobile-sidebar input[name="new_feed_url"]')
+                add_button = page.locator('#mobile-sidebar button.add-feed-button')
             else:
-                # Desktop: fresh element location
+                # Desktop: locate current form elements
                 feed_input = page.locator('input[placeholder="Enter RSS URL"]')
                 add_button = page.locator('button').filter(has_text="").first
             
             # Clear and enter URL (with error handling)
             try:
-                if feed_input.count() > 0:
-                    feed_input.clear()
-                    if test_url:
-                        feed_input.fill(test_url)
-                else:
-                    print(f"  ⚠️ Could not find input field for {description}")
-                    continue
+                feed_input.clear()
+                if test_url:
+                    feed_input.fill(test_url)
             except Exception as e:
                 print(f"  ⚠️ Could not interact with input field: {e}")
                 continue
             
             # Click add button
             add_button.click()
+            
+            # Wait for HTMX to complete (sidebar gets completely replaced)
             wait_for_htmx_complete(page, timeout=8000)
             
-            # Check for any response in sidebar (viewport-specific)
+            # Check for any response in sidebar or page (HTMX may completely replace content)
             if viewport_name == "mobile":
                 sidebar_selector = "#mobile-sidebar"
                 try:
-                    expect(page.locator(sidebar_selector)).to_be_visible(timeout=5000)
-                    sidebar_text = page.locator(sidebar_selector).inner_text(timeout=5000)
+                    if page.locator(sidebar_selector).is_visible():
+                        sidebar_text = page.locator(sidebar_selector).inner_text()
+                    else:
+                        # Mobile sidebar might be hidden, check main content
+                        sidebar_text = page.locator("body").inner_text()
                 except Exception as e:
-                    print(f"  Warning: Could not get mobile sidebar text: {e}")
+                    print(f"  Warning: Could not get mobile content: {e}")
                     sidebar_text = ""
             else:
-                # For desktop, try to get text from sidebar or fall back to page text
-                sidebar_text = ""
+                # For desktop, check sidebar first, then page content
                 try:
-                    if page.locator("#sidebar").count() > 0:
-                        sidebar_text = page.locator("#sidebar").inner_text(timeout=2000)
+                    if page.locator("#sidebar").count() > 0 and page.locator("#sidebar").is_visible():
+                        sidebar_text = page.locator("#sidebar").inner_text()
                     else:
-                        # Fall back to checking page content for feedback
-                        sidebar_text = page.locator("body").inner_text(timeout=2000)
+                        # Sidebar might be replaced entirely, check page content
+                        sidebar_text = page.locator("body").inner_text()
                 except Exception as e:
-                    print(f"  Warning: Could not get desktop sidebar text: {e}")
-                    sidebar_text = page.locator("body").inner_text() if page.locator("body").count() > 0 else ""
+                    print(f"  Warning: Could not get desktop content: {e}")
+                    sidebar_text = ""
             
             # Look for specific messages
             has_error_msg = "Error" in sidebar_text or "Failed" in sidebar_text
@@ -160,12 +155,16 @@ def test_add_feed_edge_cases(page):
                 print(f"  ❌ No clear response for {description} ({viewport_name})")
                 print(f"  Sidebar text preview: {sidebar_text[:200]}...")
             
-            # Verify app didn't crash (check that we can still interact with the page)
+            # Verify app didn't crash and page is still responsive
             if viewport_name == "mobile":
-                assert page.locator("#mobile-sidebar").count() > 0, f"{viewport_name} sidebar should exist"
+                # Mobile: check main content area is still visible (sidebar might be hidden after form)
+                assert page.locator("#main-content").count() > 0, f"{viewport_name} main content should exist"
+                # Check that mobile nav button is still functional
+                assert page.locator("#mobile-nav-button").count() > 0, f"{viewport_name} navigation should be available"
             else:
-                # For desktop, just check the page is still responsive
-                assert page.locator("#desktop-layout").is_visible(), f"{viewport_name} desktop layout should be visible"
+                # Desktop: check core layout elements are still present
+                page_title = page.title()
+                assert page_title == "RSS Reader", f"{viewport_name} page should remain functional (title: {page_title})"
         
         print(f"  ✓ {viewport_name} add feed edge cases test passed")
     

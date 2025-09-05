@@ -211,7 +211,12 @@ class TestComprehensiveRegression:
         
         # Rapid clicking test
         for i in range(5):
-            # Quick feed selections
+            # Quick feed selections - ensure mobile sidebar is open if needed
+            mobile_nav_button = page.locator("button#mobile-nav-button")
+            if mobile_nav_button.is_visible():
+                mobile_nav_button.click()
+                page.wait_for_timeout(200)
+                
             feed_links = page.locator("a[href*='feed_id']").all()
             if len(feed_links) > 0:
                 feed_links[i % len(feed_links)].click()
@@ -309,9 +314,20 @@ class TestComprehensiveRegression:
         wait_for_page_ready(page)
         
         # Navigate to different feeds and verify session persists
+        # Ensure mobile sidebar is open if needed
+        mobile_nav_button = page.locator("button#mobile-nav-button")
+        if mobile_nav_button.is_visible():
+            mobile_nav_button.click()
+            page.wait_for_timeout(300)
+            
         feed_links = page.locator("a[href*='feed_id']").all()
         
         for i, feed_link in enumerate(feed_links[:2]):  # Test first 2 feeds
+            # Reopen sidebar before each feed click if mobile
+            if mobile_nav_button.is_visible():
+                mobile_nav_button.click()
+                page.wait_for_timeout(300)
+                
             feed_link.click()
             wait_for_htmx_complete(page)
             

@@ -10,6 +10,14 @@ from playwright.sync_api import sync_playwright
 
 
 @pytest.fixture(scope="session")
+def server_manager():
+    """Dummy fixture for compatibility - tests should start server manually or use MINIMAL_MODE"""
+    # This is a placeholder since tests are expected to have server running
+    # Start server with: MINIMAL_MODE=true python app.py
+    return None
+
+
+@pytest.fixture(scope="session")
 def test_server_url(server_manager):
     """Ensure test server is running and return URL for UI tests"""
     server_url = "http://localhost:8080"

@@ -19,27 +19,26 @@ cd "$(dirname "$0")"
 # Activate virtual environment
 source venv/bin/activate
 
-# Get number of CPU cores
-N_CORES=$(nproc)
-echo "Running tests on $N_CORES CPU cores with native pytest server management"
+# Running tests with file-level parallelization to reduce conflicts
+echo "Running tests with file-level parallelization (--dist=loadfile) to reduce conflicts"
 echo ""
 
 # Run tests based on section argument - now using native pytest fixtures
 run_all_tests() {
-    # Run core tests with full parallelization (MINIMAL_MODE managed by conftest.py)
-    echo "🔬 Running core tests (fully parallel, no server needed)..."
-    python -m pytest tests/core/ -n auto
+    # Run core tests with file-level parallelization
+    echo "🔬 Running core tests (file-level parallelization)..."
+    python -m pytest tests/core/ -n auto --dist=loadfile
     CORE_RESULT=$?
     
-    # Run UI tests: files in parallel with server per worker (managed by conftest.py)
+    # Run UI tests with file-level parallelization
     echo ""
-    echo "🌐 Running UI tests (files parallel, server per worker)..."
+    echo "🌐 Running UI tests (file-level parallelization)..."
     python -m pytest tests/ui/ -n auto --dist=loadfile
     UI_RESULT=$?
     
-    # Run specialized tests in parallel per file (some may need network)
+    # Run specialized tests with file-level parallelization
     echo ""
-    echo "⚙️  Running specialized tests (files parallel)..."
+    echo "⚙️  Running specialized tests (file-level parallelization)..."
     python -m pytest tests/specialized/ -n auto --dist=loadfile
     SPEC_RESULT=$?
     
@@ -51,17 +50,17 @@ run_all_tests() {
 }
 
 run_core_tests() {
-    echo "🔬 Running core tests (fully parallel, no server needed)..."
-    python -m pytest tests/core/ -n auto
+    echo "🔬 Running core tests (file-level parallelization)..."
+    python -m pytest tests/core/ -n auto --dist=loadfile
 }
 
 run_ui_tests() {
-    echo "🌐 Running UI tests (files parallel, server per worker)..."
+    echo "🌐 Running UI tests (file-level parallelization)..."
     python -m pytest tests/ui/ -n auto --dist=loadfile
 }
 
 run_specialized_tests() {
-    echo "⚙️  Running specialized tests (files parallel)..."
+    echo "⚙️  Running specialized tests (file-level parallelization)..."
     python -m pytest tests/specialized/ -n auto --dist=loadfile
 }
 
