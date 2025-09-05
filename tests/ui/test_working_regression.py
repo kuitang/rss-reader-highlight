@@ -7,11 +7,13 @@ import pytest
 from playwright.sync_api import Page, expect
 import time
 
+pytestmark = pytest.mark.needs_server
+
 
 class TestWorkingRegression:
     """Regression tests based on the actual working app structure."""
     
-    def test_basic_functionality_flow(self, page: Page):
+    def test_basic_functionality_flow(self, page: Page, test_server_url):
         """
         Test basic RSS reader functionality:
         1. Load homepage with feeds
@@ -22,7 +24,7 @@ class TestWorkingRegression:
         """
         # Navigate and wait for page load
         page.set_viewport_size({"width": 1200, "height": 800})  # Ensure desktop layout
-        page.goto("http://localhost:8080")
+        page.goto(test_server_url)
         page.wait_for_load_state("networkidle")
         
         # Take screenshot of initial state
@@ -152,7 +154,7 @@ class TestWorkingRegression:
         # Set mobile viewport
         page.set_viewport_size({"width": 390, "height": 844})
         
-        page.goto("http://localhost:8080")
+        page.goto(test_server_url)
         page.wait_for_load_state("networkidle")
         
         page.screenshot(path="/tmp/regression_mobile_initial.png")
@@ -193,7 +195,7 @@ class TestWorkingRegression:
 
     def test_htmx_requests_monitoring(self, page: Page):
         """Monitor HTMX requests to ensure they're working properly."""
-        page.goto("http://localhost:8080")
+        page.goto(test_server_url)
         page.wait_for_load_state("networkidle")
         
         # Monitor network activity
@@ -238,7 +240,7 @@ class TestWorkingRegression:
 
     def test_read_unread_state_persistence(self, page: Page):
         """Test that read/unread state persists across page interactions."""
-        page.goto("http://localhost:8080")
+        page.goto(test_server_url)
         page.wait_for_load_state("networkidle")
         
         # Select a feed first - open mobile sidebar if needed

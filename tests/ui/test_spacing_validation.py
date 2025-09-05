@@ -4,8 +4,7 @@ import pytest
 from playwright.sync_api import sync_playwright, expect
 from contextlib import contextmanager
 
-TEST_PORT = 8080
-TEST_URL = f"http://localhost:{TEST_PORT}"
+pytestmark = pytest.mark.needs_server
 
 def wait_for_htmx_complete(page, timeout=5000):
     """Wait for all HTMX requests to complete"""
@@ -33,11 +32,11 @@ def mobile_page_context(browser, width=390, height=844):
 class TestSpacingValidation:
     """Test spacing and UX layout validation"""
     
-    def test_perfect_tab_layout_mobile(self, browser):
+    def test_perfect_tab_layout_mobile(self, browser, test_server_url):
         """Test that tabs are compact, right-aligned, and All Feeds has space"""
         with mobile_page_context(browser) as page:
             try:
-                page.goto(TEST_URL, timeout=10000)
+                page.goto(test_server_url, timeout=10000)
                 wait_for_page_ready(page)
                 
                 # Wait for tab structure to load
@@ -82,7 +81,7 @@ class TestSpacingValidation:
         """Test that active tab buttons have no grey border"""
         with mobile_page_context(browser) as page:
             try:
-                page.goto(TEST_URL, timeout=10000)
+                page.goto(test_server_url, timeout=10000)
                 wait_for_page_ready(page)
                 
                 # Find active tab button
@@ -117,7 +116,7 @@ class TestSpacingValidation:
         # Test with a real browser context to validate spacing
         with mobile_page_context(browser) as page:
             try:
-                page.goto(TEST_URL, timeout=10000)
+                page.goto(test_server_url, timeout=10000)
                 wait_for_page_ready(page)
                 
                 # Wait for feed list to load
@@ -153,7 +152,7 @@ class TestSpacingValidation:
         """Test that action buttons line has same padding as header"""
         with mobile_page_context(browser) as page:
             try:
-                page.goto(TEST_URL, timeout=10000)
+                page.goto(test_server_url, timeout=10000)
                 wait_for_page_ready(page)
                 
                 # Wait for feed items and click one to view detail
@@ -217,7 +216,7 @@ class TestSpacingValidation:
         """Test that spacing is consistent across mobile layout"""
         with mobile_page_context(browser) as page:
             try:
-                page.goto(TEST_URL, timeout=10000)
+                page.goto(test_server_url, timeout=10000)
                 wait_for_page_ready(page)
                 
                 # Get all containers that should have consistent padding

@@ -624,7 +624,6 @@ def before(req, sess):
     if len(user_items) == 0:
         import traceback
         import json
-        from fasthtml.common import Html, Head, Title, Body, H1, H2, Pre, Details, Summary, Div, Style, Span, Response
         
         # Gather ALL diagnostic SQL
         with get_db() as conn:
@@ -764,12 +763,12 @@ Step 3 - JOIN with user_feeds (session={session_id}): {diagnostics['step3_with_u
         # Log to console as well
         logger.error(f"INVARIANT VIOLATION: Session {session_id} sees 0 items!")
         
-        # Return 500 error with diagnostic HTML
-        return Response(
-            str(error_html),
-            status_code=500,
-            headers={"Content-Type": "text/html"}
-        )
+        # Return proper HTML response with 500 status code
+        # NOTE: We're in middleware, not a route handler, so we must return a raw HTTP response.
+        # Route handlers can return FastHTML objects directly (FastHTML auto-converts them),
+        # but middleware runs before FastHTML's response pipeline, so we need HTMLResponse.
+        # Use to_xml() to convert FastHTML object to actual HTML string.
+        return HTMLResponse(to_xml(error_html), status_code=500)
     
     # Store in request scope for easy access
     req.scope['session_id'] = session_id

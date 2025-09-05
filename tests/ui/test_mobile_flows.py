@@ -11,7 +11,7 @@ import pytest
 from playwright.sync_api import Page, expect
 import time
 
-BASE_URL = "http://localhost:8080"
+pytestmark = pytest.mark.needs_server
 
 # HTMX Helper Functions for Fast Testing
 def wait_for_htmx_complete(page, timeout=5000):
@@ -27,10 +27,10 @@ class TestMobileFlows:
     """Test mobile-specific UI flows and behaviors"""
     
     @pytest.fixture(autouse=True)
-    def setup(self, page: Page):
+    def setup(self, page: Page, test_server_url):
         """Set mobile viewport for all tests"""
         page.set_viewport_size({"width": 375, "height": 667})
-        page.goto(BASE_URL)
+        page.goto(test_server_url)
         wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
     
     # Navigation Tests (from test_mobile_navigation.py)
@@ -309,7 +309,7 @@ class TestMobileFlows:
         article_title = page.locator("#item-detail strong").first.text_content()
         
         # Navigate away and then back to test direct URL access
-        page.goto(BASE_URL)
+        page.goto(test_server_url)
         wait_for_page_ready(page)  # FIXED: Don't expect sidebar visible on main page
         
         # Now navigate directly to the article URL
@@ -352,7 +352,7 @@ class TestMobileFlows:
             assert "feed_id=" in current_url, "Should be on filtered feed view"
             
             # Navigate away and back to test sharing
-            page.goto(BASE_URL)
+            page.goto(test_server_url)
             wait_for_page_ready(page)  # OPTIMIZED: Wait for page to load, sidebar is hidden by default
             
             # Navigate directly to the feed URL
@@ -377,10 +377,10 @@ class TestMobileFlows:
             
             # Should have unread parameter in URL
             current_url = page.url
-            assert "unread" in current_url or page.url == BASE_URL + "/", "Should have unread context"
+            assert "unread" in current_url or page.url == test_server_url + "/", "Should have unread context"
             
             # Navigate away and back
-            page.goto(BASE_URL + "/?feed_id=1")  # Go to different view
+            page.goto(test_server_url + "/?feed_id=1")  # Go to different view
             page.wait_for_selector("#mobile-sidebar", state="visible")
             
             # Navigate back to unread view

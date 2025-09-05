@@ -1,9 +1,14 @@
 #!/bin/bash
 
-# RSS Reader Test Suite using native pytest server management
+# RSS Reader Test Suite - Requires manual server startup for UI tests
 
-echo "🧪 RSS Reader Native pytest Test Suite"
-echo "======================================="
+echo "🧪 RSS Reader Test Suite"
+echo "========================"
+echo ""
+echo "⚠️  UI TESTS REQUIRE RUNNING SERVER ⚠️"
+echo "Start server before running UI tests:"
+echo "  python app.py  (or MINIMAL_MODE=true python app.py)"
+echo ""
 
 # Parse command line arguments
 TEST_SECTION=""
@@ -21,9 +26,10 @@ source venv/bin/activate
 
 # Running tests with file-level parallelization to reduce conflicts
 echo "Running tests with file-level parallelization (--dist=loadfile) to reduce conflicts"
+echo "To skip server-dependent tests: pytest -m 'not needs_server'"
 echo ""
 
-# Run tests based on section argument - now using native pytest fixtures
+# Run tests based on section argument
 run_all_tests() {
     # Run core tests with file-level parallelization
     echo "🔬 Running core tests (file-level parallelization)..."
@@ -42,8 +48,14 @@ run_all_tests() {
     python -m pytest tests/specialized/ -n auto --dist=loadfile
     SPEC_RESULT=$?
     
+    # Run integration tests (currently skipped)
+    echo ""
+    echo "🔗 Running integration tests (currently skipped)..."
+    python -m pytest tests/integration/ -n auto --dist=loadfile
+    INTEGRATION_RESULT=$?
+    
     # Return failure if any test suite failed
-    if [ $CORE_RESULT -ne 0 ] || [ $UI_RESULT -ne 0 ] || [ $SPEC_RESULT -ne 0 ]; then
+    if [ $CORE_RESULT -ne 0 ] || [ $UI_RESULT -ne 0 ] || [ $SPEC_RESULT -ne 0 ] || [ $INTEGRATION_RESULT -ne 0 ]; then
         return 1
     fi
     return 0
@@ -64,6 +76,11 @@ run_specialized_tests() {
     python -m pytest tests/specialized/ -n auto --dist=loadfile
 }
 
+run_integration_tests() {
+    echo "🔗 Running integration tests (currently skipped)..."
+    python -m pytest tests/integration/ -n auto --dist=loadfile
+}
+
 # Main execution based on section
 case "$TEST_SECTION" in
     "core")
@@ -75,12 +92,15 @@ case "$TEST_SECTION" in
     "specialized")
         run_specialized_tests
         ;;
+    "integration")
+        run_integration_tests
+        ;;
     "")
         run_all_tests
         ;;
     *)
         echo "Unknown section: $TEST_SECTION"
-        echo "Valid sections: core, ui, specialized"
+        echo "Valid sections: core, ui, specialized, integration"
         exit 1
         ;;
 esac
@@ -88,7 +108,7 @@ esac
 # Save exit code
 TEST_RESULT=$?
 
-# Native pytest handles all cleanup through fixtures and hooks
+# Tests with @pytest.mark.needs_server require manual server startup
 echo ""
 if [ $TEST_RESULT -eq 0 ]; then
     echo "✅ All tests passed!"

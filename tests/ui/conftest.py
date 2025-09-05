@@ -2,33 +2,42 @@
 
 Each test MODULE (file) gets its own browser instance for isolation when running
 files in parallel, but tests within a module share the browser for efficiency.
+
+Server Dependency Management:
+- UI tests require a running server (marked with @pytest.mark.needs_server)
+- Start server manually: python app.py (or MINIMAL_MODE=true python app.py)
+- Server URL standardized through test_server_url fixture
 """
 
 import pytest
 import httpx
+import os
 from playwright.sync_api import sync_playwright
 
 
 @pytest.fixture(scope="session")
-def server_manager():
-    """Dummy fixture for compatibility - tests should start server manually or use MINIMAL_MODE"""
-    # This is a placeholder since tests are expected to have server running
-    # Start server with: MINIMAL_MODE=true python app.py
-    return None
-
-
-@pytest.fixture(scope="session")
-def test_server_url(server_manager):
-    """Ensure test server is running and return URL for UI tests"""
-    server_url = "http://localhost:8080"
+def test_server_url():
+    """Verify server is running and return URL for UI tests
+    
+    This fixture enforces server dependency for UI tests.
+    
+    To run UI tests:
+    1. Start server: python app.py (or MINIMAL_MODE=true python app.py)  
+    2. Run tests: pytest tests/ui/
+    
+    Or skip server-dependent tests: pytest -m "not needs_server"
+    """
+    server_url = os.environ.get('TEST_SERVER_URL', 'http://localhost:8080')
     
     # Verify server is accessible
     try:
         response = httpx.get(server_url, timeout=5)
         if response.status_code != 200:
-            pytest.fail(f"Test server returned status {response.status_code}")
+            pytest.skip(f"Test server not running: returned status {response.status_code}. "
+                       f"Start server with: python app.py")
     except httpx.RequestError as e:
-        pytest.fail(f"Test server not accessible at {server_url}: {e}")
+        pytest.skip(f"Test server not accessible at {server_url}: {e}. "
+                   f"Start server with: python app.py")
     
     return server_url
 

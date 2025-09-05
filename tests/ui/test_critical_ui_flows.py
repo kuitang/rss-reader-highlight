@@ -15,8 +15,7 @@ import sys
 from playwright.sync_api import sync_playwright, expect
 from contextlib import contextmanager
 
-TEST_PORT = 8080  # Use the main server port
-TEST_URL = f"http://localhost:{TEST_PORT}"
+pytestmark = pytest.mark.needs_server
 
 # HTMX Helper Functions for Fast Testing
 def wait_for_htmx_complete(page, timeout=5000):
@@ -31,35 +30,21 @@ def wait_for_page_ready(page):
     """Fast page ready check - waits for network idle instead of fixed timeout"""
     page.wait_for_load_state("networkidle")
 
-@contextmanager
-def existing_server():
-    """Use existing server running on port 8080"""
-    # Just verify server is responding
-    import httpx
-    try:
-        response = httpx.get(TEST_URL, timeout=5)
-        if response.status_code == 200:
-            yield
-        else:
-            raise Exception(f"Server not responding: {response.status_code}")
-    except Exception as e:
-        raise Exception(f"Server not available at {TEST_URL}. Start server first: python app.py")
 
 class TestFormParameterBugFlow:
     """Test the form parameter bug we debugged extensively"""
     
     @pytest.mark.skip(reason="Feed submission test - skipping per user request")
-    def test_feed_url_form_submission_complete_flow(self, page):
+    def test_feed_url_form_submission_complete_flow(self, page, test_server_url):
         """Test: Type URL → Click add → Verify server receives parameter correctly
         
         This was our BIGGEST bug - form parameters not mapping to FastHTML functions.
-        Requires: python app.py running in separate terminal
         
         UPDATED SELECTORS to match current app.py implementation.
         """
         # Set desktop viewport to ensure desktop layout
         page.set_viewport_size({"width": 1200, "height": 800})
-        page.goto(TEST_URL)
+        page.goto(test_server_url)
         wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle instead of 3 seconds
         
         # 1. Verify desktop layout is visible first
@@ -98,14 +83,14 @@ class TestFormParameterBugFlow:
         expect(page.locator("#sidebar h3").first).to_be_visible()  # FIXED: Use sidebar-specific h3
 
     @pytest.mark.skip(reason="Feed submission test - skipping per user request")
-    def test_feed_url_form_submission_mobile_flow(self, page):
+    def test_feed_url_form_submission_mobile_flow(self, page, test_server_url):
         """Test mobile workflow: Open sidebar → Type URL → Click add → Verify functionality
         
         UPDATED SELECTORS to match current app.py implementation.
         """
         # Set mobile viewport
         page.set_viewport_size({"width": 375, "height": 667})
-        page.goto(TEST_URL)
+        page.goto(test_server_url)
         wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
         
         # 1. Open mobile sidebar - UPDATED SELECTOR using filter
@@ -130,14 +115,14 @@ class TestFormParameterBugFlow:
         # Verify app remains stable in mobile layout
         expect(page.locator("#mobile-sidebar")).to_be_visible()
 
-    def test_mobile_sidebar_auto_close_on_feed_click(self, page):
+    def test_mobile_sidebar_auto_close_on_feed_click(self, page, test_server_url):
         """Test: Mobile sidebar should auto-close when feed link is clicked
         
         UPDATED SELECTORS to match current app.py CSS class implementation.
         """
         # Set mobile viewport
         page.set_viewport_size({"width": 375, "height": 667})
-        page.goto(TEST_URL)
+        page.goto(test_server_url)
         wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
         
         # 1. Open mobile sidebar - UPDATED SELECTOR
@@ -162,14 +147,14 @@ class TestFormParameterBugFlow:
             # 5. Verify feed filtering worked (URL should have feed_id)
             assert "feed_id" in page.url, "URL should contain feed_id parameter"
 
-    def test_desktop_feed_filtering_full_page_update(self, page):
+    def test_desktop_feed_filtering_full_page_update(self, page, test_server_url):
         """Test: Desktop feed click should trigger full page update with proper filtering
         
         UPDATED SELECTORS to match current app.py implementation.
         """
         # Set desktop viewport
         page.set_viewport_size({"width": 1920, "height": 1080})
-        page.goto(TEST_URL)
+        page.goto(test_server_url)
         wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
         
         # 1. Verify we start with main view (check desktop-specific elements)
@@ -188,14 +173,14 @@ class TestFormParameterBugFlow:
         expect(page.locator("#sidebar")).to_be_visible()
     
     @pytest.mark.skip(reason="Feed submission test - skipping per user request")
-    def test_duplicate_feed_detection_via_form(self, page):
+    def test_duplicate_feed_detection_via_form(self, page, test_server_url):
         """Test: Add existing feed → Should show proper handling
         
         UPDATED SELECTORS to match current app.py implementation.
         """
         # Set desktop viewport for consistency
         page.set_viewport_size({"width": 1200, "height": 800})
-        page.goto(TEST_URL)
+        page.goto(test_server_url)
         wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
         page.wait_for_selector("a[href*='feed_id']", timeout=10000)  # OPTIMIZED: Wait for feeds to load
         
@@ -214,14 +199,14 @@ class TestBBCRedirectHandlingFlow:
     """Test BBC feed redirect handling that we fixed"""
     
     @pytest.mark.skip(reason="Feed submission test - skipping per user request")
-    def test_bbc_feed_addition_with_redirects(self, page):
+    def test_bbc_feed_addition_with_redirects(self, page, test_server_url):
         """Test: Add BBC feed → Handle 302 redirect → Parse successfully → Shows in UI
         
         UPDATED SELECTORS to match current app.py implementation.
         """
         # Set desktop viewport for consistency
         page.set_viewport_size({"width": 1200, "height": 800})
-        page.goto(TEST_URL)
+        page.goto(test_server_url)
         wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
         
         # Count initial feeds
@@ -253,7 +238,7 @@ class TestBBCRedirectHandlingFlow:
 class TestBlueIndicatorHTMXFlow:
     """Test the complex blue indicator HTMX update flow we implemented"""
     
-    def test_blue_indicator_disappears_on_article_click(self, page):
+    def test_blue_indicator_disappears_on_article_click(self, page, test_server_url):
         """Test: Click article with blue dot → Dot disappears immediately → HTMX update working
         
         Tests both mobile and desktop layouts.
@@ -265,7 +250,7 @@ class TestBlueIndicatorHTMXFlow:
         ]:
             print(f"\n--- Testing {viewport_name} blue indicator behavior ---")
             page.set_viewport_size(viewport_size)
-            page.goto(TEST_URL)
+            page.goto(test_server_url)
             wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
             
             # Verify correct layout is active
@@ -314,14 +299,14 @@ class TestBlueIndicatorHTMXFlow:
             expect(detail_view.locator("strong").first).to_be_visible()
             print(f"  ✓ {viewport_name} blue indicator test passed")
     
-    def test_unread_view_article_behavior(self, page):
+    def test_unread_view_article_behavior(self, page, test_server_url):
         """Test: Unread view → Click article → Article marked as read
         
         UPDATED SELECTORS to match current app.py implementation.
         """
         # Set desktop viewport for consistency
         page.set_viewport_size({"width": 1200, "height": 800})
-        page.goto(TEST_URL)
+        page.goto(test_server_url)
         wait_for_page_ready(page)
         
         # 1. Switch to Unread view - UPDATED: Use link with role=button
@@ -348,14 +333,14 @@ class TestBlueIndicatorHTMXFlow:
             # Detail view should show content
             expect(page.locator("#item-detail, #desktop-item-detail").first).to_be_visible()
     
-    def test_multiple_article_clicks_blue_management(self, page):
+    def test_multiple_article_clicks_blue_management(self, page, test_server_url):
         """Test: Click multiple articles → Each loses blue dot → UI updates correctly
         
         UPDATED SELECTORS to match current app.py implementation.
         """
         # Set desktop viewport for consistency
         page.set_viewport_size({"width": 1200, "height": 800})
-        page.goto(TEST_URL)
+        page.goto(test_server_url)
         wait_for_page_ready(page)
         
         # Get articles with blue dots
@@ -395,7 +380,7 @@ class TestBlueIndicatorHTMXFlow:
 class TestSessionAndSubscriptionFlow:
     """Test the session auto-subscription flow that caused 'No posts available'"""
     
-    def test_fresh_user_auto_subscription_flow(self, page):
+    def test_fresh_user_auto_subscription_flow(self, page, test_server_url):
         """Test: Fresh browser → Auto session → Auto subscribe → Articles appear
         
         Tests both mobile and desktop layouts.
@@ -409,7 +394,7 @@ class TestSessionAndSubscriptionFlow:
             print(f"\n--- Testing {viewport_name} auto-subscription flow ---")
             page.set_viewport_size(viewport_size)
             # 1. Fresh browser visit
-            page.goto(TEST_URL)
+            page.goto(test_server_url)
             wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
             
             # Verify correct layout is active
@@ -456,13 +441,13 @@ class TestSessionAndSubscriptionFlow:
         # Tab 1: Regular browsing
         page1 = browser.new_page()
         page1.set_viewport_size({"width": 1200, "height": 800})  # Desktop viewport for consistency
-        page1.goto(TEST_URL)
+        page1.goto(test_server_url)
         wait_for_page_ready(page1)
         
         # Tab 2: Independent session
         page2 = browser.new_page()
         page2.set_viewport_size({"width": 1200, "height": 800})  # Desktop viewport for consistency
-        page2.goto(TEST_URL)
+        page2.goto(test_server_url)
         wait_for_page_ready(page2)
         
         try:
@@ -489,7 +474,7 @@ class TestSessionAndSubscriptionFlow:
 class TestFullViewportHeightFlow:
     """Test viewport height utilization that we fixed"""
     
-    def test_viewport_layout_adaptation(self, page):
+    def test_viewport_layout_adaptation(self, page, test_server_url):
         """Test: Both viewport sizes → Proper layout and height utilization
         
         UPDATED SELECTORS to match current app.py implementation.
@@ -500,7 +485,7 @@ class TestFullViewportHeightFlow:
         ]:
             print(f"\n--- Testing {viewport_name} viewport layout ---")
             page.set_viewport_size(viewport_size)
-            page.goto(TEST_URL)
+            page.goto(test_server_url)
             wait_for_page_ready(page)
             
             if viewport_name == "desktop":
@@ -537,10 +522,10 @@ class TestErrorHandlingUIFeedback:
     """Test error handling and user feedback mechanisms"""
     
     @pytest.mark.skip(reason="Feed submission test - skipping per user request")
-    def test_network_error_handling_ui_feedback(self, page):
+    def test_network_error_handling_ui_feedback(self, page, test_server_url):
         """Test: Network errors → Proper user feedback → No broken UI"""
 
-        page.goto(TEST_URL)
+        page.goto(test_server_url)
         wait_for_page_ready(page)
         
         # Test adding feed that will definitely fail
@@ -566,10 +551,10 @@ class TestErrorHandlingUIFeedback:
             expect(page.locator("#sidebar")).to_be_visible()
     
     @pytest.mark.skip(reason="Feed submission test - skipping per user request")
-    def test_malformed_url_error_handling(self, page):
+    def test_malformed_url_error_handling(self, page, test_server_url):
         """Test: Invalid URLs → Proper validation → User-friendly errors"""
 
-        page.goto(TEST_URL)
+        page.goto(test_server_url)
         wait_for_page_ready(page)
         
         invalid_urls = [
@@ -599,11 +584,11 @@ class TestErrorHandlingUIFeedback:
 class TestComplexNavigationFlows:
     """Test complex navigation patterns that could break"""
     
-    def test_deep_navigation_and_back_button_flow(self, page):
+    def test_deep_navigation_and_back_button_flow(self, page, test_server_url):
         """Test: Deep navigation → Browser back → State consistency → No broken UI"""
 
         page.set_viewport_size({"width": 1200, "height": 800})  # Desktop viewport for consistency
-        page.goto(TEST_URL)
+        page.goto(test_server_url)
         wait_for_page_ready(page)
         
         # 1. Navigate through different views (desktop-specific)
@@ -634,11 +619,11 @@ class TestComplexNavigationFlows:
         # Should eventually be stable - desktop layout should be working
         expect(page.locator("#sidebar")).to_be_visible()
     
-    def test_rapid_clicking_stability(self, page):
+    def test_rapid_clicking_stability(self, page, test_server_url):
         """Test: Rapid clicking → Multiple HTMX requests → UI stability → No race conditions"""
 
         page.set_viewport_size({"width": 1200, "height": 800})  # Desktop viewport for consistency
-        page.goto(TEST_URL)
+        page.goto(test_server_url)
         wait_for_page_ready(page)
         
         # Collect clickable elements safely (desktop-specific)
@@ -705,7 +690,7 @@ class TestTabSizeAndAlignment:
                 
                 try:
                     # Navigate to the app
-                    page.goto(TEST_URL, wait_until='networkidle')
+                    page.goto(test_server_url, wait_until='networkidle')
                     wait_for_page_ready(page)
                     
                     # Find tab container - mobile vs desktop

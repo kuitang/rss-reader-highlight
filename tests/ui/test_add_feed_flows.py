@@ -11,6 +11,8 @@ from playwright.sync_api import sync_playwright, expect
 import time
 from datetime import datetime
 
+pytestmark = pytest.mark.needs_server
+
 # HTMX Helper Functions for Fast Testing
 def wait_for_htmx_complete(page, timeout=5000):
     """Wait for all HTMX requests to complete - much faster than fixed timeouts"""
@@ -25,7 +27,7 @@ def wait_for_page_ready(page):
 class TestAddFeedFlows:
     """Test add feed functionality across mobile and desktop interfaces"""
     
-    def test_add_feed_complete_flow(self, page):
+    def test_add_feed_complete_flow(self, page, test_server_url):
         """Test complete add feed flow for both mobile and desktop"""
         
         for viewport_name, viewport_size, test_url in [
@@ -34,7 +36,7 @@ class TestAddFeedFlows:
         ]:
             print(f"\n{('📱' if viewport_name == 'mobile' else '🖥️')} TESTING {viewport_name.upper()} ADD FEED FLOW")
             page.set_viewport_size(viewport_size)
-            page.goto("http://localhost:8080")
+            page.goto(test_server_url)
             wait_for_page_ready(page)
             
             if viewport_name == "mobile":
@@ -121,7 +123,7 @@ class TestAddFeedFlows:
         ]:
             print(f"\n{('🖥️' if viewport_name == 'desktop' else '📱')} TESTING {viewport_name.upper()} NAVIGATION AFTER FEED ADD")
             page.set_viewport_size(viewport_size)
-            page.goto("http://localhost:8080")
+            page.goto(test_server_url)
             wait_for_page_ready(page)
             
             if viewport_name == "desktop":
@@ -208,7 +210,7 @@ class TestAddFeedFlows:
     def test_duplicate_feed_handling(self, page):
         """Test handling of duplicate feed additions"""
         page.set_viewport_size({"width": 1200, "height": 800})  # Desktop for simplicity
-        page.goto("http://localhost:8080")
+        page.goto(test_server_url)
         wait_for_page_ready(page)
         
         print("🔄 TESTING DUPLICATE FEED HANDLING")
@@ -236,7 +238,7 @@ class TestAddFeedFlows:
     def test_invalid_url_handling(self, page):
         """Test handling of invalid URLs"""
         page.set_viewport_size({"width": 1200, "height": 800})  # Desktop
-        page.goto("http://localhost:8080")
+        page.goto(test_server_url)
         wait_for_page_ready(page)
         
         print("❌ TESTING INVALID URL HANDLING")
@@ -277,7 +279,7 @@ class TestAddFeedFlows:
     def test_empty_form_submission(self, page):
         """Test submission of empty form"""
         page.set_viewport_size({"width": 1200, "height": 800})  # Desktop
-        page.goto("http://localhost:8080")
+        page.goto(test_server_url)
         wait_for_page_ready(page)
         
         print("⭕ TESTING EMPTY FORM SUBMISSION")
