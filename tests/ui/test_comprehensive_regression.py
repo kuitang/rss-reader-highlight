@@ -106,7 +106,7 @@ class TestComprehensiveRegression:
                     feed_links[iteration % len(feed_links)].click()
                     
                     # Wait for sidebar to close and content to load
-                    page.wait_for_timeout(1000)
+                    page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
                     expect(page.locator("#mobile-sidebar")).to_be_hidden()
                     
                     # Scroll down in feed list
@@ -121,7 +121,7 @@ class TestComprehensiveRegression:
                         article_items[0].click()
                         
                         # Wait for article to load (full-screen mobile view)
-                        page.wait_for_timeout(1000)
+                        page.wait_for_selector("#main-content", state="visible", timeout=5000)
                         
                         # Verify article content is visible
                         expect(page.locator("#main-content")).to_contain_text("From:")
@@ -162,7 +162,7 @@ class TestComprehensiveRegression:
         article_items = page.locator("li[id*='desktop-feed-item']").all()
         if len(article_items) > 0:
             article_items[0].click()
-            page.wait_for_timeout(1000)
+            page.wait_for_selector("#desktop-item-detail", state="visible", timeout=5000)
             expect(page.locator("#desktop-item-detail")).to_contain_text("From:")
         
         # Switch to mobile viewport
@@ -319,15 +319,17 @@ class TestComprehensiveRegression:
         """Test application resilience under various error conditions"""
         page.goto(test_server_url)
         
-        # Test invalid item URL
-        page.goto(f"{test_server_url}/item/99999")
+        # Test invalid item URL (use very high number unlikely to exist)
+        invalid_item_id = 999999
+        page.goto(f"{test_server_url}/item/{invalid_item_id}")
         wait_for_page_ready(page)
         
         # Should gracefully handle non-existent items
         # Page loads successfully (title may be default FastHTML page now)
         
-        # Test invalid feed ID
-        page.goto(f"{test_server_url}/?feed_id=99999")
+        # Test invalid feed ID (use very high number unlikely to exist)
+        invalid_feed_id = 999999
+        page.goto(f"{test_server_url}/?feed_id={invalid_feed_id}")
         wait_for_page_ready(page)
         
         # Should gracefully handle invalid feed IDs

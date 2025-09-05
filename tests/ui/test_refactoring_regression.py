@@ -7,7 +7,6 @@ any issues from the recent PageData class and optimization refactoring.
 
 import pytest
 from playwright.sync_api import Page, expect
-import time
 import random
 
 
@@ -49,7 +48,7 @@ class TestRefactoringRegression:
         page.screenshot(path="/tmp/desktop_initial.png")
         
         # Wait for feeds to load - look for the feed list structure
-        page.wait_for_selector("main", timeout=10000)
+        page.wait_for_selector("#desktop-layout, #mobile-sidebar", timeout=10000)
         
         # Check console for any initial errors
         console_messages = []
@@ -79,7 +78,8 @@ class TestRefactoringRegression:
             else:
                 print(f"Feed link not visible, skipping")
                 continue
-            time.sleep(1)  # Allow HTMX updates
+            # Wait for feed content to update instead of arbitrary sleep
+            page.wait_for_selector("#desktop-feeds-content", state="visible", timeout=5000)
             
             # Take screenshot after feed click
             page.screenshot(path=f"/tmp/desktop_cycle_{cycle}_feed_clicked.png")
@@ -95,7 +95,7 @@ class TestRefactoringRegression:
             # Scroll down multiple times to load more items
             for scroll in range(3):
                 page.keyboard.press("PageDown")
-                time.sleep(0.5)
+                page.wait_for_timeout(500)  # Short wait for scroll animation
             
             # 3. Click on an article to view details in right panel
             article_links = middle_panel.locator("#feeds-list-container .js-filter li").all()  # Each article is in a listitem
@@ -107,7 +107,8 @@ class TestRefactoringRegression:
                 
                 article_item.click()  # Click the whole list item
                 page.wait_for_load_state("networkidle")
-                time.sleep(1)  # Allow HTMX updates
+                # Wait for feed content to update instead of arbitrary sleep
+                page.wait_for_selector("#desktop-feeds-content", state="visible", timeout=5000)
                 
                 # Verify right panel shows article (desktop detail panel)
                 detail_panel = page.locator("#desktop-item-detail")  # Desktop detail panel
@@ -118,7 +119,7 @@ class TestRefactoringRegression:
                 
                 # Check that blue dot disappeared (article marked as read)
                 # This tests the critical read/unread state functionality
-                time.sleep(1)  # Allow state update
+                page.wait_for_timeout(1000)  # Brief wait for state update
             
             # 4. Toggle between "All Posts" and "Unread" tabs
             all_posts_tab = page.locator("text=All Posts").first
@@ -128,7 +129,8 @@ class TestRefactoringRegression:
                 print("Clicking Unread tab")
                 unread_tab.click()
                 page.wait_for_load_state("networkidle")
-                time.sleep(1)
+                # Wait for feed list to update
+                page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
                 
                 # Take screenshot of unread view
                 page.screenshot(path=f"/tmp/desktop_cycle_{cycle}_unread_tab.png")
@@ -137,7 +139,8 @@ class TestRefactoringRegression:
                 print("Clicking All Posts tab")
                 all_posts_tab.click()
                 page.wait_for_load_state("networkidle")
-                time.sleep(1)
+                # Wait for feed list to update
+                page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
                 
                 # Take screenshot of all posts view
                 page.screenshot(path=f"/tmp/desktop_cycle_{cycle}_all_posts_tab.png")
@@ -211,7 +214,8 @@ class TestRefactoringRegression:
             else:
                 print(f"Feed link not visible, skipping")
                 continue
-            time.sleep(1)
+            # Wait for feed content to load
+            page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
             
             # Verify sidebar closed automatically (mobile behavior)
             # Take screenshot after feed selection
@@ -225,7 +229,7 @@ class TestRefactoringRegression:
             # Scroll down multiple times
             for scroll in range(3):
                 page.mouse.wheel(0, 500)
-                time.sleep(0.5)
+                page.wait_for_timeout(500)  # Short wait for scroll animation
             
             # 4. Click on an article (should navigate to full-screen view)
             article_links = feed_container.locator("li[id^='mobile-feed-item-']").all()
@@ -237,7 +241,8 @@ class TestRefactoringRegression:
                 
                 article_item.click()
                 page.wait_for_load_state("networkidle")
-                time.sleep(1)
+                # Wait for feed list to update
+                page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
                 
                 # Verify we're in mobile article view
                 # Take screenshot of article view
@@ -250,13 +255,15 @@ class TestRefactoringRegression:
                     print("Clicking back button")
                     back_buttons[0].click()
                     page.wait_for_load_state("networkidle")
-                    time.sleep(1)
+                    # Wait for feed list to update
+                    page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
                 else:
                     # If no back button, use browser back
                     print("Using browser back navigation")
                     page.go_back()
                     page.wait_for_load_state("networkidle")
-                    time.sleep(1)
+                    # Wait for feed list to update
+                page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
                 
                 # Verify we're back at feed list
                 expect(feed_container).to_be_visible()
@@ -272,7 +279,8 @@ class TestRefactoringRegression:
                 print("Clicking Unread tab (mobile)")
                 unread_tab.click()
                 page.wait_for_load_state("networkidle")
-                time.sleep(1)
+                # Wait for feed list to update
+                page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
                 
                 # Take screenshot of mobile unread view
                 page.screenshot(path=f"/tmp/mobile_cycle_{cycle}_unread_tab.png")
@@ -281,7 +289,8 @@ class TestRefactoringRegression:
                 print("Clicking All Posts tab (mobile)")
                 all_posts_tab.click()
                 page.wait_for_load_state("networkidle")
-                time.sleep(1)
+                # Wait for feed list to update
+                page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
                 
                 # Take screenshot of mobile all posts view
                 page.screenshot(path=f"/tmp/mobile_cycle_{cycle}_all_posts_tab.png")
@@ -334,7 +343,8 @@ class TestRefactoringRegression:
             print("Clicking feed to trigger HTMX update")
             feed_links[0].click()
             page.wait_for_load_state("networkidle")
-            time.sleep(1)
+            # Wait for feed content to load
+            page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
         
         # 2. Click on an article (should trigger HTMX update)
         article_items = page.locator("main > div:nth-child(2) li").all()
@@ -342,7 +352,8 @@ class TestRefactoringRegression:
             print("Clicking article to trigger HTMX update")
             article_items[0].click()
             page.wait_for_load_state("networkidle")
-            time.sleep(1)
+            # Wait for feed content to load
+            page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
         
         # 3. Toggle between tabs (should trigger HTMX update)
         unread_tab = page.locator("text=Unread").first
@@ -350,7 +361,8 @@ class TestRefactoringRegression:
             print("Toggling to Unread tab")
             unread_tab.click()
             page.wait_for_load_state("networkidle")
-            time.sleep(1)
+            # Wait for feed content to load
+            page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
         
         # Analyze requests for HTMX patterns
         htmx_requests = [req for req in requests if 'hx-request' in req.get('headers', {})]
@@ -382,7 +394,8 @@ class TestRefactoringRegression:
         if feed_links:
             feed_links[0].click()
             page.wait_for_load_state("networkidle")
-            time.sleep(1)
+            # Wait for feed content to load
+            page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
         
         # Find articles with blue dots (unread indicators)
         unread_articles = page.locator("li").filter(has=page.locator(".w-2.h-2.bg-blue-500")).all()
@@ -399,7 +412,8 @@ class TestRefactoringRegression:
             
             first_unread.click()  # Click the whole list item
             page.wait_for_load_state("networkidle")
-            time.sleep(2)  # Allow state update
+            # Wait for detail panel to load
+            page.wait_for_selector("#desktop-item-detail", state="visible", timeout=5000)
             
             # Take screenshot after click
             page.screenshot(path="/tmp/after_article_click.png")
@@ -419,7 +433,8 @@ class TestRefactoringRegression:
         if unread_tab.is_visible():
             unread_tab.click()
             page.wait_for_load_state("networkidle")
-            time.sleep(1)
+            # Wait for feed content to load
+            page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
             
             # Take screenshot of unread view
             page.screenshot(path="/tmp/unread_view.png")
@@ -429,12 +444,14 @@ class TestRefactoringRegression:
             if unread_articles_in_view:
                 unread_articles_in_view[0].click()
                 page.wait_for_load_state("networkidle")
-                time.sleep(2)
+                # Wait for feed list to update
+                page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
                 
                 # Go back to unread view
                 unread_tab.click()
                 page.wait_for_load_state("networkidle")
-                time.sleep(1)
+                # Wait for feed list to update
+                page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
                 
                 # Take screenshot after article removal
                 page.screenshot(path="/tmp/unread_view_after_click.png")

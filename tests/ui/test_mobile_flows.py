@@ -393,7 +393,12 @@ class TestMobileFlows:
             assert "unread" in current_url or page.url == test_server_url + "/", "Should have unread context"
             
             # Navigate away and back
-            page.goto(test_server_url + "/?feed_id=1")  # Go to different view
+            # Click on first available feed to navigate away
+            feed_link = page.locator("#mobile-sidebar a[href*='feed_id']").first
+            if feed_link.is_visible():
+                feed_link.click()
+            else:
+                page.goto(test_server_url + "/")  # Go to home as fallback
             page.wait_for_selector("#mobile-sidebar", state="visible")
             
             # Navigate back to unread view

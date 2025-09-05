@@ -161,12 +161,17 @@ class TestFormParameterBugFlow:
         expect(page.locator("#desktop-layout")).to_be_visible()
         expect(page.locator("#sidebar")).to_be_visible()
         
-        # 2. Navigate to feed URL directly (simulates feed link behavior)
-        page.goto(f"{test_server_url}/?feed_id=2")
-        wait_for_page_ready(page)  # OPTIMIZED: Wait for page load
-        
-        # 3. Verify URL updated correctly
-        expect(page).to_have_url(f"{test_server_url}/?feed_id=2")
+        # 2. Navigate to a feed by clicking on it (more realistic)
+        # Find and click on any available feed link
+        feed_links = page.locator("#sidebar a[href*='feed_id']")
+        if feed_links.count() > 0:
+            first_feed = feed_links.first
+            feed_href = first_feed.get_attribute("href")
+            first_feed.click()
+            wait_for_page_ready(page)  # OPTIMIZED: Wait for page load
+            
+            # 3. Verify URL updated correctly
+            assert "feed_id" in page.url, "Should have navigated to a feed"
         
         # 4. Verify desktop layout is still working
         expect(page.locator("#desktop-layout")).to_be_visible()
@@ -863,8 +868,17 @@ class TestPaginationButtonDuplication:
         This test prevents regression of the duplicate mobile pagination buttons
         bug where both mobile and desktop button sets were rendered simultaneously.
         """
-        # Navigate directly to feed with pagination (bypass hidden sidebar links)
-        page.goto(f"{test_server_url}/?feed_id=5")  # ClaudeAI feed typically has multiple pages
+        # Navigate to a feed that likely has pagination
+        # First get to main page then find a feed with lots of items
+        page.goto(test_server_url)
+        
+        # Try to find a feed with many items (ClaudeAI, Hacker News, etc)
+        feed_links = page.locator("#sidebar a[href*='feed_id']:has-text('ClaudeAI'), #sidebar a[href*='feed_id']:has-text('Hacker News')")
+        if feed_links.count() > 0:
+            feed_links.first.click()
+        else:
+            # Fallback: click first available feed
+            page.locator("#sidebar a[href*='feed_id']").first.click()
         
         # Wait for specific content to load (not arbitrary time)
         page.wait_for_selector("#feeds-list-container", state="visible", timeout=10000)

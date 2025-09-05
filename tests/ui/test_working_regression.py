@@ -5,7 +5,6 @@ This test validates the core functionality after the PageData class refactoring.
 
 import pytest
 from playwright.sync_api import Page, expect
-import time
 
 pytestmark = pytest.mark.needs_server
 
@@ -50,7 +49,8 @@ class TestWorkingRegression:
             # Fallback: just click first available
             claudeai_feed_link.first.click()
         page.wait_for_load_state("networkidle")
-        time.sleep(1)
+        # Wait for feed content to load instead of arbitrary sleep
+        page.wait_for_selector("#desktop-feeds-content", state="visible", timeout=5000)
         
         # Verify feed filtering worked - heading should change to ClaudeAI
         assert "feed_id" in page.url, "Should be viewing a specific feed"
@@ -68,7 +68,7 @@ class TestWorkingRegression:
         print(f"Initial unread articles: {initial_unread_count}")
         
         # Click on first available article
-        first_article = page.locator("main li[id*='desktop-feed-item-']").first
+        first_article = page.locator("li[id^='desktop-feed-item-']").first
         expect(first_article).to_be_visible()
         
         article_title_element = first_article.locator("strong").first
@@ -77,7 +77,8 @@ class TestWorkingRegression:
         
         first_article.click()
         page.wait_for_load_state("networkidle")
-        time.sleep(2)  # Allow HTMX to complete
+        # Wait for article detail to load instead of arbitrary sleep
+        page.wait_for_selector("#desktop-item-detail", state="visible", timeout=5000)
         
         page.screenshot(path="/tmp/regression_article_clicked.png")
         
@@ -102,7 +103,8 @@ class TestWorkingRegression:
         if unread_tab.is_visible():
             unread_tab.click()
             page.wait_for_load_state("networkidle")
-            time.sleep(1)
+            # Wait for feed list to update
+            page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
             page.screenshot(path="/tmp/regression_unread_tab.png")
         
         # Test All Posts tab  
@@ -110,7 +112,8 @@ class TestWorkingRegression:
         if all_posts_tab.is_visible():
             all_posts_tab.click()
             page.wait_for_load_state("networkidle")
-            time.sleep(1)
+            # Wait for feed list to update
+            page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
             page.screenshot(path="/tmp/regression_all_posts_tab.png")
         
         print("=== Testing Feed Switching ===")
@@ -124,7 +127,8 @@ class TestWorkingRegression:
         else:
             hackernews_link.first.click()
         page.wait_for_load_state("networkidle")
-        time.sleep(1)
+        # Wait for feed content to update
+        page.wait_for_selector("#desktop-feeds-content", state="visible", timeout=5000)
         
         # Verify feed changed to Hacker News
         hn_heading = page.locator("#desktop-feeds-content h3").filter(has_text="Hacker News")
@@ -173,7 +177,8 @@ class TestWorkingRegression:
             claudeai_link = page.locator("#mobile-sidebar a[href*='feed_id']:has-text('ClaudeAI')").first
             claudeai_link.click()
             page.wait_for_load_state("networkidle")
-            time.sleep(1)
+            # Wait for feed list to load
+            page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
             
             page.screenshot(path="/tmp/regression_mobile_feed_selected.png")
             
@@ -181,7 +186,8 @@ class TestWorkingRegression:
             first_article = page.locator("li[id^='mobile-feed-item-']").first
             first_article.click()
             page.wait_for_load_state("networkidle")
-            time.sleep(1)
+            # Wait for article detail to load
+            page.wait_for_selector("#mobile-item-detail, #desktop-item-detail", state="visible", timeout=5000)
             
             page.screenshot(path="/tmp/regression_mobile_article_view.png")
             
@@ -216,13 +222,15 @@ class TestWorkingRegression:
         
         claudeai_link.click()
         page.wait_for_load_state("networkidle")
-        time.sleep(1)
+        # Wait for feed content to load
+        page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
         
         # Click an article
-        first_article = page.locator("main li[id*='desktop-feed-item-']").first
+        first_article = page.locator("li[id^='desktop-feed-item-']").first
         first_article.click()
         page.wait_for_load_state("networkidle")
-        time.sleep(1)
+        # Wait for detail panel to load
+        page.wait_for_selector("#desktop-item-detail, #mobile-item-detail", state="visible", timeout=5000)
         
         # Analyze requests
         htmx_requests = [req for req in requests if 'hx-request' in req.get('headers', {})]
@@ -256,7 +264,8 @@ class TestWorkingRegression:
         
         claudeai_link.click()
         page.wait_for_load_state("networkidle")
-        time.sleep(1)
+        # Wait for feed content to load
+        page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
         
         # Count unread articles
         initial_unread = page.locator("li").filter(has=page.locator(".bg-blue-600")).all()
@@ -267,7 +276,8 @@ class TestWorkingRegression:
             first_unread = initial_unread[0]
             first_unread.click()
             page.wait_for_load_state("networkidle")
-            time.sleep(2)
+            # Wait for detail panel to load
+            page.wait_for_selector("#desktop-item-detail, #mobile-item-detail", state="visible", timeout=5000)
             
             # Check unread count decreased
             remaining_unread = page.locator("li").filter(has=page.locator(".bg-blue-600")).all()
@@ -280,11 +290,12 @@ class TestWorkingRegression:
             unread_tab = page.locator("a").filter(has_text="Unread").first
             unread_tab.click()
             page.wait_for_load_state("networkidle")
-            time.sleep(1)
+            # Wait for feed list to update
+            page.wait_for_selector("#feeds-list-container", state="visible", timeout=5000)
             
             # The article we just read should not appear in unread view
             # (This tests the filtering logic)
-            unread_view_items = page.locator("main li[id*='desktop-feed-item-']").all()
+            unread_view_items = page.locator("li[id^='desktop-feed-item-']").all()
             print(f"Items in unread view: {len(unread_view_items)}")
             
             print("✓ Read/unread state management working correctly")
