@@ -9,6 +9,8 @@ import time
 import mistletoe
 from bs4 import BeautifulSoup
 import asyncio
+import re
+import logging
 from models import (
     SessionModel, FeedModel, FeedItemModel, UserItemModel, FolderModel,
     init_db, get_db, MINIMAL_MODE
@@ -18,6 +20,9 @@ from background_worker import initialize_worker_system, shutdown_worker_system
 import background_worker
 from dateutil.relativedelta import relativedelta
 import contextlib
+
+# Set up logging
+logger = logging.getLogger(__name__)
 
 # Initialize database and setup default feeds if needed
 init_db()
@@ -361,6 +366,57 @@ def viewport_styles():
     #mobile-sidebar .add-feed-form {
         /* Mobile-specific HTMX targeting handled via JS */
     }
+    
+    /* Text wrapping and overflow prevention */
+    .prose, .prose * {
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        word-break: break-word !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    
+    /* Prevent horizontal scrolling on mobile */
+    @media (max-width: 1024px) {
+        * {
+            max-width: 100vw !important;
+            overflow-x: hidden !important;
+        }
+        
+        /* Ensure all clickable elements meet 44px minimum size */
+        button, a, [role="button"], input[type="submit"], input[type="button"] {
+            min-height: 44px !important;
+            min-width: 44px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+        
+        /* Override for tab buttons to keep them compact */
+        .uk-tab-alt {
+            max-width: 10rem !important; /* 160px - preserve max-w-40 constraint */
+        }
+        
+        .uk-tab-alt a {
+            min-height: auto !important;
+            min-width: auto !important;
+            height: auto !important;
+            display: block !important;
+            max-width: 5rem !important; /* 80px per button - keep mobile compact */
+        }
+    }
+    
+    /* URL replacement styling */
+    .url-replacement {
+        flex-wrap: wrap !important;
+        max-width: 100% !important;
+    }
+    
+    /* First item top spacing without affecting tabs */
+    .js-filter > li:first-child {
+        margin-top: 1rem !important;
+    }
+    
     """)
 
 def create_tab_container(feed_name, feed_id, unread_only, for_mobile=False):
@@ -568,7 +624,6 @@ def before(req, sess):
     if len(user_items) == 0:
         import traceback
         import json
-        from fasthtml.common import Html, Head, Title, Body, H1, H2, Pre, Details, Summary, Div, Style, Span, Response
         
         # Gather ALL diagnostic SQL
         with get_db() as conn:
@@ -708,12 +763,12 @@ Step 3 - JOIN with user_feeds (session={session_id}): {diagnostics['step3_with_u
         # Log to console as well
         logger.error(f"INVARIANT VIOLATION: Session {session_id} sees 0 items!")
         
-        # Return 500 error with diagnostic HTML
-        raise Response(
-            str(error_html),
-            status_code=500,
-            headers={"Content-Type": "text/html"}
-        )
+        # Return proper HTML response with 500 status code
+        # NOTE: We're in middleware, not a route handler, so we must return a raw HTTP response.
+        # Route handlers can return FastHTML objects directly (FastHTML auto-converts them),
+        # but middleware runs before FastHTML's response pipeline, so we need HTMLResponse.
+        # Use to_xml() to convert FastHTML object to actual HTML string.
+        return HTMLResponse(to_xml(error_html), status_code=500)
     
     # Store in request scope for easy access
     req.scope['session_id'] = session_id
@@ -814,6 +869,40 @@ app, rt = fast_app(
     after=after_middleware,
     lifespan=lifespan
 )
+
+def process_urls_in_content(content):
+    """Replace plain URLs with link icons and add copy functionality using MonsterUI components"""
+    if not content:
+        return content
+    
+    # URL regex pattern - matches http/https URLs
+    url_pattern = r'(?<!href=["\'])(?<!src=["\'])(https?://[^\s<>"\']+)'
+    
+    def replace_url(match):
+        url = match.group(1)
+        # Create MonsterUI components for link and copy button
+        link_component = DivLAligned(
+            A(
+                UkIcon('external-link', cls='w-4 h-4'),
+                Span('Link', cls=TextT.sm),
+                href=url,
+                target='_blank',
+                rel='noopener noreferrer',
+                cls=AT.primary + ' inline-flex items-center gap-1'
+            ),
+            Button(
+                'Copy',
+                onclick=f"navigator.clipboard.writeText('{url}'); this.innerHTML='Copied!'; setTimeout(() => this.innerHTML='Copy', 1000)",
+                cls=ButtonT.secondary + ' min-h-[44px] min-w-[44px] text-xs',
+                title='Copy URL'
+            ),
+            cls='inline-flex items-center gap-2 my-1'
+        )
+        return str(link_component)
+    
+    # Replace URLs that aren't already in HTML tags
+    processed_content = re.sub(url_pattern, replace_url, content)
+    return processed_content
 
 def smart_truncate_html(text, max_length=150):
     """Smart truncation that counts only visible text, preserves images regardless of URL length
@@ -1393,7 +1482,8 @@ def ItemDetailView(item, show_back=False):
             DivLAligned(
                 A("Open Link", href=item['link'], target="_blank", 
                   cls='text-blue-600 hover:underline')
-            )
+            ),
+            cls='mx-4 mb-4'
         ),
         DivLAligned(
             Span(item.get('feed_title', 'Unknown')[:2], 
@@ -1412,8 +1502,8 @@ def ItemDetailView(item, show_back=False):
         ),
         DividerLine(),
         Div(
-            NotStr(mistletoe.markdown(item.get('content') or item.get('description') or 'No content available')),
-            cls=TextT.sm + 'p-4 prose max-w-none'
+            NotStr(process_urls_in_content(mistletoe.markdown(item.get('content') or item.get('description') or 'No content available'))),
+            cls=TextT.sm + 'p-4 prose max-w-none break-words overflow-wrap-anywhere'
         ),
         id="item-detail"
     )
@@ -1451,7 +1541,69 @@ def show_item(item_id: int, htmx, sess, unread_view: bool = False, feed_id: int 
     
     if not item_data.item:
         if htmx and getattr(htmx, 'request', None) and getattr(htmx, 'target', None):
-            return Alert("Item not found", type='error', cls='m-4')
+            import traceback
+            import json
+            import sqlite3
+            
+            # Execute the same query to get diagnostic results
+            diagnostic_result = None
+            try:
+                with get_db() as conn:
+                    diagnostic_result = conn.execute("""
+                        SELECT fi.*, f.title as feed_title, 
+                               COALESCE(ui.is_read, 0) as is_read,
+                               COALESCE(ui.starred, 0) as starred,
+                               fo.name as folder_name
+                        FROM feed_items fi
+                        JOIN feeds f ON fi.feed_id = f.id
+                        JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
+                        LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
+                        LEFT JOIN folders fo ON ui.folder_id = fo.id
+                        WHERE fi.id = ?
+                    """, (session_id, session_id, item_id)).fetchone()
+            except Exception as e:
+                diagnostic_result = f"Query failed: {str(e)}"
+            
+            return Div(
+                H2("Item Not Found - Diagnostic Information", cls='text-red-600 font-bold mb-4'),
+                
+                Details(
+                    Summary("SQL Query Details"),
+                    Pre(f"""Query: get_item_for_user(session_id='{session_id}', item_id={item_id})
+
+Executed SQL:
+SELECT fi.*, f.title as feed_title, 
+       COALESCE(ui.is_read, 0) as is_read,
+       COALESCE(ui.starred, 0) as starred,
+       fo.name as folder_name
+FROM feed_items fi
+JOIN feeds f ON fi.feed_id = f.id
+JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
+LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
+LEFT JOIN folders fo ON ui.folder_id = fo.id
+WHERE fi.id = ?
+
+Parameters: ('{session_id}', '{session_id}', {item_id})"""),
+                    Pre(f"Result: {json.dumps(dict(diagnostic_result) if diagnostic_result and isinstance(diagnostic_result, sqlite3.Row) else diagnostic_result, indent=2, default=str)}")
+                ),
+                
+                Details(
+                    Summary("Request Context"),
+                    Pre(f"""Route: /item/{item_id}
+Session ID: {session_id}
+Feed ID: {feed_id}
+Unread View: {unread_view}
+HTMX Request: {bool(htmx)}
+HTMX Target: {getattr(htmx, 'target', None) if htmx else None}""")
+                ),
+                
+                Details(
+                    Summary("Stack Trace"),
+                    Pre(''.join(traceback.format_stack()))
+                ),
+                
+                cls='border border-red-300 bg-red-50 p-4 m-4 rounded'
+            )
         else:
             # Create empty PageData for not found case
             page_data = PageData(session_id, feed_id, True, 1)
@@ -1581,7 +1733,90 @@ def toggle_read(item_id: int, htmx, sess):
     if item:
         return ItemDetailView(item, show_back=bool(htmx))
     
-    return Div("Item not found", cls='text-red-500 p-4')
+    import traceback
+    import json
+    import sqlite3
+    
+    # Execute diagnostic queries to show results
+    step1_result = None
+    final_result = None
+    try:
+        with get_db() as conn:
+            # Step 1 query - check current read status
+            step1_result = conn.execute("""
+                SELECT COALESCE(ui.is_read, 0) as current_read
+                FROM feed_items fi
+                LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
+                WHERE fi.id = ?
+            """, (session_id, item_id)).fetchone()
+            
+            # Final query that would be used by get_item_for_user
+            final_result = conn.execute("""
+                SELECT fi.*, f.title as feed_title, 
+                       COALESCE(ui.is_read, 0) as is_read,
+                       COALESCE(ui.starred, 0) as starred,
+                       fo.name as folder_name
+                FROM feed_items fi
+                JOIN feeds f ON fi.feed_id = f.id
+                JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
+                LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
+                LEFT JOIN folders fo ON ui.folder_id = fo.id
+                WHERE fi.id = ?
+            """, (session_id, session_id, item_id)).fetchone()
+    except Exception as e:
+        step1_result = f"Query failed: {str(e)}"
+        final_result = f"Query failed: {str(e)}"
+    
+    return Div(
+        H2("Item Not Found - Read Toggle Diagnostic Information", cls='text-red-600 font-bold mb-4'),
+        
+        Details(
+            Summary("SQL Query Details"),
+            Pre(f"""Query: toggle_read_and_get_item(session_id='{session_id}', item_id={item_id})
+
+Step 1 - Check current read status:
+SELECT COALESCE(ui.is_read, 0) as current_read
+FROM feed_items fi
+LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
+WHERE fi.id = ?
+
+Parameters: ('{session_id}', {item_id})"""),
+            Pre(f"Step 1 Result: {json.dumps(dict(step1_result) if step1_result and isinstance(step1_result, sqlite3.Row) else step1_result, indent=2, default=str)}"),
+            Pre(f"""
+Step 2 - Update read status (if item exists):
+INSERT OR REPLACE INTO user_items (session_id, item_id, is_read, starred, folder_id)
+VALUES (?, ?, ?, 
+        COALESCE((SELECT starred FROM user_items WHERE session_id = ? AND item_id = ?), 0),
+        COALESCE((SELECT folder_id FROM user_items WHERE session_id = ? AND item_id = ?), NULL))
+
+Step 3 - Return updated item via get_item_for_user():
+SELECT fi.*, f.title as feed_title, 
+       COALESCE(ui.is_read, 0) as is_read,
+       COALESCE(ui.starred, 0) as starred,
+       fo.name as folder_name
+FROM feed_items fi
+JOIN feeds f ON fi.feed_id = f.id
+JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
+LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
+LEFT JOIN folders fo ON ui.folder_id = fo.id
+WHERE fi.id = ?"""),
+            Pre(f"Final Result: {json.dumps(dict(final_result) if final_result and isinstance(final_result, sqlite3.Row) else final_result, indent=2, default=str)}")
+        ),
+        
+        Details(
+            Summary("Request Context"),
+            Pre(f"""Route: /api/item/{item_id}/read
+Session ID: {session_id}
+HTMX Request: {bool(htmx)}""")
+        ),
+        
+        Details(
+            Summary("Stack Trace"),
+            Pre(''.join(traceback.format_stack()))
+        ),
+        
+        cls='border border-red-300 bg-red-50 p-4 m-4 rounded text-red-500'
+    )
 
 @rt('/api/folder/add')
 def add_folder(htmx, sess):

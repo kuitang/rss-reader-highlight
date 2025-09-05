@@ -13,25 +13,10 @@ def wait_for_page_ready(page):
     """Fast page ready check - waits for network idle instead of fixed timeout"""
     page.wait_for_load_state("networkidle")
 
-@pytest.fixture(scope="session")
-def browser():
-    from playwright.sync_api import sync_playwright
-    with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True)
-        yield browser
-        browser.close()
 
-@pytest.fixture
-def page(browser):
-    page = browser.new_page()
-    yield page
-    page.close()
-
-
-@pytest.mark.asyncio_mode("off")
-def test_mobile_tab_active_style_updates(page: Page):
+def test_mobile_tab_active_style_updates(page: Page, test_server_url):
     """Test that mobile tab styles update correctly when switching between All Posts and Unread"""
-    page.goto("http://localhost:8080")
+    page.goto(test_server_url)
     page.set_viewport_size({"width": 390, "height": 844})
     
     # Wait for page load

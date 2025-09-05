@@ -7,11 +7,13 @@ import pytest
 from playwright.sync_api import Page, expect
 import time
 
+pytestmark = pytest.mark.needs_server
+
 
 class TestWorkingRegression:
     """Regression tests based on the actual working app structure."""
     
-    def test_basic_functionality_flow(self, page: Page):
+    def test_basic_functionality_flow(self, page: Page, test_server_url):
         """
         Test basic RSS reader functionality:
         1. Load homepage with feeds
@@ -22,7 +24,7 @@ class TestWorkingRegression:
         """
         # Navigate and wait for page load
         page.set_viewport_size({"width": 1200, "height": 800})  # Ensure desktop layout
-        page.goto("http://localhost:8080")
+        page.goto(test_server_url)
         page.wait_for_load_state("networkidle")
         
         # Take screenshot of initial state
@@ -37,16 +39,24 @@ class TestWorkingRegression:
         # Wait for feeds to be available and just click without checking visibility first
         # (the app structure seems to have changed - let's just verify it works)
         
-        # Click ClaudeAI feed - use second one since first is likely hidden mobile version
-        claudeai_feed_link = page.locator("a[href*='feed_id=6']").nth(1)  # Second one should be desktop
-        claudeai_feed_link.click()
+        # Click ClaudeAI feed - use dynamic feed selection
+        claudeai_feed_link = page.locator("a[href*='feed_id']:has-text('ClaudeAI')")
+        # Try desktop version first (should be visible in desktop viewport)
+        if claudeai_feed_link.nth(1).is_visible():
+            claudeai_feed_link.nth(1).click()
+        elif claudeai_feed_link.first.is_visible():
+            claudeai_feed_link.first.click()
+        else:
+            # Fallback: just click first available
+            claudeai_feed_link.first.click()
         page.wait_for_load_state("networkidle")
         time.sleep(1)
         
-        # Verify feed filtering worked - heading should change
-        page.wait_for_selector("text=ClaudeAI", timeout=5000)
-        feed_heading = page.locator("h3").filter(has_text="ClaudeAI")
-        expect(feed_heading).to_be_visible()
+        # Verify feed filtering worked - heading should change to ClaudeAI
+        assert "feed_id" in page.url, "Should be viewing a specific feed"
+        feed_heading = page.locator("#desktop-feeds-content h3").filter(has_text="ClaudeAI")
+        expect(feed_heading).to_be_visible(timeout=5000)
+        print(f"Successfully navigated to ClaudeAI feed: {page.url}")
         
         page.screenshot(path="/tmp/regression_feed_selected.png")
         
@@ -88,7 +98,7 @@ class TestWorkingRegression:
         print("=== Testing Tab Switching ===")
         
         # Test Unread tab
-        unread_tab = page.locator("button", has_text="Unread")
+        unread_tab = page.locator("a").filter(has_text="Unread").first
         if unread_tab.is_visible():
             unread_tab.click()
             page.wait_for_load_state("networkidle")
@@ -96,7 +106,7 @@ class TestWorkingRegression:
             page.screenshot(path="/tmp/regression_unread_tab.png")
         
         # Test All Posts tab  
-        all_posts_tab = page.locator("button", has_text="All Posts")
+        all_posts_tab = page.locator("a").filter(has_text="All Posts").first
         if all_posts_tab.is_visible():
             all_posts_tab.click()
             page.wait_for_load_state("networkidle")
@@ -106,19 +116,24 @@ class TestWorkingRegression:
         print("=== Testing Feed Switching ===")
         
         # Switch to Hacker News feed
-        hackernews_link = page.locator("a[href*='feed_id=5']").nth(1)  # Hacker News feed - desktop version
-        hackernews_link.click()
+        hackernews_link = page.locator("a[href*='feed_id']:has-text('Hacker News')")
+        if hackernews_link.nth(1).is_visible():
+            hackernews_link.nth(1).click()
+        elif hackernews_link.first.is_visible():
+            hackernews_link.first.click()
+        else:
+            hackernews_link.first.click()
         page.wait_for_load_state("networkidle")
         time.sleep(1)
         
-        # Verify feed changed
-        hn_heading = page.locator("h3").filter(has_text="Hacker News")
+        # Verify feed changed to Hacker News
+        hn_heading = page.locator("#desktop-feeds-content h3").filter(has_text="Hacker News")
         expect(hn_heading).to_be_visible()
         
         page.screenshot(path="/tmp/regression_hackernews_selected.png")
         
-        # Check for any errors
-        error_messages = [msg for msg in console_messages if "error" in msg.lower()]
+        # Check for actual console errors (not debug logs)
+        error_messages = [msg for msg in console_messages if msg.startswith("error:")]
         warning_messages = [msg for msg in console_messages if "warning" in msg.lower()]
         
         print(f"Console errors: {len(error_messages)}")
@@ -129,18 +144,17 @@ class TestWorkingRegression:
             for error in error_messages:
                 print(f"  - {error}")
         
-        # Assert no critical errors (warnings are OK, like Tailwind CDN warning)
-        critical_errors = [msg for msg in error_messages if "error" in msg.lower() and "tailwind" not in msg.lower()]
-        assert len(critical_errors) == 0, f"Critical errors detected: {critical_errors}"
+        # Assert no critical errors (only actual error types, not debug logs)
+        assert len(error_messages) == 0, f"Critical errors detected: {error_messages}"
         
         print("=== Basic functionality test completed successfully! ===")
 
-    def test_mobile_layout_functionality(self, page: Page):
+    def test_mobile_layout_functionality(self, page: Page, test_server_url):
         """Test mobile-specific functionality and layout."""
         # Set mobile viewport
         page.set_viewport_size({"width": 390, "height": 844})
         
-        page.goto("http://localhost:8080")
+        page.goto(test_server_url)
         page.wait_for_load_state("networkidle")
         
         page.screenshot(path="/tmp/regression_mobile_initial.png")
@@ -155,16 +169,16 @@ class TestWorkingRegression:
             page.wait_for_timeout(500)
             page.screenshot(path="/tmp/regression_mobile_nav_open.png")
             
-            # Click on a feed
-            claudeai_link = page.locator("a[href*='feed_id=6']").first
+            # Click on a feed - use dynamic selector
+            claudeai_link = page.locator("#mobile-sidebar a[href*='feed_id']:has-text('ClaudeAI')").first
             claudeai_link.click()
             page.wait_for_load_state("networkidle")
             time.sleep(1)
             
             page.screenshot(path="/tmp/regression_mobile_feed_selected.png")
             
-            # Click on an article
-            first_article = page.locator("main li").first
+            # Click on an article (mobile layout)
+            first_article = page.locator("li[id^='mobile-feed-item-']").first
             first_article.click()
             page.wait_for_load_state("networkidle")
             time.sleep(1)
@@ -175,9 +189,9 @@ class TestWorkingRegression:
         else:
             print("Mobile nav button not found - may be using desktop layout")
 
-    def test_htmx_requests_monitoring(self, page: Page):
+    def test_htmx_requests_monitoring(self, page: Page, test_server_url):
         """Monitor HTMX requests to ensure they're working properly."""
-        page.goto("http://localhost:8080")
+        page.goto(test_server_url)
         page.wait_for_load_state("networkidle")
         
         # Monitor network activity
@@ -189,7 +203,17 @@ class TestWorkingRegression:
         }))
         
         # Perform actions that should trigger HTMX
-        claudeai_link = page.locator("a[href*='feed_id=6']").first
+        # Handle both mobile and desktop layouts
+        mobile_nav_button = page.locator("button#mobile-nav-button")
+        if mobile_nav_button.is_visible():
+            # Mobile: open sidebar and get mobile feed links
+            mobile_nav_button.click()
+            page.wait_for_timeout(300)
+            claudeai_link = page.locator("#mobile-sidebar a[href*='feed_id']:has-text('ClaudeAI')").first
+        else:
+            # Desktop: get sidebar feed links directly
+            claudeai_link = page.locator("#sidebar a[href*='feed_id']:has-text('ClaudeAI')").first
+        
         claudeai_link.click()
         page.wait_for_load_state("networkidle")
         time.sleep(1)
@@ -214,13 +238,22 @@ class TestWorkingRegression:
         else:
             print("! No HTMX requests detected - check if HTMX is working properly")
 
-    def test_read_unread_state_persistence(self, page: Page):
+    def test_read_unread_state_persistence(self, page: Page, test_server_url):
         """Test that read/unread state persists across page interactions."""
-        page.goto("http://localhost:8080")
+        page.goto(test_server_url)
         page.wait_for_load_state("networkidle")
         
-        # Select a feed first
-        claudeai_link = page.locator("a[href*='feed_id=6']").first
+        # Select a feed first - handle both layouts
+        mobile_nav_button = page.locator("button#mobile-nav-button")
+        if mobile_nav_button.is_visible():
+            # Mobile: open sidebar and get mobile feed links
+            mobile_nav_button.click()
+            page.wait_for_timeout(300)
+            claudeai_link = page.locator("#mobile-sidebar a[href*='feed_id']:has-text('ClaudeAI')").first
+        else:
+            # Desktop: get sidebar feed links directly
+            claudeai_link = page.locator("#sidebar a[href*='feed_id']:has-text('ClaudeAI')").first
+        
         claudeai_link.click()
         page.wait_for_load_state("networkidle")
         time.sleep(1)
@@ -244,7 +277,7 @@ class TestWorkingRegression:
                 f"Expected {initial_count - 1} unread, got {remaining_count}"
             
             # Switch to Unread view
-            unread_tab = page.locator("button", has_text="Unread")
+            unread_tab = page.locator("a").filter(has_text="Unread").first
             unread_tab.click()
             page.wait_for_load_state("networkidle")
             time.sleep(1)

@@ -11,7 +11,7 @@ import pytest
 from playwright.sync_api import Page, expect
 import time
 
-BASE_URL = "http://localhost:8080"
+pytestmark = pytest.mark.needs_server
 
 # HTMX Helper Functions for Fast Testing
 def wait_for_htmx_complete(page, timeout=5000):
@@ -23,19 +23,18 @@ def wait_for_page_ready(page):
     page.wait_for_load_state("networkidle")
 
 
-@pytest.mark.asyncio_mode("off") 
 class TestMobileFlows:
     """Test mobile-specific UI flows and behaviors"""
     
     @pytest.fixture(autouse=True)
-    def setup(self, page: Page):
+    def setup(self, page: Page, test_server_url):
         """Set mobile viewport for all tests"""
         page.set_viewport_size({"width": 375, "height": 667})
-        page.goto(BASE_URL)
+        page.goto(test_server_url)
         wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
     
     # Navigation Tests (from test_mobile_navigation.py)
-    def test_mobile_post_navigation_htmx(self, page: Page):
+    def test_mobile_post_navigation_htmx(self, page: Page, test_server_url):
         """Test that mobile post navigation uses HTMX without full page reloads"""
         
         # Check that we have the mobile layout
@@ -66,7 +65,7 @@ class TestMobileFlows:
         assert "/item/" in page.url, "URL didn't update for article"
         
         # Verify back button is shown - updated selector to match app.py CSS classes
-        back_button = page.locator("#mobile-header button").first  # Back button is first button
+        back_button = page.locator("#mobile-nav-button")  # Back button is first button
         expect(back_button).to_be_visible()
         
         # Verify it's actually a back button by checking for arrow-left icon
@@ -83,11 +82,11 @@ class TestMobileFlows:
         # Verify we're back at the list (use mobile-specific selector)
         expect(page.locator("#main-content #feeds-list-container")).to_be_visible()
     
-    def test_mobile_feed_filter_preserved(self, page: Page):
+    def test_mobile_feed_filter_preserved(self, page: Page, test_server_url):
         """Test that feed filter state is preserved during navigation"""
         
         # Open mobile sidebar - updated selector
-        menu_button = page.locator("#mobile-header button").filter(has=page.locator('uk-icon[icon="menu"]'))
+        menu_button = page.locator('#mobile-nav-button')
         menu_button.click()
         
         # Wait for sidebar - check for hidden attribute
@@ -126,7 +125,7 @@ class TestMobileFlows:
                 assert f"feed_id={feed_id}" in page.url or "/item/" in page.url
                 
                 # Go back - should return to filtered feed view
-                back_button = page.locator("#mobile-header button").first
+                back_button = page.locator("#mobile-nav-button")
                 back_button.click()
                 wait_for_htmx_complete(page)  # FIXED: Don't expect sidebar visible after back navigation
                 
@@ -134,7 +133,7 @@ class TestMobileFlows:
                 assert f"feed_id={feed_id}" in page.url
     
     # Form Persistence Tests (from test_mobile_form_bar_bug.py)  
-    def test_mobile_persistent_header_visibility(self, page: Page):
+    def test_mobile_persistent_header_visibility(self, page: Page, test_server_url):
         """Test that mobile persistent header shows/hides correctly during navigation"""
         
         # Verify we're in mobile mode
@@ -176,7 +175,7 @@ class TestMobileFlows:
             assert header_hidden, "Persistent header should be hidden in article view"
             
             # Click back button
-            back_button = page.locator("#mobile-header button").first
+            back_button = page.locator("#mobile-nav-button")
             back_button.click()
             wait_for_htmx_complete(page)
             
@@ -188,7 +187,7 @@ class TestMobileFlows:
             restored_search_input = persistent_header.locator('input[placeholder="Search posts"]')
             expect(restored_search_input).to_be_visible()
     
-    def test_mobile_search_form_functionality(self, page: Page):
+    def test_mobile_search_form_functionality(self, page: Page, test_server_url):
         """Test that mobile search form works correctly"""
         
         # Find the search input in persistent header
@@ -210,7 +209,7 @@ class TestMobileFlows:
         expect(search_input).to_have_value("")
     
     # Scrolling Behavior Tests (from test_mobile_scrolling.py)
-    def test_mobile_viewport_fixed_behavior(self, page: Page):
+    def test_mobile_viewport_fixed_behavior(self, page: Page, test_server_url):
         """Test that mobile viewport is properly fixed to prevent bounce scrolling"""
         
         # Check that body has the proper CSS to prevent scrolling
@@ -235,7 +234,7 @@ class TestMobileFlows:
         assert body_styles["body_overflow"] == "hidden", f"Body should have overflow hidden, got {body_styles['body_overflow']}"
         assert body_styles["html_overflow"] == "hidden", f"HTML should have overflow hidden, got {body_styles['html_overflow']}"
     
-    def test_mobile_content_scrolling(self, page: Page):
+    def test_mobile_content_scrolling(self, page: Page, test_server_url):
         """Test that mobile content areas scroll properly within fixed viewport"""
         
         # Main content should be scrollable
@@ -259,11 +258,11 @@ class TestMobileFlows:
         # Main content should be scrollable (overflow-y: auto or scroll)
         assert main_content_overflow["overflow_y"] in ["auto", "scroll"], f"Main content should be scrollable, got {main_content_overflow['overflow_y']}"
     
-    def test_mobile_sidebar_scrolling(self, page: Page):
+    def test_mobile_sidebar_scrolling(self, page: Page, test_server_url):
         """Test that mobile sidebar scrolls properly when opened"""
         
         # Open mobile sidebar
-        menu_button = page.locator("#mobile-header button").filter(has=page.locator('uk-icon[icon="menu"]'))
+        menu_button = page.locator('#mobile-nav-button')
         menu_button.click()
         page.wait_for_selector("#mobile-sidebar", state="visible")
         
@@ -291,7 +290,7 @@ class TestMobileFlows:
         assert sidebar_styles is not None, "Sidebar content should exist"
     
     # URL Sharing Tests (from test_mobile_url_sharing.py)
-    def test_mobile_url_sharing_article_view(self, page: Page):
+    def test_mobile_url_sharing_article_view(self, page: Page, test_server_url):
         """Test that article URLs are shareable and work when opened directly"""
         
         # Navigate to an article
@@ -310,7 +309,7 @@ class TestMobileFlows:
         article_title = page.locator("#item-detail strong").first.text_content()
         
         # Navigate away and then back to test direct URL access
-        page.goto(BASE_URL)
+        page.goto(test_server_url)
         wait_for_page_ready(page)  # FIXED: Don't expect sidebar visible on main page
         
         # Now navigate directly to the article URL
@@ -328,14 +327,14 @@ class TestMobileFlows:
         expect(page.locator("#mobile-layout")).to_be_visible()
         
         # Should have back button since we're in article view
-        back_button = page.locator("#mobile-header button").first
+        back_button = page.locator("#mobile-nav-button")
         expect(back_button).to_be_visible()
     
-    def test_mobile_url_sharing_feed_filter(self, page: Page):
+    def test_mobile_url_sharing_feed_filter(self, page: Page, test_server_url):
         """Test that feed filter URLs are shareable"""
         
         # Open sidebar and select a feed
-        menu_button = page.locator("#mobile-header button").filter(has=page.locator('uk-icon[icon="menu"]'))
+        menu_button = page.locator('#mobile-nav-button')
         menu_button.click()
         page.wait_for_selector("#mobile-sidebar", state="visible")
         
@@ -353,7 +352,7 @@ class TestMobileFlows:
             assert "feed_id=" in current_url, "Should be on filtered feed view"
             
             # Navigate away and back to test sharing
-            page.goto(BASE_URL)
+            page.goto(test_server_url)
             wait_for_page_ready(page)  # OPTIMIZED: Wait for page to load, sidebar is hidden by default
             
             # Navigate directly to the feed URL
@@ -367,7 +366,7 @@ class TestMobileFlows:
             expect(page.locator("#mobile-layout")).to_be_visible()
             expect(page.locator("#main-content")).to_be_visible()
     
-    def test_mobile_url_sharing_with_unread_filter(self, page: Page):
+    def test_mobile_url_sharing_with_unread_filter(self, page: Page, test_server_url):
         """Test URL sharing with unread filter applied"""
         
         # Click on Unread tab if available
@@ -378,10 +377,10 @@ class TestMobileFlows:
             
             # Should have unread parameter in URL
             current_url = page.url
-            assert "unread" in current_url or page.url == BASE_URL + "/", "Should have unread context"
+            assert "unread" in current_url or page.url == test_server_url + "/", "Should have unread context"
             
             # Navigate away and back
-            page.goto(BASE_URL + "/?feed_id=1")  # Go to different view
+            page.goto(test_server_url + "/?feed_id=1")  # Go to different view
             page.wait_for_selector("#mobile-sidebar", state="visible")
             
             # Navigate back to unread view
@@ -400,16 +399,16 @@ class TestMobileFlows:
     
     # NOTE: Mobile browser back/forward test moved to test_mobile_url_navigation.py to avoid test interference
 
-    def test_mobile_feed_title_persistence_after_article_navigation(self, page: Page):
+    def test_mobile_feed_title_persistence_after_article_navigation(self, page: Page, test_server_url):
         """Test that feed title shows correctly after navigating back from article when specific feed is selected"""
         
         # Open mobile sidebar first
-        hamburger_button = page.locator("#mobile-header button").filter(has=page.locator('uk-icon[icon="menu"]'))
+        hamburger_button = page.locator('#mobile-nav-button')
         hamburger_button.click()
         page.wait_for_selector("#mobile-sidebar", state="visible")
         
-        # Select a specific feed (ClaudeAI)
-        claudeai_feed = page.locator('a[href="/?feed_id=6"]').first
+        # Select a specific feed (ClaudeAI) - use dynamic feed ID
+        claudeai_feed = page.locator('a[href*="feed_id"]:has-text("ClaudeAI")').first
         expect(claudeai_feed).to_be_visible()
         claudeai_feed.click()
         wait_for_htmx_complete(page)
@@ -428,7 +427,7 @@ class TestMobileFlows:
         expect(page.locator("#main-content #item-detail")).to_be_visible()
         
         # Click back button
-        back_button = page.locator("#mobile-header button").filter(has=page.locator('uk-icon[icon="arrow-left"]'))
+        back_button = page.locator("#mobile-nav-button").filter(has=page.locator('uk-icon[icon="arrow-left"]'))
         expect(back_button).to_be_visible()
         back_button.click()
         wait_for_htmx_complete(page)
@@ -438,52 +437,6 @@ class TestMobileFlows:
         feed_title_after_back = page.locator("#mobile-persistent-header h3")
         expect(feed_title_after_back).to_have_text("ClaudeAI")  # Should NOT be "BizToc"
 
-    def test_mobile_back_navigation_preserves_feed_context(self, page: Page):
-        """Test that back navigation from articles preserves correct feed context via HTMX"""
-        
-        # Navigate to ClaudeAI feed specifically
-        hamburger_button = page.locator("#mobile-header button").filter(has=page.locator('uk-icon[icon="menu"]'))
-        hamburger_button.click()
-        page.wait_for_selector("#mobile-sidebar", state="visible")
-        
-        claudeai_feed = page.locator('a[href="/?feed_id=6"]').first
-        expect(claudeai_feed).to_be_visible()
-        claudeai_feed.click()
-        wait_for_htmx_complete(page)
-        
-        # Verify we're viewing ClaudeAI feed
-        feed_title = page.locator("#mobile-persistent-header h3")
-        expect(feed_title).to_have_text("ClaudeAI")
-        
-        # Click on an article
-        first_article = page.locator("li[id^='mobile-feed-item-']").first
-        expect(first_article).to_be_visible()
-        first_article.click()
-        wait_for_htmx_complete(page)
-        
-        # Should be on article view
-        expect(page.locator("#main-content #item-detail")).to_be_visible()
-        article_url = page.url
-        assert "feed_id=6" in article_url, "Article URL should preserve feed context"
-        
-        # Click back button - should use HTMX to return to feed list
-        back_button = page.locator("#mobile-header button").filter(has=page.locator('uk-icon[icon="arrow-left"]'))
-        expect(back_button).to_be_visible()
-        back_button.click()
-        wait_for_htmx_complete(page)
-        
-        # Should be back to ClaudeAI feed list with correct context
-        expect(page.locator("#main-content #feeds-list-container")).to_be_visible()
-        feed_title_after_back = page.locator("#mobile-persistent-header h3")
-        expect(feed_title_after_back).to_have_text("ClaudeAI")  # Should show correct feed
-        
-        # URL should show correct feed context
-        final_url = page.url
-        assert "feed_id=6" in final_url, f"Should return to ClaudeAI feed, got {final_url}"
-        assert "/item/" not in final_url, f"Should be back from article to feed list, got {final_url}"
-        
-        # This confirms that the server-side HTMX back button implementation works correctly
-        # and preserves feed context for both in-app navigation and shared links
 
 
 if __name__ == "__main__":

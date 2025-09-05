@@ -7,16 +7,17 @@ Combines functionality from:
 - HTTP redirect handling
 """
 
-import unittest
+import pytest
 from unittest.mock import patch, MagicMock
 import httpx
 from feed_parser import FeedParser
 
 
-class TestFeedIngestion(unittest.TestCase):
+class TestFeedIngestion:
     """Test feed ingestion including Reddit special cases and RSS autodiscovery"""
     
-    def setUp(self):
+    @pytest.fixture(autouse=True)
+    def setup(self):
         """Set up test fixtures"""
         self.parser = FeedParser()
     
@@ -46,20 +47,20 @@ class TestFeedIngestion(unittest.TestCase):
                     
                     # Verify it's a working RSS feed
                     fetch_result = self.parser.fetch_feed(reddit_feed_url)
-                    self.assertTrue(fetch_result['updated'], f"RSS feed should be fetchable: {reddit_feed_url}")
-                    self.assertEqual(fetch_result['status'], 200, f"RSS feed should return 200: {reddit_feed_url}")
+                    assert fetch_result['updated'], f"RSS feed should be fetchable: {reddit_feed_url}"
+                    assert fetch_result['status'] == 200, f"RSS feed should return 200: {reddit_feed_url}"
                     
                     # Verify it contains RSS content
                     feed_data = fetch_result['data']
-                    self.assertTrue(hasattr(feed_data, 'entries'), f"Should have entries: {reddit_feed_url}")
-                    self.assertGreater(len(feed_data.entries), 0, f"Should have at least one entry: {reddit_feed_url}")
+                    assert hasattr(feed_data, 'entries'), f"Should have entries: {reddit_feed_url}"
+                    assert len(feed_data.entries) > 0, f"Should have at least one entry: {reddit_feed_url}"
                 else:
                     print(f"  ✗ No RSS found")
-                    self.fail(f"Expected to find RSS feed for {url}")
+                    pytest.fail(f"Expected to find RSS feed for {url}")
                     
             except Exception as e:
                 print(f"  ✗ Exception: {str(e)}")
-                self.fail(f"Exception testing {url}: {str(e)}")
+                pytest.fail(f"Exception testing {url}: {str(e)}")
     
     # RSS Auto-discovery Tests (from test_rss_autodiscovery.py)
     def test_rss_autodiscovery_success_cases(self):
@@ -106,8 +107,8 @@ class TestFeedIngestion(unittest.TestCase):
                         
                         # Verify the discovered feed works
                         fetch_result = self.parser.fetch_feed(discovered_url)
-                        self.assertTrue(fetch_result['updated'], f"Discovered feed should work: {discovered_url}")
-                        self.assertEqual(fetch_result['status'], 200, f"Discovered feed should return 200: {discovered_url}")
+                        assert fetch_result['updated'], f"Discovered feed should work: {discovered_url}"
+                        assert fetch_result['status'] == 200, f"Discovered feed should return 200: {discovered_url}"
                     else:
                         print(f"  ✗ No feed discovered")
                         # Don't fail for now since autodiscovery isn't fully implemented
@@ -167,12 +168,12 @@ class TestFeedIngestion(unittest.TestCase):
         with patch.object(self.parser.client, 'get', return_value=mock_response):
             result = self.parser.fetch_feed("https://example.com/rss")
             
-            self.assertTrue(result['updated'])
-            self.assertEqual(result['status'], 200)
-            self.assertIn('data', result)
+            assert result['updated']
+            assert result['status'] == 200
+            assert 'data' in result
             # feedparser should parse the RSS content
-            self.assertTrue(hasattr(result['data'], 'entries'))
-            self.assertEqual(result['data'].feed.title, "Test RSS Feed")
+            assert hasattr(result['data'], 'entries')
+            assert result['data'].feed.title == "Test RSS Feed"
     
     def test_fetch_atom_feed_success(self):
         """Test fetching Atom format feeds with real FeedParser method"""
@@ -194,12 +195,12 @@ class TestFeedIngestion(unittest.TestCase):
         with patch.object(self.parser.client, 'get', return_value=mock_response):
             result = self.parser.fetch_feed("https://example.com/atom")
             
-            self.assertTrue(result['updated'])
-            self.assertEqual(result['status'], 200)
-            self.assertIn('data', result)
+            assert result['updated']
+            assert result['status'] == 200
+            assert 'data' in result
             # feedparser should parse the Atom content
-            self.assertTrue(hasattr(result['data'], 'entries'))
-            self.assertEqual(result['data'].feed.title, "Test Atom Feed")
+            assert hasattr(result['data'], 'entries')
+            assert result['data'].feed.title == "Test Atom Feed"
     
     # HTTP Redirect Handling Tests
     def test_http_redirect_handling(self):
@@ -224,7 +225,7 @@ class TestFeedIngestion(unittest.TestCase):
                 
                 if result['updated']:
                     print(f"  ✓ Redirect followed successfully")
-                    self.assertEqual(result['status'], 200, "Should get 200 after redirect")
+                    assert result['status'] == 200, "Should get 200 after redirect"
                 else:
                     print(f"  ✗ Redirect not followed properly")
                     
@@ -238,10 +239,10 @@ class TestFeedIngestion(unittest.TestCase):
             result = self.parser.fetch_feed("https://nonexistent-domain.com/rss")
             
             # Should handle gracefully
-            self.assertFalse(result['updated'])
-            self.assertEqual(result.get('status'), 0)
-            self.assertIsNone(result.get('data'))
-            self.assertIn('error', result)
+            assert not result['updated']
+            assert result.get('status') == 0
+            assert result.get('data') is None
+            assert 'error' in result
     
     def test_fetch_feed_with_http_error(self):
         """Test handling of HTTP errors (404, 500, etc.) with real FeedParser method"""
@@ -255,8 +256,8 @@ class TestFeedIngestion(unittest.TestCase):
             result = self.parser.fetch_feed("https://example.com/nonexistent.rss")
             
             # Should handle HTTP errors gracefully
-            self.assertFalse(result['updated'])
-            self.assertEqual(result['status'], 404)
+            assert not result['updated']
+            assert result['status'] == 404
     
     # Helper Methods
     def _test_autodiscovery(self, url):
@@ -269,6 +270,3 @@ class TestFeedIngestion(unittest.TestCase):
         # For now, return None to indicate autodiscovery not implemented
         return None
 
-
-if __name__ == "__main__":
-    unittest.main()
