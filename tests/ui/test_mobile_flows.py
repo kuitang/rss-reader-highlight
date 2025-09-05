@@ -199,7 +199,7 @@ class TestMobileFlows:
         """Test that mobile search form works correctly"""
         
         # Find the search input in persistent header
-        search_input = page.locator('#mobile-persistent-header input[placeholder="Search posts"]')
+        search_input = page.locator('#mobile-top-bar input[placeholder="Search posts"]')
         expect(search_input).to_be_visible()
         
         # Test UK Filter functionality (if implemented)
@@ -422,7 +422,7 @@ class TestMobileFlows:
         wait_for_htmx_complete(page)
         
         # Verify we're viewing ClaudeAI feed
-        feed_title = page.locator("#mobile-persistent-header h3")
+        feed_title = page.locator("#mobile-top-bar h3")
         expect(feed_title).to_have_text("ClaudeAI")
         
         # Click on an article
@@ -442,7 +442,7 @@ class TestMobileFlows:
         
         # Should be back to feed list with correct feed title
         expect(page.locator("#main-content #feeds-list-container")).to_be_visible()
-        feed_title_after_back = page.locator("#mobile-persistent-header h3")
+        feed_title_after_back = page.locator("#mobile-top-bar h3")
         expect(feed_title_after_back).to_have_text("ClaudeAI")  # Should NOT be "BizToc"
 
 
