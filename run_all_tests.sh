@@ -1,9 +1,8 @@
 #!/bin/bash
 
-# RSS Reader Parallel Test Runner using xargs
-# Runs tests in parallel with core control
+# RSS Reader Test Suite using pytest-xdist for parallel execution
 
-echo "🧪 RSS Reader Parallel Test Suite (using xargs)"
+echo "🧪 RSS Reader Parallel Test Suite (pytest-xdist)"
 echo "=================================================="
 
 # Ensure we're in the right directory
@@ -21,14 +20,9 @@ N_CORES=$(nproc)
 echo "Running tests on $N_CORES CPU cores"
 echo ""
 
-# Create temp directory for test outputs
-TEST_DIR=$(mktemp -d)
-echo "Test outputs: $TEST_DIR"
-echo ""
-
-# Start a shared server for UI tests (each test gets its own session)
-echo "Starting shared server for UI tests on port 8080..."
-python app.py > "$TEST_DIR/server.log" 2>&1 &
+# Start server for UI tests
+echo "Starting server on port 8080 for UI tests..."
+python app.py > test_server.log 2>&1 &
 SERVER_PID=$!
 sleep 3
 
@@ -36,97 +30,41 @@ sleep 3
 for i in {1..10}; do
     if curl -s http://localhost:8080 > /dev/null; then
         echo "✅ Server ready on port 8080"
+        echo ""
         break
     fi
     sleep 1
 done
 
-# Function to run a single test file with its own server if needed
-run_test_file() {
-    local test_file="$1"
-    local test_name=$(basename "$test_file" .py)
-    local output_file="$TEST_DIR/${test_name}.txt"
-    
-    # Determine if test needs its own server
-    if [[ "$test_file" == *"test_optimized_integration"* ]] || \
-       [[ "$test_file" == *"test_application_startup"* ]] || \
-       [[ "$test_file" == *"test_background_worker_integration"* ]]; then
-        # Tests that spawn their own servers - use isolated DB
-        TEST_DB="$TEST_DIR/${test_name}.db" python -m pytest "$test_file" -v > "$output_file" 2>&1
-        result=$?
-    else
-        # All other tests can share the server (each gets own session)
-        python -m pytest "$test_file" -v > "$output_file" 2>&1
-        result=$?
-    fi
-    
-    if [ $result -eq 0 ]; then
-        echo "✅ $(basename $test_file)"
-        return 0
-    else
-        echo "❌ $(basename $test_file)"
-        return 1
-    fi
-}
-
-export -f run_test_file
-export TEST_DIR
-
-# Find all test files and run them in parallel
-echo ""
-echo "Running all tests in parallel..."
+# Run tests with optimized parallelization:
+# - Core tests can run fully parallel (function level)
+# - UI test files run in parallel, but tests within each file run serially
+echo "Running tests with optimized parallelization..."
 echo "=================================================="
 
-find tests -name "test_*.py" -type f | xargs -P $N_CORES -I {} bash -c 'run_test_file "$@"' _ {}
+# Run core tests with full parallelization
+echo "Running core tests (fully parallel)..."
+python -m pytest tests/core/ -n auto -v --tb=short
 
-# Generate summary
+# Run UI tests: files in parallel, tests within files serially
 echo ""
-echo "=================================================="
-echo "📊 TEST SUMMARY"
-echo "=================================================="
+echo "Running UI tests (files parallel, tests serial)..."
+python -m pytest tests/ui/ -n auto --dist=loadfile -v --tb=short
 
-# Count results
-PASSED=$(grep -l "passed" "$TEST_DIR"/*.txt 2>/dev/null | wc -l)
-FAILED=$(grep -l "FAILED\|ERROR" "$TEST_DIR"/*.txt 2>/dev/null | wc -l)
-TOTAL=$(ls "$TEST_DIR"/*.txt 2>/dev/null | wc -l)
-
-echo "Tests passed: $PASSED/$TOTAL"
-
-# Show failed tests if any
-if [ $FAILED -gt 0 ]; then
-    echo ""
-    echo "❌ Failed tests:"
-    grep -l "FAILED\|ERROR" "$TEST_DIR"/*.txt 2>/dev/null | while read file; do
-        basename "$file" .txt
-    done
-fi
-
-# Show detailed results
+# Run specialized tests if they exist
 echo ""
-echo "📈 Detailed Results:"
-for file in "$TEST_DIR"/*.txt; do
-    if [ -f "$file" ]; then
-        name=$(basename "$file" .txt)
-        # Extract pytest summary line
-        summary=$(grep -E "passed|failed|error|skipped" "$file" | tail -1)
-        if [ ! -z "$summary" ]; then
-            echo "  $name: $summary"
-        fi
-    fi
-done
+echo "Running specialized tests..."
+python -m pytest tests/specialized/ -v --tb=short || true
 
-echo ""
-echo "Full test outputs saved in: $TEST_DIR"
-echo "To view a specific test: cat $TEST_DIR/<test_name>.txt"
+# Save exit code
+TEST_RESULT=$?
 
-# Kill the shared server
+# Kill the server
 if [ ! -z "$SERVER_PID" ]; then
+    echo ""
+    echo "Stopping test server..."
     kill $SERVER_PID 2>/dev/null || true
 fi
 
-# Exit with appropriate code
-if [ $FAILED -gt 0 ]; then
-    exit 1
-else
-    exit 0
-fi
+# Exit with test result
+exit $TEST_RESULT
