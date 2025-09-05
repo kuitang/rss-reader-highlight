@@ -562,6 +562,159 @@ def before(req, sess):
                     if "UNIQUE constraint failed" not in str(e):
                         raise
     
+    # INVARIANT: Every session MUST see items (no exceptions)
+    user_items = FeedItemModel.get_items_for_user(session_id, feed_id=None, unread_only=False, page=1)
+    
+    if len(user_items) == 0:
+        import traceback
+        import json
+        from fasthtml.common import Html, Head, Title, Body, H1, H2, Pre, Details, Summary, Div, Style, Span, Response
+        
+        # Gather ALL diagnostic SQL
+        with get_db() as conn:
+            diagnostics = {}
+            
+            # 1. Basic counts
+            diagnostics['feeds_count'] = conn.execute("SELECT COUNT(*) FROM feeds").fetchone()[0]
+            diagnostics['items_count'] = conn.execute("SELECT COUNT(*) FROM feed_items").fetchone()[0]
+            diagnostics['user_feeds_count'] = conn.execute(
+                "SELECT COUNT(*) FROM user_feeds WHERE session_id = ?", (session_id,)
+            ).fetchone()[0]
+            
+            # 2. Sample feeds
+            diagnostics['sample_feeds'] = [dict(row) for row in conn.execute(
+                "SELECT id, url, title FROM feeds LIMIT 5"
+            ).fetchall()]
+            
+            # 3. Sample items
+            diagnostics['sample_items'] = [dict(row) for row in conn.execute(
+                "SELECT id, feed_id, title FROM feed_items LIMIT 5"
+            ).fetchall()]
+            
+            # 4. User's subscriptions
+            diagnostics['user_subscriptions'] = [dict(row) for row in conn.execute(
+                "SELECT * FROM user_feeds WHERE session_id = ? LIMIT 5", (session_id,)
+            ).fetchall()]
+            
+            # 5. The EXACT query that's failing
+            failing_sql = """
+                SELECT fi.*, f.title as feed_title, 
+                       COALESCE(ui.is_read, 0) as is_read,
+                       COALESCE(ui.starred, 0) as starred,
+                       fo.name as folder_name
+                FROM feed_items fi
+                JOIN feeds f ON fi.feed_id = f.id
+                JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
+                LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
+                LEFT JOIN folders fo ON ui.folder_id = fo.id
+                ORDER BY fi.published DESC LIMIT 20
+            """
+            
+            diagnostics['failing_query_result'] = [dict(row) for row in conn.execute(
+                failing_sql, (session_id, session_id)
+            ).fetchall()]
+            
+            # 6. Check each JOIN step
+            diagnostics['step1_feed_items'] = conn.execute(
+                "SELECT COUNT(*) FROM feed_items"
+            ).fetchone()[0]
+            
+            diagnostics['step2_with_feeds'] = conn.execute(
+                "SELECT COUNT(*) FROM feed_items fi JOIN feeds f ON fi.feed_id = f.id"
+            ).fetchone()[0]
+            
+            diagnostics['step3_with_user_feeds'] = conn.execute(
+                "SELECT COUNT(*) FROM feed_items fi "
+                "JOIN feeds f ON fi.feed_id = f.id "
+                "JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?",
+                (session_id,)
+            ).fetchone()[0]
+        
+        # Create HTML error page
+        error_html = Html(
+            Head(
+                Title("500 - Invariant Violation"),
+                Style("""
+                    body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #ff6b6b; }
+                    h1 { color: #ff0000; border-bottom: 3px solid #ff0000; padding-bottom: 10px; }
+                    h2 { color: #ff9999; margin-top: 30px; }
+                    pre { background: #2a2a2a; padding: 15px; border-left: 4px solid #ff6b6b; 
+                          overflow-x: auto; color: #e0e0e0; }
+                    details { margin: 20px 0; }
+                    summary { cursor: pointer; color: #ff9999; font-weight: bold; padding: 10px;
+                             background: #2a2a2a; }
+                    .error-box { background: #330000; border: 2px solid #ff0000; padding: 20px;
+                                margin: 20px 0; }
+                    .metric { display: inline-block; margin: 10px 20px 10px 0; }
+                    .metric-label { color: #888; }
+                    .metric-value { color: #fff; font-size: 1.2em; font-weight: bold; }
+                """)
+            ),
+            Body(
+                H1("🚨 INVARIANT VIOLATION: User MUST See Items"),
+                
+                Div(
+                    H2("Critical Failure"),
+                    Div(
+                        f"Session {session_id} sees 0 items but this should be impossible!",
+                        cls="error-box"
+                    ),
+                    
+                    H2("Database State"),
+                    Div(
+                        Div(Span("Total Feeds: ", cls="metric-label"), 
+                            Span(str(diagnostics['feeds_count']), cls="metric-value"), cls="metric"),
+                        Div(Span("Total Items: ", cls="metric-label"), 
+                            Span(str(diagnostics['items_count']), cls="metric-value"), cls="metric"),
+                        Div(Span("User Subscriptions: ", cls="metric-label"), 
+                            Span(str(diagnostics['user_feeds_count']), cls="metric-value"), cls="metric"),
+                    ),
+                    
+                    Details(
+                        Summary("Sample Feeds"),
+                        Pre(json.dumps(diagnostics['sample_feeds'], indent=2))
+                    ),
+                    
+                    Details(
+                        Summary("Sample Items"),
+                        Pre(json.dumps(diagnostics['sample_items'], indent=2))
+                    ),
+                    
+                    Details(
+                        Summary("User Subscriptions"),
+                        Pre(json.dumps(diagnostics['user_subscriptions'], indent=2))
+                    ),
+                    
+                    H2("SQL Join Breakdown"),
+                    Pre(f"""Step 1 - feed_items table: {diagnostics['step1_feed_items']} rows
+Step 2 - JOIN with feeds: {diagnostics['step2_with_feeds']} rows
+Step 3 - JOIN with user_feeds (session={session_id}): {diagnostics['step3_with_user_feeds']} rows"""),
+                    
+                    Details(
+                        Summary("Failing SQL Query"),
+                        Pre(failing_sql),
+                        Pre(f"Parameters: ('{session_id}', '{session_id}')"),
+                        Pre(f"Result: {json.dumps(diagnostics['failing_query_result'], indent=2)}")
+                    ),
+                    
+                    Details(
+                        Summary("Stack Trace"),
+                        Pre(''.join(traceback.format_stack()))
+                    )
+                )
+            )
+        )
+        
+        # Log to console as well
+        logger.error(f"INVARIANT VIOLATION: Session {session_id} sees 0 items!")
+        
+        # Return 500 error with diagnostic HTML
+        raise Response(
+            str(error_html),
+            status_code=500,
+            headers={"Content-Type": "text/html"}
+        )
+    
     # Store in request scope for easy access
     req.scope['session_id'] = session_id
 
@@ -575,13 +728,13 @@ async def lifespan(app):
     else:
         print("FastHTML app starting up...")
         
-        # Initialize background worker in single process
-        initialize_worker_system()
-        print("Background worker system initialized")
-        
-        # Add default feeds - database constraints handle duplicates
+        # Add default feeds BEFORE worker initialization so they get queued
         print("Adding default feeds to database...")
         setup_default_feeds(minimal_mode=False)
+        
+        # Initialize background worker after feeds exist
+        initialize_worker_system()
+        print("Background worker system initialized")
     
     yield  # App is running
     

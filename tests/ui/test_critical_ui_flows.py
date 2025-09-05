@@ -298,9 +298,11 @@ class TestBlueIndicatorHTMXFlow:
             blue_dots = page.locator(".bg-blue-600")  # Blue indicator class
             initial_blue_count = blue_dots.count()
             
-            if initial_blue_count == 0:
-                print(f"  Skipping {viewport_name} - no unread articles")
-                continue
+            # DISABLED CONDITIONAL FOR DEBUGGING
+            # if initial_blue_count == 0:
+            #     print(f"  Skipping {viewport_name} - no unread articles")
+            #     continue
+            assert initial_blue_count > 0, f"Should have unread articles in {viewport_name}, but got {initial_blue_count}"
             
             # 2. Find the parent article of first blue dot (layout-specific)
             first_blue_article = page.locator(f"{articles_selector}:has(.bg-blue-600)").first
@@ -345,8 +347,10 @@ class TestBlueIndicatorHTMXFlow:
             unread_articles = page.locator("li[id^='desktop-feed-item-'], li[id^='mobile-feed-item-']")
             initial_unread_count = unread_articles.count()
             
-            if initial_unread_count == 0:
-                pytest.skip("No unread articles to test behavior")
+            # DISABLED CONDITIONAL FOR DEBUGGING
+            # if initial_unread_count == 0:
+            #     pytest.skip("No unread articles to test behavior")
+            assert initial_unread_count > 0, f"Should have unread articles, but got {initial_unread_count}"
             
             # 3. Click first article
             first_unread = unread_articles.first
@@ -371,8 +375,10 @@ class TestBlueIndicatorHTMXFlow:
         articles_with_blue = page.locator("li:has(.bg-blue-600)")
         initial_count = articles_with_blue.count()
         
-        if initial_count == 0:
-            pytest.skip("No unread articles to test")
+        # DISABLED CONDITIONAL FOR DEBUGGING
+        # if initial_count == 0:
+        #     pytest.skip("No unread articles to test")
+        assert initial_count > 0, f"Should have unread articles with blue indicators, but got {initial_count}"
         
         # Click up to 3 articles
         clicks_to_test = min(3, initial_count)

@@ -166,8 +166,10 @@ class TestCriticalHTTPWorkflows:
                 
                 # Find first article (HTMX-enabled li element, not href link)
                 articles = soup.find_all('li', attrs={'hx-get': lambda x: x and '/item/' in x})
-                if len(articles) == 0:
-                    pytest.skip("No articles available for reading state test")
+                # DISABLED CONDITIONAL FOR DEBUGGING
+                # if len(articles) == 0:
+                #     pytest.skip("No articles available for reading state test")
+                assert len(articles) > 0, f"Should have articles available, but got {len(articles)}"
                 
                 article_url = articles[0]['hx-get']
                 
