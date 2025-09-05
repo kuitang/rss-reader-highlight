@@ -26,6 +26,21 @@ TEST_DIR=$(mktemp -d)
 echo "Test outputs: $TEST_DIR"
 echo ""
 
+# Start a shared server for UI tests (each test gets its own session)
+echo "Starting shared server for UI tests on port 8080..."
+python app.py > "$TEST_DIR/server.log" 2>&1 &
+SERVER_PID=$!
+sleep 3
+
+# Wait for server to be ready
+for i in {1..10}; do
+    if curl -s http://localhost:8080 > /dev/null; then
+        echo "✅ Server ready on port 8080"
+        break
+    fi
+    sleep 1
+done
+
 # Function to run a single test file with its own server if needed
 run_test_file() {
     local test_file="$1"
@@ -40,7 +55,7 @@ run_test_file() {
         TEST_DB="$TEST_DIR/${test_name}.db" python -m pytest "$test_file" -v > "$output_file" 2>&1
         result=$?
     else
-        # Tests that don't need servers - run directly
+        # All other tests can share the server (each gets own session)
         python -m pytest "$test_file" -v > "$output_file" 2>&1
         result=$?
     fi
@@ -58,6 +73,7 @@ export -f run_test_file
 export TEST_DIR
 
 # Find all test files and run them in parallel
+echo ""
 echo "Running all tests in parallel..."
 echo "=================================================="
 
@@ -102,6 +118,11 @@ done
 echo ""
 echo "Full test outputs saved in: $TEST_DIR"
 echo "To view a specific test: cat $TEST_DIR/<test_name>.txt"
+
+# Kill the shared server
+if [ ! -z "$SERVER_PID" ]; then
+    kill $SERVER_PID 2>/dev/null || true
+fi
 
 # Exit with appropriate code
 if [ $FAILED -gt 0 ]; then
