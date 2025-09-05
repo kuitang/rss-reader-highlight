@@ -387,6 +387,14 @@ def viewport_styles():
             align-items: center !important;
             justify-content: center !important;
         }
+        
+        /* Override for tab buttons to keep them compact */
+        .uk-tab-alt a {
+            min-height: auto !important;
+            min-width: auto !important;
+            height: auto !important;
+            display: block !important;
+        }
     }
     
     /* URL replacement styling */
@@ -394,6 +402,12 @@ def viewport_styles():
         flex-wrap: wrap !important;
         max-width: 100% !important;
     }
+    
+    /* First item top spacing without affecting tabs */
+    .js-filter > li:first-child {
+        margin-top: 1rem !important;
+    }
+    
     """)
 
 def create_tab_container(feed_name, feed_id, unread_only, for_mobile=False):
