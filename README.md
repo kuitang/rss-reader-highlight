@@ -173,6 +173,43 @@ python app.py
 
 ## Testing
 
+### Test Organization
+
+Tests are organized into three categories based on their requirements and compatibility with MINIMAL_MODE:
+
+```
+tests/
+├── core/           # Unit tests - No browser/server needed (ALL MINIMAL_MODE compatible)
+├── ui/             # Browser tests - Need Playwright (SOME MINIMAL_MODE compatible)  
+└── specialized/    # Integration tests - Network/Docker (NOT MINIMAL_MODE compatible)
+```
+
+### MINIMAL_MODE Compatibility
+
+**MINIMAL_MODE** uses a pre-populated database (`data/minimal_seed.db`) with 2 feeds for fast test startup:
+- Skips background worker and feed updates
+- Creates process-specific database copy
+- Ideal for CI/CD and rapid development testing
+
+#### ✅ **Always MINIMAL_MODE Compatible (tests/core/)**
+- `test_optimized_integration.py` - HTTP API testing
+- `test_essential_mocks.py` - Error scenario testing
+- `test_direct_functions.py` - Core logic testing
+- `test_background_worker_integration.py` - Worker logic
+- `test_application_startup.py` - App initialization
+- `test_html_sanitization.py` - HTML processing
+- `test_image_extraction.py` - Image parsing
+- `test_smart_truncate_html.py` - Text truncation
+
+#### ⚠️ **Partially MINIMAL_MODE Compatible (tests/ui/)**
+- ✅ `test_critical_ui_flows.py` - Designed for minimal mode
+- ✅ `test_application_startup.py` - Has minimal mode tests
+- ❌ Other UI tests expect full database content
+
+#### ❌ **NOT MINIMAL_MODE Compatible (tests/specialized/)**
+- `test_feed_ingestion.py` - Makes real network calls
+- `test_docker_integration.py` - Requires Docker container
+
 ### Comprehensive Test Suite
 
 Our testing strategy focuses on **complex workflows that broke during development**, not trivial framework functionality.
@@ -227,16 +264,19 @@ Our testing strategy focuses on **complex workflows that broke during developmen
 
 #### **Quick Development Tests**
 ```bash
-# Core logic tests (fast, always work) - ✅ 21+ PASSING TESTS
+# Core logic tests (fast, always work, MINIMAL_MODE compatible) - ✅ 21+ PASSING TESTS
 source venv/bin/activate
-python -m pytest tests/test_optimized_integration.py tests/test_essential_mocks.py tests/test_direct_functions.py -v
+python -m pytest tests/core/ -v
 
-# Feed ingestion tests (Reddit, RSS autodiscovery)
-python -m pytest tests/test_feed_ingestion.py -v
+# Or run with MINIMAL_MODE explicitly
+MINIMAL_MODE=true python -m pytest tests/core/ -v
+
+# Feed ingestion tests (requires network)
+python -m pytest tests/specialized/test_feed_ingestion.py -v
 
 # Manual UI verification (requires browser + running server) 
-python app.py  # Start server in separate terminal
-python -m pytest tests/test_critical_ui_flows.py::TestFormParameterBugFlow -v
+MINIMAL_MODE=true python app.py  # Fast startup with minimal DB
+python -m pytest tests/ui/test_critical_ui_flows.py::TestFormParameterBugFlow -v
 ```
 
 #### **Full Test Suite**
@@ -244,11 +284,16 @@ python -m pytest tests/test_critical_ui_flows.py::TestFormParameterBugFlow -v
 # Complete optimized test suite
 source venv/bin/activate
 
-# All unit/integration tests (no server required)
-python -m pytest tests/test_optimized_integration.py tests/test_essential_mocks.py tests/test_direct_functions.py tests/test_feed_ingestion.py -v
+# All core tests (no server required, MINIMAL_MODE compatible)
+python -m pytest tests/core/ -v
 
-# All UI flow tests (requires running server: python app.py)
-python -m pytest tests/test_critical_ui_flows.py tests/test_add_feed_flows.py tests/test_mobile_flows.py -v
+# UI tests that work with MINIMAL_MODE
+MINIMAL_MODE=true python app.py  # In separate terminal
+python -m pytest tests/ui/test_critical_ui_flows.py -v
+
+# All UI flow tests (requires full database)
+python app.py  # Normal startup
+python -m pytest tests/ui/ -v
 
 # Everything with coverage
 coverage run --source=. -m pytest tests/ -v
@@ -261,16 +306,16 @@ coverage report --show-missing
 source venv/bin/activate
 
 # Form and BBC redirect bugs
-python -m pytest tests/test_critical_ui_flows.py::TestFormParameterBugFlow tests/test_critical_ui_flows.py::TestBBCRedirectHandlingFlow -v
+python -m pytest tests/ui/test_critical_ui_flows.py::TestFormParameterBugFlow tests/ui/test_critical_ui_flows.py::TestBBCRedirectHandlingFlow -v
 
 # Blue indicator and HTMX updates
-python -m pytest tests/test_critical_ui_flows.py::TestBlueIndicatorHTMXFlow -v
+python -m pytest tests/ui/test_critical_ui_flows.py::TestBlueIndicatorHTMXFlow -v
 
 # Mobile and add feed flows
-python -m pytest tests/test_mobile_flows.py tests/test_add_feed_flows.py -v
+python -m pytest tests/ui/test_mobile_flows.py tests/ui/test_add_feed_flows.py -v
 
 # Error handling scenarios
-python -m pytest tests/test_essential_mocks.py::TestNetworkErrorScenarios -v
+python -m pytest tests/core/test_essential_mocks.py::TestNetworkErrorScenarios -v
 ```
 
 ### Database Management

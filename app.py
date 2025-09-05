@@ -207,17 +207,13 @@ class MobileHandlers:
             responses = [responses]
         
         # Add navigation-specific elements for returning from article view
-        # Remove article-view class from body to show persistent header
-        body_class_script = Script("""
-        document.body.classList.remove('article-view');
-        """)
-        responses.append(body_class_script)
+        # Body class management now handled in scroll restoration event listener
         
         # Restore hamburger button for list view
         hamburger_button = Button(
             UkIcon('menu'),
             cls="p-2 rounded border hover:bg-secondary mr-2",
-            onclick="document.getElementById('mobile-sidebar').removeAttribute('hidden')",
+            hx_on_click="document.getElementById('mobile-sidebar').removeAttribute('hidden')",
             id="mobile-nav-button",
             hx_swap_oob="outerHTML"
         )
@@ -246,7 +242,7 @@ class DesktopHandlers:
     def sidebar_column(data):
         """Left column - feeds sidebar"""
         return Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
-            FeedsSidebar(data.session_id)
+            FeedsSidebar(data.session_id, for_mobile=False)
         )
 
 # ROUTING MAP - Explicit about which handler for which target
@@ -422,14 +418,8 @@ def htmx_item_response(htmx, item_data, _scroll=None):
     """HTMX item response using routing patterns"""
     responses = [ItemDetailView(item_data.item, show_back=False)]
     
-    # MOBILE UPDATES - Full article view setup
+    # MOBILE UPDATES - Full article view setup (body class now handled in ItemDetailView)
     if htmx.target in ['main-content', '#main-content']:
-        # Add CSS class to body to hide mobile persistent header
-        body_class_script = Script("""
-        document.body.classList.add('article-view');
-        """)
-        responses.append(body_class_script)
-        
         # Update nav button to show chevron for article view
         back_url = "/"
         if item_data.feed_id:
@@ -572,6 +562,159 @@ def before(req, sess):
                     if "UNIQUE constraint failed" not in str(e):
                         raise
     
+    # INVARIANT: Every session MUST see items (no exceptions)
+    user_items = FeedItemModel.get_items_for_user(session_id, feed_id=None, unread_only=False, page=1)
+    
+    if len(user_items) == 0:
+        import traceback
+        import json
+        from fasthtml.common import Html, Head, Title, Body, H1, H2, Pre, Details, Summary, Div, Style, Span, Response
+        
+        # Gather ALL diagnostic SQL
+        with get_db() as conn:
+            diagnostics = {}
+            
+            # 1. Basic counts
+            diagnostics['feeds_count'] = conn.execute("SELECT COUNT(*) FROM feeds").fetchone()[0]
+            diagnostics['items_count'] = conn.execute("SELECT COUNT(*) FROM feed_items").fetchone()[0]
+            diagnostics['user_feeds_count'] = conn.execute(
+                "SELECT COUNT(*) FROM user_feeds WHERE session_id = ?", (session_id,)
+            ).fetchone()[0]
+            
+            # 2. Sample feeds
+            diagnostics['sample_feeds'] = [dict(row) for row in conn.execute(
+                "SELECT id, url, title FROM feeds LIMIT 5"
+            ).fetchall()]
+            
+            # 3. Sample items
+            diagnostics['sample_items'] = [dict(row) for row in conn.execute(
+                "SELECT id, feed_id, title FROM feed_items LIMIT 5"
+            ).fetchall()]
+            
+            # 4. User's subscriptions
+            diagnostics['user_subscriptions'] = [dict(row) for row in conn.execute(
+                "SELECT * FROM user_feeds WHERE session_id = ? LIMIT 5", (session_id,)
+            ).fetchall()]
+            
+            # 5. The EXACT query that's failing
+            failing_sql = """
+                SELECT fi.*, f.title as feed_title, 
+                       COALESCE(ui.is_read, 0) as is_read,
+                       COALESCE(ui.starred, 0) as starred,
+                       fo.name as folder_name
+                FROM feed_items fi
+                JOIN feeds f ON fi.feed_id = f.id
+                JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
+                LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
+                LEFT JOIN folders fo ON ui.folder_id = fo.id
+                ORDER BY fi.published DESC LIMIT 20
+            """
+            
+            diagnostics['failing_query_result'] = [dict(row) for row in conn.execute(
+                failing_sql, (session_id, session_id)
+            ).fetchall()]
+            
+            # 6. Check each JOIN step
+            diagnostics['step1_feed_items'] = conn.execute(
+                "SELECT COUNT(*) FROM feed_items"
+            ).fetchone()[0]
+            
+            diagnostics['step2_with_feeds'] = conn.execute(
+                "SELECT COUNT(*) FROM feed_items fi JOIN feeds f ON fi.feed_id = f.id"
+            ).fetchone()[0]
+            
+            diagnostics['step3_with_user_feeds'] = conn.execute(
+                "SELECT COUNT(*) FROM feed_items fi "
+                "JOIN feeds f ON fi.feed_id = f.id "
+                "JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?",
+                (session_id,)
+            ).fetchone()[0]
+        
+        # Create HTML error page
+        error_html = Html(
+            Head(
+                Title("500 - Invariant Violation"),
+                Style("""
+                    body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #ff6b6b; }
+                    h1 { color: #ff0000; border-bottom: 3px solid #ff0000; padding-bottom: 10px; }
+                    h2 { color: #ff9999; margin-top: 30px; }
+                    pre { background: #2a2a2a; padding: 15px; border-left: 4px solid #ff6b6b; 
+                          overflow-x: auto; color: #e0e0e0; }
+                    details { margin: 20px 0; }
+                    summary { cursor: pointer; color: #ff9999; font-weight: bold; padding: 10px;
+                             background: #2a2a2a; }
+                    .error-box { background: #330000; border: 2px solid #ff0000; padding: 20px;
+                                margin: 20px 0; }
+                    .metric { display: inline-block; margin: 10px 20px 10px 0; }
+                    .metric-label { color: #888; }
+                    .metric-value { color: #fff; font-size: 1.2em; font-weight: bold; }
+                """)
+            ),
+            Body(
+                H1("🚨 INVARIANT VIOLATION: User MUST See Items"),
+                
+                Div(
+                    H2("Critical Failure"),
+                    Div(
+                        f"Session {session_id} sees 0 items but this should be impossible!",
+                        cls="error-box"
+                    ),
+                    
+                    H2("Database State"),
+                    Div(
+                        Div(Span("Total Feeds: ", cls="metric-label"), 
+                            Span(str(diagnostics['feeds_count']), cls="metric-value"), cls="metric"),
+                        Div(Span("Total Items: ", cls="metric-label"), 
+                            Span(str(diagnostics['items_count']), cls="metric-value"), cls="metric"),
+                        Div(Span("User Subscriptions: ", cls="metric-label"), 
+                            Span(str(diagnostics['user_feeds_count']), cls="metric-value"), cls="metric"),
+                    ),
+                    
+                    Details(
+                        Summary("Sample Feeds"),
+                        Pre(json.dumps(diagnostics['sample_feeds'], indent=2))
+                    ),
+                    
+                    Details(
+                        Summary("Sample Items"),
+                        Pre(json.dumps(diagnostics['sample_items'], indent=2))
+                    ),
+                    
+                    Details(
+                        Summary("User Subscriptions"),
+                        Pre(json.dumps(diagnostics['user_subscriptions'], indent=2))
+                    ),
+                    
+                    H2("SQL Join Breakdown"),
+                    Pre(f"""Step 1 - feed_items table: {diagnostics['step1_feed_items']} rows
+Step 2 - JOIN with feeds: {diagnostics['step2_with_feeds']} rows
+Step 3 - JOIN with user_feeds (session={session_id}): {diagnostics['step3_with_user_feeds']} rows"""),
+                    
+                    Details(
+                        Summary("Failing SQL Query"),
+                        Pre(failing_sql),
+                        Pre(f"Parameters: ('{session_id}', '{session_id}')"),
+                        Pre(f"Result: {json.dumps(diagnostics['failing_query_result'], indent=2)}")
+                    ),
+                    
+                    Details(
+                        Summary("Stack Trace"),
+                        Pre(''.join(traceback.format_stack()))
+                    )
+                )
+            )
+        )
+        
+        # Log to console as well
+        logger.error(f"INVARIANT VIOLATION: Session {session_id} sees 0 items!")
+        
+        # Return 500 error with diagnostic HTML
+        raise Response(
+            str(error_html),
+            status_code=500,
+            headers={"Content-Type": "text/html"}
+        )
+    
     # Store in request scope for easy access
     req.scope['session_id'] = session_id
 
@@ -581,17 +724,17 @@ async def lifespan(app):
     """Handle app startup and shutdown with background worker"""
     if MINIMAL_MODE:
         print("FastHTML app starting in MINIMAL MODE...")
-        print("⚡ Skipping background worker and default feeds for fast startup")
+        print("⚡ Using pre-populated seed database (no network calls, no background worker)")
     else:
         print("FastHTML app starting up...")
         
-        # Initialize background worker in single process
+        # Add default feeds BEFORE worker initialization so they get queued
+        print("Adding default feeds to database...")
+        setup_default_feeds(minimal_mode=False)
+        
+        # Initialize background worker after feeds exist
         initialize_worker_system()
         print("Background worker system initialized")
-        
-        # Add default feeds - database constraints handle duplicates
-        print("Adding default feeds to database...")
-        setup_default_feeds()
     
     yield  # App is running
     
@@ -612,6 +755,15 @@ app, rt = fast_app(
         // Restore scroll position after navigating back
         htmx.on('htmx:afterSwap', function(evt) {
             if (window.innerWidth < 1024 && evt.detail.target && evt.detail.target.id === 'main-content') {
+                // Body class management for mobile article view
+                if (evt.detail.xhr && evt.detail.xhr.responseURL) {
+                    if (evt.detail.xhr.responseURL.includes('/item/')) {
+                        htmx.addClass(document.body, 'article-view');
+                    } else {
+                        htmx.removeClass(document.body, 'article-view');
+                    }
+                }
+                
                 // Extract scroll position from request path
                 if (evt.detail.pathInfo && evt.detail.pathInfo.requestPath) {
                     const match = evt.detail.pathInfo.requestPath.match(/_scroll=(\\d+)/);
@@ -628,33 +780,11 @@ app, rt = fast_app(
             }
         });
         
-        // Close mobile sidebar when a feed link is clicked
-        document.addEventListener('click', function(e) {
-            // Check if clicked element is a feed link
-            if (e.target.closest('a[href^="/?feed_id="], a[href^="/?folder_id="], a[href="/"]')) {
-                const sidebar = document.getElementById('mobile-sidebar');
-                if (sidebar && !sidebar.hasAttribute('hidden')) {
-                    sidebar.setAttribute('hidden', 'true');
-                }
-            }
-        });
+        // Mobile sidebar auto-close now handled via hx-on:click on individual feed links
         
-        // Unified responsive form targeting
-        document.addEventListener('htmx:configRequest', function(e) {
-            if (e.detail.elt.classList.contains('add-feed-form')) {
-                // Determine target based on container
-                const isMobile = e.detail.elt.closest('#mobile-sidebar');
-                
-                if (isMobile) {
-                    // Override target for mobile context
-                    e.detail.target = '#mobile-sidebar';
-                    e.detail.headers['HX-Target'] = '#mobile-sidebar';
-                }
-                // Desktop keeps default #sidebar target
-            }
-        });
+        // Form targeting now handled via hx-on:htmx:config-request on individual forms
         
-        // Removed afterSwap handler - now using CSS classes instead of hidden attribute
+        // Body class management now handled in scroll restoration handler above
         
         """),
         Style("""
@@ -816,12 +946,13 @@ def FeedSidebarItem(feed, count=""):
                 cls="gap-3"
             ),
             href=f"/?feed_id={feed['id']}",
-            cls=Styling.SIDEBAR_ITEM
+            cls=Styling.SIDEBAR_ITEM,
+            hx_on_click="const sidebar = document.getElementById('mobile-sidebar'); if (sidebar && !sidebar.hasAttribute('hidden')) { sidebar.setAttribute('hidden', 'true'); }"
         )
     )
 
-def FeedsSidebar(session_id):
-    """Create unified feeds sidebar that works for both mobile and desktop"""
+def FeedsSidebar(session_id, for_mobile=False):
+    """Create feeds sidebar with proper HTMX targeting based on context"""
     feeds = FeedModel.get_user_feeds(session_id)
     folders = FolderModel.get_folders(session_id)
     
@@ -842,7 +973,7 @@ def FeedsSidebar(session_id):
                     )
                 ),
                 hx_post="/api/feed/add",
-                hx_target=Targets.DESKTOP_SIDEBAR,  # Default to desktop, JS will override for mobile
+                hx_target=Targets.MOBILE_SIDEBAR if for_mobile else Targets.DESKTOP_SIDEBAR,
                 hx_swap="outerHTML",
                 cls="add-feed-form"
             ),
@@ -857,7 +988,8 @@ def FeedsSidebar(session_id):
                     cls="gap-3"
                 ),
                 href="/",
-                cls="hover:bg-secondary p-4 block"
+                cls="hover:bg-secondary p-4 block",
+                hx_on_click="const sidebar = document.getElementById('mobile-sidebar'); if (sidebar && !sidebar.hasAttribute('hidden')) { sidebar.setAttribute('hidden', 'true'); }"
             )
         ),
         Div(cls="feeds-list")(*[FeedSidebarItem(feed) for feed in feeds]),
@@ -1158,7 +1290,7 @@ def MobileSidebar(session_id):
     )(
         Div(
             cls="bg-black bg-opacity-50 absolute inset-0",
-            onclick="document.getElementById('mobile-sidebar').setAttribute('hidden', 'true')"
+            hx_on_click="document.getElementById('mobile-sidebar').setAttribute('hidden', 'true')"
         ),
         Div(cls="bg-background w-80 h-full overflow-y-auto relative z-10")(
             Div(cls="p-4 border-b")(
@@ -1167,11 +1299,11 @@ def MobileSidebar(session_id):
                     Button(
                         UkIcon('x'),
                         cls="p-1 rounded hover:bg-secondary",
-                        onclick="document.getElementById('mobile-sidebar').setAttribute('hidden', 'true')"
+                        hx_on_click="document.getElementById('mobile-sidebar').setAttribute('hidden', 'true')"
                     )
                 )
             ),
-            FeedsSidebar(session_id)
+            FeedsSidebar(session_id, for_mobile=True)
         )
     )
 
@@ -1212,7 +1344,7 @@ def MobileHeader(session_id, show_back=False, feed_id=None, unread_view=False):
     ) if show_back else Button(
         UkIcon('menu'),
         cls="p-2 rounded border hover:bg-secondary mr-2",  # Added mr-2 for consistent spacing
-        onclick="document.getElementById('mobile-sidebar').removeAttribute('hidden')",
+        hx_on_click="document.getElementById('mobile-sidebar').removeAttribute('hidden')",
         id="mobile-nav-button"
     )
     
@@ -1412,7 +1544,7 @@ def add_feed(htmx, sess, new_feed_url: str = ""):
         else:
             # Desktop: return sidebar container with content
             return Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
-                FeedsSidebar(session_id)
+                FeedsSidebar(session_id, for_mobile=False)
             )
         
     except Exception as e:
@@ -1427,7 +1559,7 @@ def add_feed(htmx, sess, new_feed_url: str = ""):
             return MobileSidebar(session_id)
         else:
             return Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
-                FeedsSidebar(session_id)
+                FeedsSidebar(session_id, for_mobile=False)
             )
 
 @rt('/api/item/{item_id}/star')
@@ -1466,7 +1598,7 @@ def add_folder(htmx, sess):
     
     # Return updated sidebar (this is for folder add, always from desktop sidebar)
     return Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
-        FeedsSidebar(session_id)
+        FeedsSidebar(session_id, for_mobile=False)
     )
 
 @rt('/api/update-status')

@@ -15,6 +15,15 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Deploy PR preview to Fly.io
+        id: deploy
         uses: superfly/fly-pr-review-apps@1.2.1
         with:
           config: fly.preview.toml
+      
+      - name: Allocate shared IPv4 for preview app
+        if: github.event.action != 'closed'
+        run: |
+          # Get the app name from the deploy step output or construct it
+          APP_NAME="pr-${{ github.event.number }}-${{ github.repository_owner }}-${{ github.event.repository.name }}"
+          echo "Allocating shared IPv4 for app: $APP_NAME"
+          fly ips allocate-v4 --shared -a "$APP_NAME" || echo "IPv4 allocation failed or already exists"

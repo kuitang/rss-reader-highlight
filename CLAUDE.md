@@ -34,22 +34,28 @@ python clear_db.py
 
 ### Testing Commands
 
+#### Test Organization
+Tests are organized into three directories:
+- `tests/core/` - Unit tests (no browser/server needed, ALL MINIMAL_MODE compatible)
+- `tests/ui/` - Playwright browser tests (SOME MINIMAL_MODE compatible)
+- `tests/specialized/` - Network/Docker integration tests (NOT MINIMAL_MODE compatible)
+
 #### Quick Development Tests (Fast, Core Logic)
 ```bash
 # IMPORTANT: Activate virtual environment first
 source venv/bin/activate
 
-# Run core logic tests - always work, no browser needed
-python -m pytest tests/test_optimized_integration.py tests/test_essential_mocks.py tests/test_direct_functions.py -v
+# Run all core logic tests - always work, no browser needed, MINIMAL_MODE compatible
+python -m pytest tests/core/ -v
 
-# Run tests excluding those that need full database (when using MINIMAL_MODE)
-python -m pytest tests/test_optimized_integration.py tests/test_essential_mocks.py tests/test_direct_functions.py -v -m "not need_full_db"
+# Or run specific core tests
+python -m pytest tests/core/test_optimized_integration.py tests/core/test_essential_mocks.py tests/core/test_direct_functions.py -v
 
 # Single test for quick feedback
-python -m pytest tests/test_direct_functions.py::test_session_and_feed_workflow -v
+python -m pytest tests/core/test_direct_functions.py::test_session_and_feed_workflow -v
 
-# Test feed ingestion (Reddit, RSS autodiscovery, parsing)
-python -m pytest tests/test_feed_ingestion.py -v
+# Test feed ingestion (Reddit, RSS autodiscovery, parsing) - requires network
+python -m pytest tests/specialized/test_feed_ingestion.py -v
 ```
 
 #### UI Flow Tests (Require Running Server)
@@ -62,15 +68,20 @@ python -m pytest tests/test_feed_ingestion.py -v
 
 # Then run UI tests targeting specific bugs we debugged (in another terminal)
 source venv/bin/activate
-python -m pytest tests/test_critical_ui_flows.py::TestFormParameterBugFlow -v
-python -m pytest tests/test_critical_ui_flows.py::TestBBCRedirectHandlingFlow -v
-python -m pytest tests/test_critical_ui_flows.py::TestBlueIndicatorHTMXFlow -v
 
-# Test add feed flows (mobile + desktop)
-python -m pytest tests/test_add_feed_flows.py -v
+# Tests that work with MINIMAL_MODE
+python -m pytest tests/ui/test_critical_ui_flows.py -v
 
-# Test mobile-specific flows (navigation, forms, scrolling, URL sharing)
-python -m pytest tests/test_mobile_flows.py -v
+# Specific bug tests
+python -m pytest tests/ui/test_critical_ui_flows.py::TestFormParameterBugFlow -v
+python -m pytest tests/ui/test_critical_ui_flows.py::TestBBCRedirectHandlingFlow -v
+python -m pytest tests/ui/test_critical_ui_flows.py::TestBlueIndicatorHTMXFlow -v
+
+# Test add feed flows (mobile + desktop) - requires full database
+python -m pytest tests/ui/test_add_feed_flows.py -v
+
+# Test mobile-specific flows - requires full database
+python -m pytest tests/ui/test_mobile_flows.py -v
 ```
 
 #### Test Coverage
@@ -78,8 +89,8 @@ python -m pytest tests/test_mobile_flows.py -v
 # Activate virtual environment first
 source venv/bin/activate
 
-# Run with coverage reporting
-coverage run --source=. -m pytest tests/test_optimized_integration.py tests/test_essential_mocks.py -v
+# Core tests coverage (MINIMAL_MODE compatible)
+coverage run --source=. -m pytest tests/core/ -v
 coverage report --show-missing
 
 # Full test suite coverage
@@ -172,7 +183,7 @@ Tests focus on **complex workflows that broke during development**, not trivial 
 
 ### Test Categories
 
-#### Critical UI Flow Tests (`tests/test_critical_ui_flows.py`) 
+#### Critical UI Flow Tests (`tests/ui/test_critical_ui_flows.py`) 
 **Comprehensive Playwright automation** targeting exact bugs we debugged:
 - Form parameter mapping issues
 - BBC redirect handling (302 → `follow_redirects=True`)
@@ -183,19 +194,19 @@ Tests focus on **complex workflows that broke during development**, not trivial 
 - **Updated selectors** to match current app.py implementation
 
 #### Consolidated Feature Tests
-- **`tests/test_add_feed_flows.py`** - Mobile + desktop add feed functionality, duplicate handling
-- **`tests/test_mobile_flows.py`** - Navigation, form persistence, scrolling, URL sharing
-- **`tests/test_feed_ingestion.py`** - Reddit special cases, RSS autodiscovery, format parsing
-- **`tests/test_comprehensive_regression.py`** - Comprehensive Playwright regression testing for architecture refactoring validation
+- **`tests/ui/test_add_feed_flows.py`** - Mobile + desktop add feed functionality, duplicate handling
+- **`tests/ui/test_mobile_flows.py`** - Navigation, form persistence, scrolling, URL sharing
+- **`tests/specialized/test_feed_ingestion.py`** - Reddit special cases, RSS autodiscovery, format parsing
+- **`tests/ui/test_comprehensive_regression.py`** - Comprehensive Playwright regression testing for architecture refactoring validation
 
-#### HTTP Integration Tests (`tests/test_optimized_integration.py`)
+#### HTTP Integration Tests (`tests/core/test_optimized_integration.py`)
 **Black-box server testing**:
 - Fresh start workflow (empty DB → feed setup → session creation)
 - API endpoint verification with proper HTTP semantics
 - Session persistence across requests
 - Form processing and response validation
 
-#### Essential Mock Tests (`tests/test_essential_mocks.py`)
+#### Essential Mock Tests (`tests/core/test_essential_mocks.py`)
 **Dangerous scenarios** other tests cannot safely cover:
 - Network error simulation (timeouts, HTTP errors)
 - Database constraint violations
@@ -213,23 +224,25 @@ Tests focus on **complex workflows that broke during development**, not trivial 
 ```bash
 # Activate virtual environment and run quick core logic tests
 source venv/bin/activate
-python -m pytest tests/test_optimized_integration.py tests/test_essential_mocks.py tests/test_direct_functions.py -v
+python -m pytest tests/core/ -v
 ```
 
 #### After Major Changes
 ```bash
 # Activate virtual environment and run full coverage verification
 source venv/bin/activate
-coverage run --source=. -m pytest tests/test_optimized_integration.py tests/test_essential_mocks.py -v
+coverage run --source=. -m pytest tests/core/ -v
 coverage report --show-missing
 ```
 
 #### UI Feature Development
 ```bash
-# Start server: source venv/bin/activate && python app.py
+# Start server with minimal mode for fast testing
+source venv/bin/activate && MINIMAL_MODE=true python app.py
+
 # Test specific UI flows (in another terminal)
 source venv/bin/activate
-python -m pytest tests/test_critical_ui_flows.py -v
+python -m pytest tests/ui/test_critical_ui_flows.py -v
 ```
 
 ## Database Schema

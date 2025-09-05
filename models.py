@@ -8,23 +8,37 @@ from contextlib import contextmanager
 
 # Database path selection based on mode
 MINIMAL_MODE = os.environ.get("MINIMAL_MODE", "false").lower() == "true"
-DB_PATH = "data/minimal.db" if MINIMAL_MODE else "data/rss.db"
+
+# Use DATABASE_PATH from environment if set, otherwise fall back to default
+if MINIMAL_MODE:
+    # MINIMAL MODE: Process-specific database copied from seed (no network calls)
+    import os
+    pid = os.getpid()
+    DB_PATH = f"data/minimal.{pid}.db"
+    print(f"🚨 WARNING: MINIMAL_MODE ignores DATABASE_PATH environment variable!")
+    print(f"🚨 WARNING: Using process-specific database with pre-populated articles: {DB_PATH}")
+else:
+    DB_PATH = os.environ.get("DATABASE_PATH", "data/rss.db")
 
 def init_db():
     """Initialize database with required tables"""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     
-    # In minimal mode, copy fresh seed database if it exists
+    # In minimal mode, copy fresh seed database with pre-populated articles (no network calls)
     if MINIMAL_MODE:
         seed_path = "data/minimal_seed.db"
         if os.path.exists(seed_path):
+            # Always overwrite for fresh state (minimal mode should be predictable)
+            if os.path.exists(DB_PATH):
+                os.remove(DB_PATH)
             import shutil
             shutil.copy2(seed_path, DB_PATH)
-            print(f"✅ Copied fresh minimal database from {seed_path}")
+            # Ensure copied database is writable (seed may be write-protected)
+            os.chmod(DB_PATH, 0o644)
+            print(f"✅ Copied minimal database with articles from {seed_path} to {DB_PATH}")
             return
         else:
-            print(f"⚠️  Minimal seed database not found at {seed_path}")
-            print("Run: python create_minimal_db.py to create it first")
+            raise FileNotFoundError(f"Minimal seed database not found at {seed_path} - create it by copying articles from normal database")
     
     # Normal database initialization
     
