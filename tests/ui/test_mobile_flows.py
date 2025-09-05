@@ -80,7 +80,7 @@ class TestMobileFlows:
         page.wait_for_selector("li[id^='mobile-feed-item-']", timeout=10000)
         
         # Verify we're back at the list (use mobile-specific selector)
-        expect(page.locator("#main-content #feeds-list-container")).to_be_visible()
+        expect(page.locator("#feeds-list-container")).to_be_visible()
     
     def test_mobile_feed_filter_preserved(self, page: Page, test_server_url):
         """Test that feed filter state is preserved during navigation"""
@@ -198,8 +198,13 @@ class TestMobileFlows:
     def test_mobile_search_form_functionality(self, page: Page, test_server_url):
         """Test that mobile search form works correctly"""
         
-        # Find the search input in persistent header
-        search_input = page.locator('#mobile-top-bar input[placeholder="Search posts"]')
+        # Click search button to expand search
+        search_button = page.locator('button[title="Search"]')
+        expect(search_button).to_be_visible()
+        search_button.click()
+        
+        # Find the search input in expanded search bar
+        search_input = page.locator('#mobile-search-input')
         expect(search_input).to_be_visible()
         
         # Test UK Filter functionality (if implemented)
@@ -422,7 +427,7 @@ class TestMobileFlows:
         wait_for_htmx_complete(page)
         
         # Verify we're viewing ClaudeAI feed
-        feed_title = page.locator("#mobile-top-bar h3")
+        feed_title = page.locator("#main-content h3")
         expect(feed_title).to_have_text("ClaudeAI")
         
         # Click on an article
@@ -441,8 +446,8 @@ class TestMobileFlows:
         wait_for_htmx_complete(page)
         
         # Should be back to feed list with correct feed title
-        expect(page.locator("#main-content #feeds-list-container")).to_be_visible()
-        feed_title_after_back = page.locator("#mobile-top-bar h3")
+        expect(page.locator("#feeds-list-container")).to_be_visible()
+        feed_title_after_back = page.locator("#main-content h3")
         expect(feed_title_after_back).to_have_text("ClaudeAI")  # Should NOT be "BizToc"
 
 
