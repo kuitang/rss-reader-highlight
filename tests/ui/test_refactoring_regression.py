@@ -91,8 +91,8 @@ class TestRefactoringRegression:
                 time.sleep(1)  # Allow state update
             
             # 4. Toggle between "All Posts" and "Unread" tabs
-            all_posts_tab = page.locator("text=All Posts")
-            unread_tab = page.locator("text=Unread")
+            all_posts_tab = page.locator("text=All Posts").first
+            unread_tab = page.locator("text=Unread").first
             
             if unread_tab.is_visible():
                 print("Clicking Unread tab")
@@ -228,8 +228,8 @@ class TestRefactoringRegression:
                 page.screenshot(path=f"/tmp/mobile_cycle_{cycle}_back_to_list.png")
             
             # 6. Toggle between "All Posts" and "Unread" tabs
-            all_posts_tab = page.locator("text=All Posts")
-            unread_tab = page.locator("text=Unread")
+            all_posts_tab = page.locator("text=All Posts").first
+            unread_tab = page.locator("text=Unread").first
             
             if unread_tab.is_visible():
                 print("Clicking Unread tab (mobile)")
@@ -305,7 +305,7 @@ class TestRefactoringRegression:
             time.sleep(1)
         
         # 3. Toggle between tabs (should trigger HTMX update)
-        unread_tab = page.locator("text=Unread")
+        unread_tab = page.locator("text=Unread").first
         if unread_tab.is_visible():
             print("Toggling to Unread tab")
             unread_tab.click()
@@ -374,7 +374,7 @@ class TestRefactoringRegression:
                 f"Expected {initial_unread_count - 1} unread articles, got {final_unread_count}"
         
         # Test unread view behavior
-        unread_tab = page.locator("text=Unread")
+        unread_tab = page.locator("text=Unread").first
         if unread_tab.is_visible():
             unread_tab.click()
             page.wait_for_load_state("networkidle")

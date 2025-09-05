@@ -4,7 +4,7 @@ Test Docker container integration using existing test patterns.
 Points existing tests to Docker container instead of local server.
 """
 
-import asyncio
+import pytest
 from playwright.sync_api import sync_playwright
 import httpx
 import time
@@ -22,7 +22,6 @@ def test_docker_integration():
     
     # Test 1: HTTP API endpoints
     print("\n--- TEST 1: HTTP API Endpoints ---")
-    import httpx
     with httpx.Client() as client:
         # Test main page
         response = client.get(f"{DOCKER_URL}/")

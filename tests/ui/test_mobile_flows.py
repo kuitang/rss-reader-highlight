@@ -66,7 +66,7 @@ class TestMobileFlows:
         assert "/item/" in page.url, "URL didn't update for article"
         
         # Verify back button is shown - updated selector to match app.py CSS classes
-        back_button = page.locator("#mobile-header button").first  # Back button is first button
+        back_button = page.locator("#mobile-nav-button")  # Back button is first button
         expect(back_button).to_be_visible()
         
         # Verify it's actually a back button by checking for arrow-left icon
@@ -87,7 +87,7 @@ class TestMobileFlows:
         """Test that feed filter state is preserved during navigation"""
         
         # Open mobile sidebar - updated selector
-        menu_button = page.locator("#mobile-header button").filter(has=page.locator('uk-icon[icon="menu"]'))
+        menu_button = page.locator('#mobile-nav-button')
         menu_button.click()
         
         # Wait for sidebar - check for hidden attribute
@@ -126,7 +126,7 @@ class TestMobileFlows:
                 assert f"feed_id={feed_id}" in page.url or "/item/" in page.url
                 
                 # Go back - should return to filtered feed view
-                back_button = page.locator("#mobile-header button").first
+                back_button = page.locator("#mobile-nav-button")
                 back_button.click()
                 wait_for_htmx_complete(page)  # FIXED: Don't expect sidebar visible after back navigation
                 
@@ -176,7 +176,7 @@ class TestMobileFlows:
             assert header_hidden, "Persistent header should be hidden in article view"
             
             # Click back button
-            back_button = page.locator("#mobile-header button").first
+            back_button = page.locator("#mobile-nav-button")
             back_button.click()
             wait_for_htmx_complete(page)
             
@@ -263,7 +263,7 @@ class TestMobileFlows:
         """Test that mobile sidebar scrolls properly when opened"""
         
         # Open mobile sidebar
-        menu_button = page.locator("#mobile-header button").filter(has=page.locator('uk-icon[icon="menu"]'))
+        menu_button = page.locator('#mobile-nav-button')
         menu_button.click()
         page.wait_for_selector("#mobile-sidebar", state="visible")
         
@@ -328,14 +328,14 @@ class TestMobileFlows:
         expect(page.locator("#mobile-layout")).to_be_visible()
         
         # Should have back button since we're in article view
-        back_button = page.locator("#mobile-header button").first
+        back_button = page.locator("#mobile-nav-button")
         expect(back_button).to_be_visible()
     
     def test_mobile_url_sharing_feed_filter(self, page: Page):
         """Test that feed filter URLs are shareable"""
         
         # Open sidebar and select a feed
-        menu_button = page.locator("#mobile-header button").filter(has=page.locator('uk-icon[icon="menu"]'))
+        menu_button = page.locator('#mobile-nav-button')
         menu_button.click()
         page.wait_for_selector("#mobile-sidebar", state="visible")
         
@@ -404,7 +404,7 @@ class TestMobileFlows:
         """Test that feed title shows correctly after navigating back from article when specific feed is selected"""
         
         # Open mobile sidebar first
-        hamburger_button = page.locator("#mobile-header button").filter(has=page.locator('uk-icon[icon="menu"]'))
+        hamburger_button = page.locator('#mobile-nav-button')
         hamburger_button.click()
         page.wait_for_selector("#mobile-sidebar", state="visible")
         
@@ -428,7 +428,7 @@ class TestMobileFlows:
         expect(page.locator("#main-content #item-detail")).to_be_visible()
         
         # Click back button
-        back_button = page.locator("#mobile-header button").filter(has=page.locator('uk-icon[icon="arrow-left"]'))
+        back_button = page.locator("#mobile-nav-button").filter(has=page.locator('uk-icon[icon="arrow-left"]'))
         expect(back_button).to_be_visible()
         back_button.click()
         wait_for_htmx_complete(page)
@@ -442,7 +442,7 @@ class TestMobileFlows:
         """Test that back navigation from articles preserves correct feed context via HTMX"""
         
         # Navigate to ClaudeAI feed specifically
-        hamburger_button = page.locator("#mobile-header button").filter(has=page.locator('uk-icon[icon="menu"]'))
+        hamburger_button = page.locator('#mobile-nav-button')
         hamburger_button.click()
         page.wait_for_selector("#mobile-sidebar", state="visible")
         
@@ -467,7 +467,7 @@ class TestMobileFlows:
         assert "feed_id=6" in article_url, "Article URL should preserve feed context"
         
         # Click back button - should use HTMX to return to feed list
-        back_button = page.locator("#mobile-header button").filter(has=page.locator('uk-icon[icon="arrow-left"]'))
+        back_button = page.locator("#mobile-nav-button").filter(has=page.locator('uk-icon[icon="arrow-left"]'))
         expect(back_button).to_be_visible()
         back_button.click()
         wait_for_htmx_complete(page)

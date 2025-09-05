@@ -26,7 +26,7 @@ class TestComprehensiveRegression:
         
         # Wait for page load
         wait_for_page_ready(page)
-        expect(page.locator("title")).to_have_text("RSS Reader")
+        assert page.title() == "RSS Reader"
         
         # Verify desktop three-column layout is visible
         expect(page.locator("#desktop-layout")).to_be_visible()
@@ -38,8 +38,8 @@ class TestComprehensiveRegression:
         for iteration in range(3):
             print(f"Desktop iteration {iteration + 1}")
             
-            # Click on a feed in sidebar
-            feed_links = page.locator("a[href*='feed_id']").all()
+            # Click on a feed in sidebar (desktop version)
+            feed_links = page.locator("#sidebar a[href*='feed_id']").all()
             if len(feed_links) > iteration:
                 feed_links[iteration].click()
                 
@@ -53,7 +53,7 @@ class TestComprehensiveRegression:
                 wait_for_htmx_complete(page, timeout=3000)
                 
                 # Click on an article
-                article_items = page.locator("li[id*='desktop-feed-item']").all()
+                article_items = page.locator("#desktop-feeds-content li[id*='desktop-feed-item']").all()
                 if len(article_items) > 0:
                     article_items[0].click()
                     
@@ -64,9 +64,9 @@ class TestComprehensiveRegression:
                     # Verify URL updated
                     assert "/item/" in page.url
                     
-                    # Toggle between All Posts and Unread tabs
-                    all_posts_tab = page.locator("a:has-text('All Posts')")
-                    unread_tab = page.locator("a:has-text('Unread')")
+                    # Toggle between All Posts and Unread tabs (use visible one for desktop)
+                    all_posts_tab = page.locator("#desktop-layout a:has-text('All Posts')").first
+                    unread_tab = page.locator("#desktop-layout a:has-text('Unread')").first
                     
                     if all_posts_tab.is_visible():
                         all_posts_tab.click()
@@ -135,9 +135,9 @@ class TestComprehensiveRegression:
                             # Wait for navigation back to feed list
                             page.wait_for_timeout(1000)
                             
-                            # Toggle between tabs
-                            all_posts_tab = page.locator("a:has-text('All Posts')")
-                            unread_tab = page.locator("a:has-text('Unread')")
+                            # Toggle between tabs (use visible one for mobile)
+                            all_posts_tab = page.locator("#mobile-layout a:has-text('All Posts')").first
+                            unread_tab = page.locator("#mobile-layout a:has-text('Unread')").first
                             
                             if all_posts_tab.is_visible():
                                 all_posts_tab.click()
@@ -186,12 +186,12 @@ class TestComprehensiveRegression:
         page.wait_for_timeout(2000)
         
         # Test blue indicator state changes
-        unread_items = page.locator("li[id*='feed-item'] .w-2.h-2.bg-blue-500")
+        unread_items = page.locator("#desktop-feeds-content li[id*='feed-item'] .w-2.h-2.bg-blue-500")
         initial_count = unread_items.count()
         
         if initial_count > 0:
             # Click an unread article
-            first_unread_item = page.locator("li[id*='feed-item']:has(.w-2.h-2.bg-blue-500)").first
+            first_unread_item = page.locator("#desktop-feeds-content li[id*='feed-item']:has(.w-2.h-2.bg-blue-500)").first
             first_unread_item.click()
             
             # Wait for HTMX update
@@ -224,7 +224,7 @@ class TestComprehensiveRegression:
                 page.wait_for_timeout(200)
         
         # Verify app is still responsive
-        expect(page.locator("title")).to_have_text("RSS Reader")
+        assert page.title() == "RSS Reader"
         
         # Check for JavaScript errors
         errors = []
@@ -316,7 +316,7 @@ class TestComprehensiveRegression:
             wait_for_htmx_complete(page)
             
             # Verify page loads and session is maintained
-            expect(page.locator("title")).to_have_text("RSS Reader")
+            assert page.title() == "RSS Reader"
             
             # Click an article to test state management
             article_items = page.locator("li[id*='feed-item']").all()
@@ -340,19 +340,19 @@ class TestComprehensiveRegression:
         wait_for_page_ready(page)
         
         # Should gracefully handle non-existent items
-        expect(page.locator("title")).to_have_text("RSS Reader")
+        assert page.title() == "RSS Reader"
         
         # Test invalid feed ID
         page.goto("http://localhost:8080/?feed_id=99999")
         wait_for_page_ready(page)
         
         # Should gracefully handle invalid feed IDs
-        expect(page.locator("title")).to_have_text("RSS Reader")
+        assert page.title() == "RSS Reader"
         
         # Return to valid state
         page.goto("http://localhost:8080")
         wait_for_page_ready(page)
-        expect(page.locator("title")).to_have_text("RSS Reader")
+        assert page.title() == "RSS Reader"
 
 
 class TestHTMXArchitectureValidation:
@@ -373,7 +373,7 @@ class TestHTMXArchitectureValidation:
             expect(page.locator("#mobile-sidebar")).to_be_visible()
             
             # Close sidebar
-            close_button = page.locator("#mobile-sidebar button[onclick*='setAttribute']")
+            close_button = page.locator("#mobile-sidebar button[hx-on-click*='setAttribute']")
             close_button.click()
             expect(page.locator("#mobile-sidebar")).to_be_hidden()
     
@@ -407,13 +407,13 @@ class TestHTMXArchitectureValidation:
         # Test desktop tab behavior
         page.goto("http://localhost:8080")
         page.set_viewport_size({"width": 1200, "height": 800})
-        page.wait_for_timeout(1000)
+        wait_for_page_ready(page)
         
         # Desktop tabs should use regular links (no HTMX)
-        all_posts_desktop = page.locator("#desktop-feeds-content a:has-text('All Posts')")
+        all_posts_desktop = page.locator("#desktop-feeds-content a:has-text('All Posts')").first
         if all_posts_desktop.is_visible():
             # Should have href but no hx-get for desktop
-            expect(all_posts_desktop).to_have_attribute("href")
+            expect(all_posts_desktop).to_have_attribute("href", "/?unread=0")
             all_posts_desktop.click()
             wait_for_htmx_complete(page)
         
@@ -422,10 +422,10 @@ class TestHTMXArchitectureValidation:
         wait_for_page_ready(page)
         
         # Mobile tabs should use HTMX attributes
-        all_posts_mobile = page.locator("#mobile-persistent-header a:has-text('All Posts')")
+        all_posts_mobile = page.locator("#mobile-persistent-header a:has-text('All Posts')").first
         if all_posts_mobile.is_visible():
             # Should have both href and hx-get for mobile
-            expect(all_posts_mobile).to_have_attribute("href")
-            expect(all_posts_mobile).to_have_attribute("hx-get")
+            expect(all_posts_mobile).to_have_attribute("href", "/?unread=0")
+            expect(all_posts_mobile).to_have_attribute("hx-get", "/?unread=0")
             all_posts_mobile.click()
             wait_for_htmx_complete(page)

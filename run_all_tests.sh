@@ -1,9 +1,17 @@
 #!/bin/bash
 
-# RSS Reader Test Suite using pytest-xdist for parallel execution
+# RSS Reader Test Suite using native pytest server management
 
-echo "🧪 RSS Reader Parallel Test Suite (pytest-xdist)"
-echo "=================================================="
+echo "🧪 RSS Reader Native pytest Test Suite"
+echo "======================================="
+
+# Parse command line arguments
+TEST_SECTION=""
+if [ "$1" = "--section" ] && [ -n "$2" ]; then
+    TEST_SECTION="$2"
+    echo "Running only $TEST_SECTION tests"
+    echo ""
+fi
 
 # Ensure we're in the right directory
 cd "$(dirname "$0")"
@@ -11,60 +19,82 @@ cd "$(dirname "$0")"
 # Activate virtual environment
 source venv/bin/activate
 
-# Kill any existing test servers
-pkill -f "python app.py" || true
-sleep 1
-
 # Get number of CPU cores
 N_CORES=$(nproc)
-echo "Running tests on $N_CORES CPU cores"
+echo "Running tests on $N_CORES CPU cores with native pytest server management"
 echo ""
 
-# Start server for UI tests
-echo "Starting server on port 8080 for UI tests..."
-python app.py > test_server.log 2>&1 &
-SERVER_PID=$!
-sleep 3
-
-# Wait for server to be ready
-for i in {1..10}; do
-    if curl -s http://localhost:8080 > /dev/null; then
-        echo "✅ Server ready on port 8080"
-        echo ""
-        break
+# Run tests based on section argument - now using native pytest fixtures
+run_all_tests() {
+    # Run core tests with full parallelization (MINIMAL_MODE managed by conftest.py)
+    echo "🔬 Running core tests (fully parallel, no server needed)..."
+    python -m pytest tests/core/ -n auto
+    CORE_RESULT=$?
+    
+    # Run UI tests: files in parallel with server per worker (managed by conftest.py)
+    echo ""
+    echo "🌐 Running UI tests (files parallel, server per worker)..."
+    python -m pytest tests/ui/ -n auto --dist=loadfile
+    UI_RESULT=$?
+    
+    # Run specialized tests in parallel per file (some may need network)
+    echo ""
+    echo "⚙️  Running specialized tests (files parallel)..."
+    python -m pytest tests/specialized/ -n auto --dist=loadfile
+    SPEC_RESULT=$?
+    
+    # Return failure if any test suite failed
+    if [ $CORE_RESULT -ne 0 ] || [ $UI_RESULT -ne 0 ] || [ $SPEC_RESULT -ne 0 ]; then
+        return 1
     fi
-    sleep 1
-done
+    return 0
+}
 
-# Run tests with optimized parallelization:
-# - Core tests can run fully parallel (function level)
-# - UI test files run in parallel, but tests within each file run serially
-echo "Running tests with optimized parallelization..."
-echo "=================================================="
+run_core_tests() {
+    echo "🔬 Running core tests (fully parallel, no server needed)..."
+    python -m pytest tests/core/ -n auto
+}
 
-# Run core tests with full parallelization
-echo "Running core tests (fully parallel)..."
-python -m pytest tests/core/ -n auto -v --tb=short
+run_ui_tests() {
+    echo "🌐 Running UI tests (files parallel, server per worker)..."
+    python -m pytest tests/ui/ -n auto --dist=loadfile
+}
 
-# Run UI tests: files in parallel, tests within files serially
-echo ""
-echo "Running UI tests (files parallel, tests serial)..."
-python -m pytest tests/ui/ -n auto --dist=loadfile -v --tb=short
+run_specialized_tests() {
+    echo "⚙️  Running specialized tests (files parallel)..."
+    python -m pytest tests/specialized/ -n auto --dist=loadfile
+}
 
-# Run specialized tests if they exist
-echo ""
-echo "Running specialized tests..."
-python -m pytest tests/specialized/ -v --tb=short || true
+# Main execution based on section
+case "$TEST_SECTION" in
+    "core")
+        run_core_tests
+        ;;
+    "ui")
+        run_ui_tests
+        ;;
+    "specialized")
+        run_specialized_tests
+        ;;
+    "")
+        run_all_tests
+        ;;
+    *)
+        echo "Unknown section: $TEST_SECTION"
+        echo "Valid sections: core, ui, specialized"
+        exit 1
+        ;;
+esac
 
 # Save exit code
 TEST_RESULT=$?
 
-# Kill the server
-if [ ! -z "$SERVER_PID" ]; then
-    echo ""
-    echo "Stopping test server..."
-    kill $SERVER_PID 2>/dev/null || true
+# Native pytest handles all cleanup through fixtures and hooks
+echo ""
+if [ $TEST_RESULT -eq 0 ]; then
+    echo "✅ All tests passed!"
+else
+    echo "❌ Some tests failed (exit code: $TEST_RESULT)"
 fi
 
-# Exit with test result
 exit $TEST_RESULT

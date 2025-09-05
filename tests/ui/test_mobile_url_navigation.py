@@ -30,6 +30,9 @@ class TestMobileNavigationComplete:
     def test_scroll_position_preservation_critical(self, page: Page):
         """CRITICAL: Mobile scroll position must be preserved on back navigation"""
         
+        # Set mobile viewport first
+        page.set_viewport_size({"width": 390, "height": 844})
+        
         # Start at All Posts view
         page.goto(f"{BASE_URL}/?unread=0")
         wait_for_page_ready(page)
@@ -55,29 +58,12 @@ class TestMobileNavigationComplete:
         print(f"📏 SCROLL SETUP: {expected_scroll}px of {scroll_setup['scrollHeight']}px")
         
         # Navigate to article by clicking (to trigger HTMX, not direct navigation)
-        # Find any clickable feed item (mobile or desktop)
-        feed_item = page.locator("li[id*='feed-item-']").first
+        # Find mobile feed item specifically  
+        feed_item = page.locator("li[id^='mobile-feed-item-']").first
         
-        # Force visibility and click
-        page.evaluate("""() => {
-            const item = document.querySelector("li[id*='feed-item-']");
-            if (item) {
-                item.style.display = 'block';
-                item.style.visibility = 'visible';
-                item.style.opacity = '1';
-            }
-        }""")
-        
-        # Wait a moment for styling to apply
-        page.wait_for_timeout(100)
-        
-        if feed_item.is_visible():
-            feed_item.click()
-            wait_for_htmx_complete(page)
-        else:
-            # Fallback: use direct navigation but with history
-            page.evaluate(f'() => {{ htmx.ajax("GET", "{BASE_URL}/item/8530?unread_view=False", "#main-content"); }}')
-            wait_for_htmx_complete(page)
+        # Click the first article directly (articles are visible by default)
+        feed_item.click()
+        wait_for_htmx_complete(page)
         
         assert "/item/" in page.url, "Should be in article view"
         

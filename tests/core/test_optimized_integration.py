@@ -1,7 +1,7 @@
-"""Integration tests requiring manually started server on port 8080.
+"""Integration tests with self-contained server instances.
 
 Database setup and startup tests have been moved to test_application_startup.py.
-These tests focus on UI workflows that broke during development and require a full database."""
+These tests focus on UI workflows that broke during development and can run with minimal or full database."""
 
 import pytest
 import httpx
@@ -9,18 +9,95 @@ import time
 import os
 import subprocess
 import sys
+import multiprocessing
+import uvicorn
+import tempfile
+import socket
 from bs4 import BeautifulSoup
 from contextlib import contextmanager
 from unittest.mock import patch, Mock
 
-TEST_PORT = 8080
-TEST_URL = f"http://localhost:{TEST_PORT}"
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '../..'))
+
+def get_free_port():
+    """Get a random free port"""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(('', 0))
+        s.listen(1)
+        port = s.getsockname()[1]
+    return port
+
+def create_temp_db_path():
+    """Create a temporary database path"""
+    fd, path = tempfile.mkstemp(suffix='.db', prefix='test_integration_')
+    os.close(fd)
+    return path
+
+def start_app_process(port, db_path, minimal_mode=False):
+    """Start the application in a separate process"""
+    def run_app():
+        import os
+        os.environ['DATABASE_PATH'] = db_path
+        if minimal_mode:
+            os.environ['MINIMAL_MODE'] = 'true'
+        else:
+            os.environ.pop('MINIMAL_MODE', None)
+        
+        # Import app after setting environment variables
+        from app import app
+        
+        # Start uvicorn server
+        uvicorn.run(app, host="0.0.0.0", port=port, log_level="warning")
+    
+    process = multiprocessing.Process(target=run_app)
+    process.start()
+    return process
 
 @contextmanager
-def test_server():
-    """Use the existing running server instead of creating a separate one"""
-    # Just return the URL of the existing server
-    yield f"http://localhost:{TEST_PORT}"
+def test_server(minimal_mode=None):
+    """Context manager that starts an app server on a random port"""
+    # Use environment variable if minimal_mode not specified
+    if minimal_mode is None:
+        minimal_mode = os.environ.get('MINIMAL_MODE', 'false').lower() == 'true'
+    
+    port = get_free_port()
+    db_path = create_temp_db_path()
+    
+    # Start the server process
+    process = start_app_process(port, db_path, minimal_mode)
+    
+    try:
+        # Wait for server to start
+        server_url = f"http://localhost:{port}"
+        
+        # Wait up to 10 seconds for server to be ready
+        for attempt in range(50):  # 50 * 0.2 = 10 seconds
+            try:
+                response = httpx.get(f"{server_url}/", timeout=2)
+                if response.status_code == 200:
+                    break
+            except (httpx.ConnectError, httpx.TimeoutException):
+                time.sleep(0.2)
+                continue
+        else:
+            raise RuntimeError(f"Server failed to start on port {port}")
+        
+        yield server_url
+        
+    finally:
+        # Clean up
+        process.terminate()
+        process.join(timeout=5)
+        if process.is_alive():
+            process.kill()
+            process.join()
+        
+        # Clean up database file
+        try:
+            os.unlink(db_path)
+        except OSError:
+            pass
 
 def parse_html(content):
     return BeautifulSoup(content, 'html.parser')

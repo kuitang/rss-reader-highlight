@@ -109,7 +109,7 @@ class TestFormParameterBugFlow:
         wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
         
         # 1. Open mobile sidebar - UPDATED SELECTOR using filter
-        mobile_menu_button = page.locator('#mobile-header button').filter(has=page.locator('uk-icon[icon="menu"]'))
+        mobile_menu_button = page.locator('#mobile-nav-button')
         expect(mobile_menu_button).to_be_visible()
         mobile_menu_button.click()
         page.wait_for_selector("#mobile-sidebar", state="visible")  # OPTIMIZED: Wait for sidebar to appear
@@ -141,7 +141,7 @@ class TestFormParameterBugFlow:
         wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
         
         # 1. Open mobile sidebar - UPDATED SELECTOR
-        mobile_menu_button = page.locator('#mobile-header button').filter(has=page.locator('uk-icon[icon="menu"]'))
+        mobile_menu_button = page.locator('#mobile-nav-button')
         mobile_menu_button.click()
         page.wait_for_selector("#mobile-sidebar", state="visible")  # OPTIMIZED: Wait for sidebar to open
         
@@ -423,7 +423,7 @@ class TestSessionAndSubscriptionFlow:
                 articles_selector = "li[id^='desktop-feed-item-']"
             else:
                 # Mobile: feeds are in mobile sidebar (initially hidden)
-                menu_button = page.locator('#mobile-header button').filter(has=page.locator('uk-icon[icon="menu"]'))
+                menu_button = page.locator('#mobile-nav-button')
                 menu_button.click()
                 page.wait_for_selector("#mobile-sidebar a[href*='feed_id']", timeout=15000)
                 feed_links = page.locator("#mobile-sidebar a[href*='feed_id']")
@@ -489,50 +489,48 @@ class TestSessionAndSubscriptionFlow:
 class TestFullViewportHeightFlow:
     """Test viewport height utilization that we fixed"""
     
-    def test_desktop_full_height_usage(self, page):
-        """Test: Desktop viewport → Full height utilization → Proper scrolling containers
+    def test_viewport_layout_adaptation(self, page):
+        """Test: Both viewport sizes → Proper layout and height utilization
         
         UPDATED SELECTORS to match current app.py implementation.
         """
-        # Set large desktop viewport
-        page.set_viewport_size({"width": 1400, "height": 1000})
-        page.goto(TEST_URL)
-        wait_for_page_ready(page)
-        
-        # 1. Desktop layout should be visible
-        expect(page.locator("#desktop-layout")).to_be_visible()
-        
-        # 2. Each panel should be visible
-        expect(page.locator("#sidebar")).to_be_visible()
-        expect(page.locator("#desktop-feeds-content")).to_be_visible()
-        expect(page.locator("#desktop-item-detail")).to_be_visible()
-        
-        # 3. Content areas should have proper height
-        content_area = page.locator("#desktop-feeds-content")
-        if content_area.is_visible():
-            content_height = content_area.bounding_box()["height"]
-            assert content_height > 400, f"Content area should use substantial height, got {content_height}px"
-    
-    def test_mobile_layout_adaptation(self, page):
-        """Test: Mobile viewport → Layout stacking → Responsive behavior
-        
-        UPDATED SELECTORS to match current app.py implementation.
-        """
-        # Test mobile layout
-        page.set_viewport_size({"width": 375, "height": 667})
-        page.goto(TEST_URL)
-        wait_for_page_ready(page)
-        
-        # Desktop should be hidden, mobile should be visible
-        expect(page.locator("#desktop-layout")).to_be_hidden()
-        expect(page.locator("#mobile-layout")).to_be_visible()
-        
-        # Mobile content should be accessible
-        expect(page.locator("#main-content")).to_be_visible()
-        
-        # Should be able to interact with mobile elements
-        menu_button = page.locator('#mobile-header button').filter(has=page.locator('uk-icon[icon="menu"]'))
-        expect(menu_button).to_be_visible()
+        for viewport_name, viewport_size in [
+            ("desktop", {"width": 1400, "height": 1000}),
+            ("mobile", {"width": 375, "height": 667})
+        ]:
+            print(f"\n--- Testing {viewport_name} viewport layout ---")
+            page.set_viewport_size(viewport_size)
+            page.goto(TEST_URL)
+            wait_for_page_ready(page)
+            
+            if viewport_name == "desktop":
+                # Desktop layout should be visible
+                expect(page.locator("#desktop-layout")).to_be_visible()
+                expect(page.locator("#mobile-layout")).to_be_hidden()
+                
+                # Each panel should be visible
+                expect(page.locator("#sidebar")).to_be_visible()
+                expect(page.locator("#desktop-feeds-content")).to_be_visible()
+                expect(page.locator("#desktop-item-detail")).to_be_visible()
+                
+                # Content areas should have proper height
+                content_area = page.locator("#desktop-feeds-content")
+                if content_area.is_visible():
+                    content_height = content_area.bounding_box()["height"]
+                    assert content_height > 400, f"Desktop content area should use substantial height, got {content_height}px"
+            else:
+                # Mobile layout should be visible
+                expect(page.locator("#desktop-layout")).to_be_hidden()
+                expect(page.locator("#mobile-layout")).to_be_visible()
+                
+                # Mobile content should be accessible
+                expect(page.locator("#main-content")).to_be_visible()
+                
+                # Should be able to interact with mobile elements
+                menu_button = page.locator('#mobile-nav-button')
+                expect(menu_button).to_be_visible()
+            
+            print(f"  ✓ {viewport_name} layout test passed")
 
 
 class TestErrorHandlingUIFeedback:

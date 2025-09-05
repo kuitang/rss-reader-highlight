@@ -88,7 +88,7 @@ class TestWorkingRegression:
         print("=== Testing Tab Switching ===")
         
         # Test Unread tab
-        unread_tab = page.locator("button", has_text="Unread")
+        unread_tab = page.locator("a").filter(has_text="Unread").first
         if unread_tab.is_visible():
             unread_tab.click()
             page.wait_for_load_state("networkidle")
@@ -96,7 +96,7 @@ class TestWorkingRegression:
             page.screenshot(path="/tmp/regression_unread_tab.png")
         
         # Test All Posts tab  
-        all_posts_tab = page.locator("button", has_text="All Posts")
+        all_posts_tab = page.locator("a").filter(has_text="All Posts").first
         if all_posts_tab.is_visible():
             all_posts_tab.click()
             page.wait_for_load_state("networkidle")
@@ -244,7 +244,7 @@ class TestWorkingRegression:
                 f"Expected {initial_count - 1} unread, got {remaining_count}"
             
             # Switch to Unread view
-            unread_tab = page.locator("button", has_text="Unread")
+            unread_tab = page.locator("a").filter(has_text="Unread").first
             unread_tab.click()
             page.wait_for_load_state("networkidle")
             time.sleep(1)
