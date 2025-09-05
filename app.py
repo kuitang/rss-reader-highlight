@@ -1481,23 +1481,25 @@ def MobileHeader(session_id, show_back=False, feed_id=None, unread_view=False):
                         title="Search"
                     )
                 ),
-                # Expandable search bar (hidden by default)
+                # Expandable search bar with X inside input (height invariant)
                 Div(
-                    cls="flex items-center space-x-2 flex-1",
+                    cls="flex items-center flex-1",
                     id="search-bar",
                     style="display: none;"
                 )(
-                    Input(
-                        placeholder="Search posts",
-                        cls="flex-1 px-3 py-1 rounded border",
-                        id="mobile-search-input",
-                        uk_filter_control=""
-                    ),
-                    Button(
-                        UkIcon('x'),
-                        hx_on_click="document.getElementById('search-bar').style.display='none'; document.getElementById('icon-bar').style.display='block';",
-                        cls="p-2 rounded hover:bg-secondary",
-                        title="Close search"
+                    Div(cls="uk-inline flex-1")(
+                        Input(
+                            placeholder="Search posts",
+                            cls="flex-1 w-full pr-8",
+                            id="mobile-search-input",
+                            uk_filter_control=""
+                        ),
+                        Button(
+                            UkIcon('x', cls="w-4 h-4"),
+                            hx_on_click="document.getElementById('search-bar').style.display='none'; document.getElementById('icon-bar').style.display='block';",
+                            cls="uk-form-icon uk-form-icon-flip p-1 hover:text-red-500 cursor-pointer absolute right-1 top-1/2 -translate-y-1/2",
+                            title="Close search"
+                        )
                     )
                 )
             )
