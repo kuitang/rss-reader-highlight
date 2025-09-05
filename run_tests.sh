@@ -27,28 +27,22 @@ run_test() {
     
     if eval "$command"; then
         echo "✅ $description PASSED"
-        ((passed++))
+        passed=$((passed + 1))
     else
         echo "❌ $description FAILED"
     fi
-    ((total++))
+    total=$((total + 1))
 }
 
-# Test Suite
-run_test "Essential Mock Tests (Dangerous scenarios)" \
-    "python -m pytest tests/core/test_essential_mocks.py -v"
+# Test Suite - Run all tests by directory
+run_test "Core Tests (Unit & Integration)" \
+    "python -m pytest tests/core/ -v --tb=short"
 
-run_test "Direct Function Tests (Database logic)" \
-    "python -m pytest tests/core/test_direct_functions.py -v"
+run_test "UI Tests (Playwright Browser Tests)" \
+    "python -m pytest tests/ui/ -v --tb=short"
 
-run_test "HTTP Integration Tests (Black-box server testing)" \
-    "python -m pytest tests/core/test_optimized_integration.py -v --tb=short || echo 'Note: HTTP tests may fail due to subprocess server issues'"
-
-run_test "Critical UI Flow Tests (UI bugs we debugged)" \
-    "python -m pytest tests/ui/test_critical_ui_flows.py::TestFormParameterBugFlow -v --tb=short || echo 'Note: UI tests require display - run manually with: python -m pytest tests/ui/test_critical_ui_flows.py -v'"
-
-run_test "Application Setup Verification" \
-    "python -c 'from models import init_db; from feed_parser import FeedParser; import app; init_db(); FeedParser(); print(\"All imports: OK\")'"
+run_test "Specialized Tests (Network & Docker)" \
+    "python -m pytest tests/specialized/ -v --tb=short || echo 'Note: Specialized tests may require network access'"
 
 # Summary
 echo ""
