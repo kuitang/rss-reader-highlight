@@ -1,19 +1,23 @@
-"""Shared Playwright fixtures for UI tests with proper isolation for parallel execution"""
+"""Shared Playwright fixtures for UI tests with module-level isolation
+
+Each test MODULE (file) gets its own browser instance for isolation when running
+files in parallel, but tests within a module share the browser for efficiency.
+"""
 
 import pytest
 from playwright.sync_api import sync_playwright
 
-@pytest.fixture(scope="function")  # Each test gets its own browser
+@pytest.fixture(scope="module")  # One browser per test file/module
 def browser():
-    """Create a new browser instance for each test to ensure isolation in parallel execution"""
+    """Create a browser instance per test module for parallel suite execution"""
     with sync_playwright() as p:
         browser = p.chromium.launch(headless=True)
         yield browser
         browser.close()
 
-@pytest.fixture(scope="function")  # Each test gets its own page
+@pytest.fixture(scope="function")  # Each test gets its own page/context
 def page(browser):
-    """Create a new page in a new context for complete isolation"""
+    """Create a new page in a new context for test isolation within a module"""
     context = browser.new_context()
     page = context.new_page()
     yield page

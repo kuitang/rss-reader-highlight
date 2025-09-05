@@ -9,17 +9,14 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.11"]
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
+    - name: Set up Python 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: ${{ matrix.python-version }}
+        python-version: "3.11"
 
     - name: Cache pip dependencies
       uses: actions/cache@v4
@@ -38,49 +35,18 @@ jobs:
       run: |
         python -m playwright install chromium
 
-    - name: Run core tests (no browser needed)
+    - name: Run all tests with parallel runner
       run: |
-        python -m pytest tests/core/ -v --tb=short -x --disable-warnings
+        chmod +x ./run_all_tests.sh
+        ./run_all_tests.sh
       env:
-        TEST_DB: ':memory:'
-
-    - name: Run specialized tests (network required)
-      run: |
-        python -m pytest tests/specialized/ -v --tb=short --disable-warnings
-      continue-on-error: true  # Network tests may be flaky
-      env:
-        TEST_DB: ':memory:'
-
-    - name: Start application for UI tests
-      run: |
-        MINIMAL_MODE=true python app.py &
-        sleep 5
-      env:
-        PORT: 8080
-        DATABASE_PATH: ./test_ui.db
-
-    - name: Wait for server to be ready
-      run: |
-        for i in {1..30}; do
-          if curl -s http://localhost:8080 > /dev/null; then
-            echo "✅ Server ready on port 8080"
-            break
-          fi
-          echo "Waiting for server... ($i/30)"
-          sleep 2
-        done
-
-    - name: Run UI tests
-      run: |
-        python -m pytest tests/ui/ -v --tb=short --disable-warnings
-      env:
-        PYTEST_CURRENT_TEST: ''
+        CI: true
 
     - name: Upload test artifacts on failure
       if: failure()
       uses: actions/upload-artifact@v4
       with:
-        name: test-artifacts-${{ matrix.python-version }}
+        name: test-artifacts
         path: |
           screenshots/
           test-results/
@@ -117,29 +83,3 @@ jobs:
       run: |
         docker run --rm rss-reader-test bash -c "python -m pytest tests/core/test_direct_functions.py tests/core/test_essential_mocks.py -v --tb=short"
 
-  parallel-test:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v4
-
-    - name: Set up Python 3.11
-      uses: actions/setup-python@v5
-      with:
-        python-version: "3.11"
-
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-
-    - name: Install Playwright browsers
-      run: |
-        python -m playwright install chromium
-
-    - name: Run parallel test suite
-      run: |
-        chmod +x ./run_all_tests.sh
-        ./run_all_tests.sh
-      env:
-        CI: true

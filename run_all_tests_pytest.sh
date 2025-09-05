@@ -36,13 +36,25 @@ for i in {1..10}; do
     sleep 1
 done
 
-# Run all tests in parallel using pytest-xdist
-# -n auto uses all available CPU cores
-# -v for verbose output
-# --tb=short for shorter tracebacks
-echo "Running all tests in parallel with pytest-xdist..."
+# Run tests with optimized parallelization:
+# - Core tests can run fully parallel (function level)
+# - UI test files run in parallel, but tests within each file run serially
+echo "Running tests with optimized parallelization..."
 echo "=================================================="
-python -m pytest tests/ -n auto -v --tb=short
+
+# Run core tests with full parallelization
+echo "Running core tests (fully parallel)..."
+python -m pytest tests/core/ -n auto -v --tb=short
+
+# Run UI tests: files in parallel, tests within files serially
+echo ""
+echo "Running UI tests (files parallel, tests serial)..."
+python -m pytest tests/ui/ -n auto --dist=loadfile -v --tb=short
+
+# Run specialized tests if they exist
+echo ""
+echo "Running specialized tests..."
+python -m pytest tests/specialized/ -v --tb=short || true
 
 # Save exit code
 TEST_RESULT=$?
