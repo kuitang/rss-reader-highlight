@@ -8,13 +8,12 @@ Combines functionality from:
 """
 
 import pytest
-import unittest
 from unittest.mock import patch, MagicMock
 import httpx
 from feed_parser import FeedParser
 
 
-class TestFeedIngestion(unittest.TestCase):
+class TestFeedIngestion:
     """Test feed ingestion including Reddit special cases and RSS autodiscovery"""
     
     @pytest.fixture(autouse=True)
@@ -271,6 +270,3 @@ class TestFeedIngestion(unittest.TestCase):
         # For now, return None to indicate autodiscovery not implemented
         return None
 
-
-if __name__ == "__main__":
-    unittest.main()

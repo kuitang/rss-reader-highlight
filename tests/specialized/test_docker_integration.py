@@ -69,8 +69,6 @@ def test_docker_integration():
         browser.close()
     
     print("\n🎉 DOCKER INTEGRATION TESTS COMPLETED")
-    return True
 
 if __name__ == "__main__":
-    success = test_docker_integration()
-    exit(0 if success else 1)
+    test_docker_integration()

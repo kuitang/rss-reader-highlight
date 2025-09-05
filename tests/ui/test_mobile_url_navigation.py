@@ -21,11 +21,26 @@ class TestMobileNavigationComplete:
     """CRITICAL mobile navigation test suite - covers scroll position preservation and UI state"""
     
     @pytest.fixture(autouse=True)
-    def setup(self, page: Page):
-        """Set mobile viewport for all tests"""
+    def fresh_start(self, page: Page):
+        """Start each test with fresh page load to reset navigation state (preserve session)"""
+        # Set mobile viewport first
         page.set_viewport_size({"width": 390, "height": 844})  # iPhone 13 size
-        page.goto(BASE_URL)
+        
+        # Navigate to clean starting state (preserves session cookies automatically)
+        page.goto(f"{BASE_URL}/?unread=0", wait_until="networkidle")
         wait_for_page_ready(page)
+        
+        # Ensure clean DOM state - mobile sidebar should be closed by default
+        page.evaluate("""() => {
+            const sidebar = document.getElementById('mobile-sidebar');
+            if (sidebar) sidebar.setAttribute('hidden', 'true');
+            
+            // Clear any navigation history pollution
+            if (window.history && window.history.replaceState) {
+                window.history.replaceState(null, '', '/?unread=0');
+            }
+        }""")
+        page.wait_for_timeout(200)  # Increased wait for state settlement
     
     def test_scroll_position_preservation_critical(self, page: Page):
         """CRITICAL: Mobile scroll position must be preserved on back navigation"""
@@ -37,31 +52,32 @@ class TestMobileNavigationComplete:
         page.goto(f"{BASE_URL}/?unread=0")
         wait_for_page_ready(page)
         
-        # CRITICAL: Set and verify scroll position
+        # CRITICAL: Set and verify scroll position on the feeds list container
         scroll_setup = page.evaluate("""() => {
-            const mainContent = document.getElementById('main-content');
-            if (mainContent) {
-                mainContent.scrollTop = 600;
+            const feedsList = document.getElementById('feeds-list-container') || 
+                             document.querySelector('.js-filter') ||
+                             document.querySelector('[uk-filter]');
+            if (feedsList) {
+                feedsList.scrollTop = 600;
                 return {
                     success: true,
-                    scrollTop: mainContent.scrollTop,
-                    scrollHeight: mainContent.scrollHeight
+                    scrollTop: feedsList.scrollTop,
+                    scrollHeight: feedsList.scrollHeight,
+                    elementId: feedsList.id || feedsList.className
                 };
             }
-            return { success: false, scrollTop: 0, scrollHeight: 0 };
+            return { success: false, scrollTop: 0, scrollHeight: 0, elementId: 'not-found' };
         }""")
         
         if not scroll_setup['success']:
-            pytest.skip("main-content element not available in test environment")
+            pytest.skip(f"feeds list container not available in test environment: {scroll_setup['elementId']}")
             
         expected_scroll = scroll_setup['scrollTop']
-        print(f"📏 SCROLL SETUP: {expected_scroll}px of {scroll_setup['scrollHeight']}px")
+        print(f"📏 SCROLL SETUP: {expected_scroll}px of {scroll_setup['scrollHeight']}px on {scroll_setup['elementId']}")
         
         # Navigate to article by clicking (to trigger HTMX, not direct navigation)
-        # Find mobile feed item specifically  
+        # Articles should be visible in main content area (sidebar closed by setup)
         feed_item = page.locator("li[id^='mobile-feed-item-']").first
-        
-        # Click the first article directly (articles are visible by default)
         feed_item.click()
         wait_for_htmx_complete(page)
         
@@ -77,16 +93,19 @@ class TestMobileNavigationComplete:
         # Wait for DOM to settle after back navigation
         page.wait_for_timeout(100)
         
-        # CRITICAL: Check scroll position preserved
+        # CRITICAL: Check scroll position preserved on the feeds list container
         scroll_check = page.evaluate("""() => {
-            const mainContent = document.getElementById('main-content');
-            if (!mainContent) {
+            const feedsList = document.getElementById('feeds-list-container') || 
+                             document.querySelector('.js-filter') ||
+                             document.querySelector('[uk-filter]');
+            if (!feedsList) {
                 // Check if we're in desktop layout after back navigation
                 const desktopLayout = document.getElementById('desktop-layout');
                 const mobileLayout = document.getElementById('mobile-layout');
                 return {
                     element: false,
                     scrollTop: -1,
+                    elementId: 'not-found',
                     debug: {
                         hasDesktop: !!desktopLayout,
                         hasMobile: !!mobileLayout,
@@ -97,7 +116,8 @@ class TestMobileNavigationComplete:
             
             return {
                 element: true,
-                scrollTop: mainContent.scrollTop,
+                scrollTop: feedsList.scrollTop,
+                elementId: feedsList.id || feedsList.className,
                 debug: {
                     hasDesktop: !!document.getElementById('desktop-layout'),
                     hasMobile: !!document.getElementById('mobile-layout'),
@@ -110,12 +130,17 @@ class TestMobileNavigationComplete:
         print(f"🔍 DEBUG: Body class: {scroll_check['debug']['bodyClass']}")
         
         if not scroll_check['element']:
-            # Browser back may have triggered full page reload - check if we can find mobile content
+            # Browser back may have triggered full page reload - check if we can find feeds list
             page.wait_for_timeout(500)  # Additional wait
-            final_scroll = page.evaluate("() => document.getElementById('main-content')?.scrollTop ?? -999")
+            final_scroll = page.evaluate("""() => {
+                const feedsList = document.getElementById('feeds-list-container') || 
+                                 document.querySelector('.js-filter') ||
+                                 document.querySelector('[uk-filter]');
+                return feedsList?.scrollTop ?? -999;
+            }""")
             
             if final_scroll == -999:
-                pytest.fail("CRITICAL: main-content element missing after back navigation - DOM structure changed")
+                pytest.fail(f"CRITICAL: feeds list container missing after back navigation - element: {scroll_check['elementId']}")
         else:
             final_scroll = scroll_check['scrollTop']
         
@@ -136,8 +161,10 @@ class TestMobileNavigationComplete:
         # Test navigation by direct URL (more reliable than element clicking)
         # Simulate: list view -> article view -> back to list
         
-        # Step 1: Navigate to article (simulates clicking article)
-        page.goto(f"{BASE_URL}/item/8530?unread_view=False")
+        # Step 1: Navigate to article by finding and clicking any available article
+        # Articles should be visible in main content (sidebar closed by setup)
+        feed_item = page.locator("li[id^='mobile-feed-item-']").first
+        feed_item.click()
         wait_for_page_ready(page)
         
         # Verify chevron button appears (arrow-left icon)
@@ -181,8 +208,10 @@ class TestMobileNavigationComplete:
         mobile_header = page.locator('#mobile-persistent-header')
         expect(mobile_header).to_be_visible()
         
-        # Navigate to article view - header should be hidden
-        page.goto(f"{BASE_URL}/item/8530?unread_view=False")
+        # Navigate to article view by clicking an article - header should be hidden
+        # Articles should be visible in main content (sidebar closed by setup)
+        feed_item = page.locator("li[id^='mobile-feed-item-']").first
+        feed_item.click()
         wait_for_page_ready(page)
         
         # Check if header is hidden via CSS
@@ -211,7 +240,10 @@ class TestMobileNavigationComplete:
         page.goto(f"{BASE_URL}/?unread=0")
         wait_for_page_ready(page)
         
-        page.goto(f"{BASE_URL}/item/8530?unread_view=False")  # Simulate clicking from All Posts
+        # Click on an article from All Posts view (don't hardcode ID)
+        # Articles should be visible in main content (sidebar closed by setup)
+        feed_item = page.locator("li[id^='mobile-feed-item-']").first
+        feed_item.click()
         wait_for_page_ready(page)
         
         page.go_back()
@@ -224,7 +256,10 @@ class TestMobileNavigationComplete:
         page.goto(f"{BASE_URL}/")
         wait_for_page_ready(page)
         
-        page.goto(f"{BASE_URL}/item/8530?unread_view=True")  # Simulate clicking from Unread
+        # Click on an article from Unread view (don't hardcode ID)
+        # Articles should be visible in main content (sidebar closed by setup) 
+        feed_item = page.locator("li[id^='mobile-feed-item-']").first
+        feed_item.click()
         wait_for_page_ready(page)
         
         page.go_back()
@@ -234,10 +269,7 @@ class TestMobileNavigationComplete:
         print("✅ UNREAD: State preserved after back navigation")
 
 
-# Legacy class for backward compatibility
-class TestMobileURLNavigation(TestMobileNavigationComplete):
-    """Backward compatibility class - delegates to comprehensive tests"""
-    pass
+# Legacy class removed - was causing test isolation issues by running same tests twice
 
 
 if __name__ == "__main__":
