@@ -854,6 +854,50 @@ class TestSearchBarHeightInvariant:
         print("✅ Search height invariant test passed!")
 
 
+class TestPaginationButtonDuplication:
+    """Test to prevent duplicate mobile bottom scroll buttons - app.py:1322-1330 bug"""
+    
+    def test_pagination_buttons_no_duplicates(self, page, test_server_url):
+        """Ensure exactly 4 pagination buttons exist (no duplicates)
+        
+        This test prevents regression of the duplicate mobile pagination buttons
+        bug where both mobile and desktop button sets were rendered simultaneously.
+        """
+        page.goto(test_server_url)
+        wait_for_page_ready(page)
+        
+        # Navigate to a feed with enough items to trigger pagination
+        # Look for any feed link and click it
+        feed_links = page.locator('a[href*="feed_id="]')
+        if feed_links.count() > 0:
+            feed_links.first.click()
+            wait_for_htmx_complete(page)
+        
+        # Check if pagination exists (only test if pagination is present)
+        pagination_container = page.locator('.p-4.border-t')  # Pagination footer container
+        if pagination_container.is_visible():
+            # Count all chevron navigation buttons in pagination
+            chevrons_left_count = pagination_container.locator('uk-icon[icon="chevrons-left"]').count()
+            chevron_left_count = pagination_container.locator('uk-icon[icon="chevron-left"]').count()  
+            chevron_right_count = pagination_container.locator('uk-icon[icon="chevron-right"]').count()
+            chevrons_right_count = pagination_container.locator('uk-icon[icon="chevrons-right"]').count()
+            
+            # Verify exactly one of each navigation button type
+            assert chevrons_left_count == 1, f"Expected 1 'first page' button, found {chevrons_left_count}"
+            assert chevron_left_count == 1, f"Expected 1 'previous page' button, found {chevron_left_count}"  
+            assert chevron_right_count == 1, f"Expected 1 'next page' button, found {chevron_right_count}"
+            assert chevrons_right_count == 1, f"Expected 1 'last page' button, found {chevrons_right_count}"
+            
+            # Verify total pagination buttons count
+            total_nav_buttons = chevrons_left_count + chevron_left_count + chevron_right_count + chevrons_right_count
+            assert total_nav_buttons == 4, f"Expected exactly 4 navigation buttons total, found {total_nav_buttons}"
+            
+            print("✅ Pagination button duplication test passed!")
+        else:
+            # No pagination present - test passes but log it
+            print("📝 No pagination present on current page - duplication test skipped")
+
+
 if __name__ == "__main__":
     # Run critical UI flow tests
     pytest.main([__file__, "-v", "--tb=short"])

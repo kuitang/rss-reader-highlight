@@ -1318,16 +1318,11 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
                 DivLAligned(
                     DivCentered(f'Page {page} of {total_pages}', cls=TextT.sm),
                     DivLAligned(
-                        # Mobile versions
-                        Button(UkIcon('chevrons-left'), hx_get=first_url, hx_target=Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary lg:hidden"),
-                        Button(UkIcon('chevron-left'), hx_get=prev_url, hx_target=Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary lg:hidden"),
-                        Button(UkIcon('chevron-right'), hx_get=next_url, hx_target=Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary lg:hidden"),
-                        Button(UkIcon('chevrons-right'), hx_get=last_url, hx_target=Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary lg:hidden"),
-                        # Desktop versions - use HTMX for consistency
-                        Button(UkIcon('chevrons-left'), hx_get=first_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else "#main-content", cls="p-2 rounded border hover:bg-secondary hidden lg:inline-block"),
-                        Button(UkIcon('chevron-left'), hx_get=prev_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else "#main-content", cls="p-2 rounded border hover:bg-secondary hidden lg:inline-block"),
-                        Button(UkIcon('chevron-right'), hx_get=next_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else "#main-content", cls="p-2 rounded border hover:bg-secondary hidden lg:inline-block"),
-                        Button(UkIcon('chevrons-right'), hx_get=last_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else "#main-content", cls="p-2 rounded border hover:bg-secondary hidden lg:inline-block"),
+                        # Unified responsive pagination buttons
+                        Button(UkIcon('chevrons-left'), hx_get=first_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary"),
+                        Button(UkIcon('chevron-left'), hx_get=prev_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary"),
+                        Button(UkIcon('chevron-right'), hx_get=next_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary"),
+                        Button(UkIcon('chevrons-right'), hx_get=last_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary"),
                         cls='space-x-1'
                     )
                 )
