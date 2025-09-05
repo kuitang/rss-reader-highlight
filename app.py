@@ -1562,8 +1562,8 @@ def index(htmx, sess, feed_id: int = None, unread: bool = True, folder_id: int =
     if htmx and getattr(htmx, 'request', None) and getattr(htmx, 'target', None):
         return route_htmx_fragment(htmx, data)
     
-    # FULL PAGE - From Step 5
-    return Titled("RSS Reader", *full_page_dual_layout(data))
+    # FULL PAGE - No title banner, direct content
+    return full_page_dual_layout(data)
 
 @rt('/item/{item_id}')
 def show_item(item_id: int, htmx, sess, unread_view: bool = False, feed_id: int = None, _scroll: int = None):
@@ -1641,7 +1641,7 @@ HTMX Target: {getattr(htmx, 'target', None) if htmx else None}""")
         else:
             # Create empty PageData for not found case
             page_data = PageData(session_id, feed_id, True, 1)
-            return Titled("RSS Reader", *full_page_dual_layout(page_data))
+            return full_page_dual_layout(page_data)
     
     # Mark as read
     item_data.mark_read_and_refresh()
@@ -1650,7 +1650,7 @@ HTMX Target: {getattr(htmx, 'target', None) if htmx else None}""")
     if htmx and getattr(htmx, 'request', None) and getattr(htmx, 'target', None):
         return htmx_item_response(htmx, item_data, _scroll)
     else:
-        return Titled("RSS Reader", *full_page_item_response(item_data))
+        return full_page_item_response(item_data)
 
 @rt('/api/feed/add')
 def add_feed(htmx, sess, new_feed_url: str = ""):
