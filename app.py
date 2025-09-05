@@ -1067,10 +1067,10 @@ def FeedsSidebar(session_id, for_mobile=False):
             DivFullySpaced(
                 H3("Feeds"),
                 Button(
-                    "🔄",
+                    UkIcon('refresh-cw'),
                     hx_post="/api/session/reset",
                     hx_swap="none",
-                    cls="p-1 text-xs hover:bg-secondary rounded",
+                    cls="p-1 hover:bg-secondary rounded",
                     title="Reset all session data",
                     hx_confirm="Are you sure? This will clear all your subscriptions and settings."
                 )
