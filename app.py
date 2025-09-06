@@ -176,28 +176,8 @@ class MobileHandlers:
         responses = [FeedsContent(data.session_id, data.feed_id, data.unread, 
                     data.page, for_desktop=False, data=data)]
         
-        # Update persistent header with correct tab state for mobile HTMX requests
-        if update_header:
-            updated_header = Div(
-                cls='flex-shrink-0 bg-background border-b z-10 lg:hidden',
-                id='mobile-persistent-header',
-                hx_swap_oob="outerHTML",
-                onwheel="event.preventDefault(); event.stopPropagation(); return false;"
-            )(
-                Div(cls='flex px-4 py-2')(
-                    H3(data.feed_name),
-                    create_tab_container(data.feed_name, data.feed_id, data.unread, for_mobile=True)
-                ),
-                Div(cls='px-4 pb-2')(
-                    Div(cls='uk-inline w-full')(
-                        Span(cls='uk-form-icon text-muted-foreground')(UkIcon('search')),
-                        Input(placeholder='Search posts', uk_filter_control="", id="mobile-persistent-search")
-                    )
-                )
-            )
-            responses.append(updated_header)
-        
-        return tuple(responses) if len(responses) > 1 else responses[0]
+        # No more persistent header updates - all functionality moved to main header
+        return responses[0]
     
     @staticmethod
     def sidebar(data):
@@ -452,7 +432,7 @@ def create_tab_container(feed_name, feed_id, unread_only, for_mobile=False):
         alt=True, cls='ml-auto max-w-40'
     )
 
-def prepare_item_data(session_id, item_id, feed_id, unread_view):
+def prepare_item_data(session_id, item_id, feed_id, unread_view, page=1):
     """Centralized item data preparation"""
     class ItemData:
         def __init__(self):
@@ -462,6 +442,7 @@ def prepare_item_data(session_id, item_id, feed_id, unread_view):
             self.unread_view = unread_view
             self.session_id = session_id
             self.item_id = item_id
+            self.page = page
         
         def mark_read_and_refresh(self):
             """Mark item as read and refresh data"""
@@ -484,6 +465,10 @@ def htmx_item_response(htmx, item_data, _scroll=None):
         # Add unread parameter based on the view we came from
         if item_data.unread_view is False:  # We came from "All Posts" view
             back_url += "&unread=0" if item_data.feed_id else "?unread=0"
+        
+        # Add page parameter if we came from a page other than 1
+        if item_data.page > 1:
+            back_url += f"&page={item_data.page}" if '?' in back_url else f"?page={item_data.page}"
         
         # Preserve scroll position if provided
         if _scroll:
@@ -531,7 +516,7 @@ def htmx_item_response(htmx, item_data, _scroll=None):
 def full_page_item_response(item_data):
     """Full page response for item with proper layout"""
     # Create PageData for consistency
-    page_data = PageData(item_data.session_id, item_data.feed_id, item_data.unread_view, 1)
+    page_data = PageData(item_data.session_id, item_data.feed_id, item_data.unread_view, item_data.page)
     
     # Modify desktop layout to show the item in detail column
     def desktop_layout_with_item(data, item):
@@ -807,7 +792,7 @@ app, rt = fast_app(
         htmx.config.includeIndicatorStyles = false;
         
         // Scroll restoration using hx-vals (configured per FeedItem)
-        // Restore scroll position after navigating back
+        // Restore scroll position after navigating back, reset to top for forward navigation
         htmx.on('htmx:afterSwap', function(evt) {
             if (window.innerWidth < 1024 && evt.detail.target && evt.detail.target.id === 'main-content') {
                 // Body class management for mobile article view
@@ -819,10 +804,11 @@ app, rt = fast_app(
                     }
                 }
                 
-                // Extract scroll position from request path
+                // Check if this is back navigation with scroll position to restore
                 if (evt.detail.pathInfo && evt.detail.pathInfo.requestPath) {
                     const match = evt.detail.pathInfo.requestPath.match(/_scroll=(\\d+)/);
                     if (match) {
+                        // Back navigation - restore scroll position
                         const scrollPos = parseInt(match[1]);
                         setTimeout(() => {
                             const mainContent = document.getElementById('main-content');
@@ -830,7 +816,23 @@ app, rt = fast_app(
                                 mainContent.scrollTop = scrollPos;
                             }
                         }, 50);
+                    } else {
+                        // Forward navigation - reset scroll to top
+                        setTimeout(() => {
+                            const mainContent = document.getElementById('main-content');
+                            if (mainContent) {
+                                mainContent.scrollTop = 0;
+                            }
+                        }, 50);
                     }
+                } else {
+                    // No path info - reset scroll to top
+                    setTimeout(() => {
+                        const mainContent = document.getElementById('main-content');
+                        if (mainContent) {
+                            mainContent.scrollTop = 0;
+                        }
+                    }, 50);
                 }
             }
         });
@@ -849,6 +851,24 @@ app, rt = fast_app(
         /* Hide mobile persistent header when body has article-view class */
         body.article-view #mobile-persistent-header {
             display: none !important;
+        }
+        
+        /* Fix mobile navigation button state transitions */
+        #mobile-nav-button {
+            transition: all 0.2s ease-in-out !important;
+            background-color: transparent !important;
+            color: inherit !important;
+        }
+        
+        #mobile-nav-button:hover {
+            background-color: hsl(var(--secondary)) !important;
+            color: inherit !important;
+        }
+        
+        /* Ensure clean state reset on button swap */
+        #mobile-nav-button:not(:hover):not(:active):not(:focus) {
+            background-color: transparent !important;
+            color: inherit !important;
         }
         
         /* Fix viewport scrolling on mobile - more specific and with !important */
@@ -871,7 +891,7 @@ app, rt = fast_app(
 )
 
 def process_urls_in_content(content):
-    """Replace plain URLs with link icons and add copy functionality using MonsterUI components"""
+    """Replace plain URLs with compact emoji links and copy functionality"""
     if not content:
         return content
     
@@ -880,23 +900,25 @@ def process_urls_in_content(content):
     
     def replace_url(match):
         url = match.group(1)
-        # Create MonsterUI components for link and copy button
-        link_component = DivLAligned(
+        # Create compact inline components with emojis
+        link_component = Span(
             A(
-                UkIcon('external-link', cls='w-4 h-4'),
-                Span('Link', cls=TextT.sm),
+                "🔗",
                 href=url,
                 target='_blank',
                 rel='noopener noreferrer',
-                cls=AT.primary + ' inline-flex items-center gap-1'
+                cls='text-blue-600 hover:text-blue-800 no-underline',
+                title='Open link'
             ),
             Button(
-                'Copy',
-                onclick=f"navigator.clipboard.writeText('{url}'); this.innerHTML='Copied!'; setTimeout(() => this.innerHTML='Copy', 1000)",
-                cls=ButtonT.secondary + ' min-h-[44px] min-w-[44px] text-xs',
-                title='Copy URL'
+                "📋",
+                onclick=f"navigator.clipboard.writeText('{url}'); this.innerHTML='✅'; setTimeout(() => this.innerHTML='📋', 1000)",
+                cls='ml-1 text-blue-600 hover:text-blue-800 bg-transparent border-0 p-0 cursor-pointer',
+                title='Copy URL',
+                style='line-height: inherit; height: auto; font-size: inherit;'
             ),
-            cls='inline-flex items-center gap-2 my-1'
+            cls='inline-flex items-center gap-1',
+            style='line-height: inherit; height: auto;'
         )
         return str(link_component)
     
@@ -1046,7 +1068,20 @@ def FeedsSidebar(session_id, for_mobile=False):
     folders = FolderModel.get_folders(session_id)
     
     return Ul(
-        Li(H3("Feeds"), cls='p-3'),
+        Li(
+            DivFullySpaced(
+                H3("Feeds"),
+                Button(
+                    UkIcon('refresh-cw'),
+                    hx_post="/api/session/reset",
+                    hx_swap="none",
+                    cls="p-1 hover:bg-secondary rounded",
+                    title="Reset all session data",
+                    hx_confirm="Are you sure? This will clear all your subscriptions and settings."
+                )
+            ),
+            cls='p-3'
+        ),
         Li(
             Form(
                 DivLAligned(
@@ -1107,7 +1142,7 @@ def FeedsSidebar(session_id, for_mobile=False):
         cls='mt-3'
     )
 
-def FeedItem(item, unread_view=False, for_desktop=False, feed_id=None):
+def FeedItem(item, unread_view=False, for_desktop=False, feed_id=None, page=1):
     """Feed item component
     
     Args:
@@ -1127,6 +1162,8 @@ def FeedItem(item, unread_view=False, for_desktop=False, feed_id=None):
     item_url = f"/item/{item['id']}?unread_view={unread_view}"
     if feed_id:
         item_url += f"&feed_id={feed_id}"
+    if page > 1:
+        item_url += f"&page={page}"
     
     # Simple consistent approach: same HTMX pattern, just different targets
     if for_desktop:
@@ -1156,7 +1193,7 @@ def FeedItem(item, unread_view=False, for_desktop=False, feed_id=None):
     
     return Li(
         # Title row with blue dot
-        DivLAligned(
+        DivFullySpaced(
             Strong(item['title']) if not is_read else Span(item['title']),  # Bold for unread, normal for read
             Span(cls='flex h-2 w-2 rounded-full bg-blue-600') if not item.get('is_read', 0) else ''
         ),
@@ -1182,55 +1219,19 @@ def FeedItem(item, unread_view=False, for_desktop=False, feed_id=None):
         **attrs
     )
 
-def FeedsList(items, unread_view=False, for_desktop=False, feed_id=None):
+def FeedsList(items, unread_view=False, for_desktop=False, feed_id=None, page=1):
     """Create list of feed items (adapted from MailList)"""
-    return Ul(cls='js-filter space-y-2 p-4 pt-0')(*[FeedItem(item, unread_view, for_desktop, feed_id) for item in items])
+    return Ul(cls='js-filter space-y-2 p-4 pt-0')(*[FeedItem(item, unread_view, for_desktop, feed_id, page) for item in items])
 
 def MobilePersistentHeader(session_id, feed_id=None, unread_only=False, show_chrome=True):
-    """Create persistent mobile header with tabs and search form - conditionally visible"""
-    # Simple header logic
-    if feed_id:
-        feeds = FeedModel.get_user_feeds(session_id)
-        feed = next((f for f in feeds if f['id'] == feed_id), None)
-        feed_name = feed['title'] if feed else "Unknown Feed"
-    else:
-        feed_name = "All Feeds"
-    
-    # Build URL parameters for tab navigation
-    url_params = []
-    if feed_id:
-        url_params.append(f"feed_id={feed_id}")
-    
-    # Base URL for tab navigation
-    base_url = "/?" + "&".join(url_params) if url_params else "/"
-    
-    # Option 2: Return completely different elements based on visibility
-    # This ensures HTMX can do simple element replacement
-    if not show_chrome:
-        # Return a hidden placeholder div with same ID
-        return Div(
-            id='mobile-persistent-header',
-            cls='hidden',
-            style='display: none;'
-        )()
-    
-    # Return the visible header - removed hx-preserve to allow tab state updates
+    """Create persistent mobile header - simplified since icons moved to main header"""
+    # New design: no persistent header chrome, all functionality moved to main header
+    # Return empty/hidden element to maintain layout structure
     return Div(
-        cls='flex-shrink-0 bg-background border-b z-10 lg:hidden',
         id='mobile-persistent-header',
-        onwheel="event.preventDefault(); event.stopPropagation(); return false;"
-    )(
-        Div(cls='flex px-4 py-2')(
-            H3(feed_name),
-            create_tab_container(feed_name, feed_id, unread_only, for_mobile=True)
-        ),
-        Div(cls='px-4 pb-2')(
-            Div(cls='uk-inline w-full')(
-                Span(cls='uk-form-icon text-muted-foreground')(UkIcon('search')),
-                Input(placeholder='Search posts', uk_filter_control="", id="mobile-persistent-search")
-            )
-        )
-    )
+        cls='hidden',
+        style='display: none;'
+    )()
 
 def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_desktop=False, data=None):
     """Create main feeds content area with pagination - MOBILE VERSION NO LONGER INCLUDES HEADER
@@ -1324,51 +1325,28 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
                 DivLAligned(
                     DivCentered(f'Page {page} of {total_pages}', cls=TextT.sm),
                     DivLAligned(
-                        # Mobile versions
-                        Button(UkIcon('chevrons-left'), hx_get=first_url, hx_target=Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary lg:hidden"),
-                        Button(UkIcon('chevron-left'), hx_get=prev_url, hx_target=Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary lg:hidden"),
-                        Button(UkIcon('chevron-right'), hx_get=next_url, hx_target=Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary lg:hidden"),
-                        Button(UkIcon('chevrons-right'), hx_get=last_url, hx_target=Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary lg:hidden"),
-                        # Desktop versions - use HTMX for consistency
-                        Button(UkIcon('chevrons-left'), hx_get=first_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else "#main-content", cls="p-2 rounded border hover:bg-secondary hidden lg:inline-block"),
-                        Button(UkIcon('chevron-left'), hx_get=prev_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else "#main-content", cls="p-2 rounded border hover:bg-secondary hidden lg:inline-block"),
-                        Button(UkIcon('chevron-right'), hx_get=next_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else "#main-content", cls="p-2 rounded border hover:bg-secondary hidden lg:inline-block"),
-                        Button(UkIcon('chevrons-right'), hx_get=last_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else "#main-content", cls="p-2 rounded border hover:bg-secondary hidden lg:inline-block"),
+                        # Unified responsive pagination buttons
+                        Button(UkIcon('chevrons-left'), hx_get=first_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary"),
+                        Button(UkIcon('chevron-left'), hx_get=prev_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary"),
+                        Button(UkIcon('chevron-right'), hx_get=next_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary"),
+                        Button(UkIcon('chevrons-right'), hx_get=last_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary"),
                         cls='space-x-1'
                     )
                 )
             )
         )
     
-    # Different layouts for mobile vs desktop
-    if for_desktop:
-        # Desktop: sticky header + scrollable content (unchanged)
-        return Div(cls='flex flex-col h-full')(
-            # Sticky header section
-            Div(cls='sticky top-0 bg-background border-b z-10')(
-                Div(cls='flex px-4 py-3')(
-                    H3(feed_name),
-                    create_tab_container(feed_name, feed_id, unread_only, for_mobile=False)
-                ),
-                Div(cls='px-4 pb-3')(
-                    Div(cls='uk-inline w-full')(
-                        Span(cls='uk-form-icon text-muted-foreground')(UkIcon('search')),
-                        Input(placeholder='Search posts', uk_filter_control="")
-                    )
-                )
-            ),
-            # Scrollable content area
-            Div(cls='flex-1 overflow-y-auto', id="feeds-list-container", uk_filter="target: .js-filter")(
-                FeedsList(paginated_items, unread_only, for_desktop, feed_id) if paginated_items else Div(P("No posts available"), cls='p-4 text-center text-muted-foreground'),
-                pagination_footer()
-            )
-        )
-    else:
-        # Mobile: ONLY content (header moved to persistent header, parent handles scrolling)
-        return Div(cls='p-0', id="feeds-list-container", uk_filter="target: .js-filter")(
-            FeedsList(paginated_items, unread_only, for_desktop, feed_id) if paginated_items else Div(P("No posts available"), cls='p-4 text-center text-muted-foreground'),
-            pagination_footer()
-        )
+    # Unified layout for both mobile and desktop - same simple content structure
+    # Add feed name as title at the top of content area
+    content_elements = [
+        H3(feed_name, cls='px-4 pt-4 pb-2'),  # Feed title at top of content
+        FeedsList(paginated_items, unread_only, for_desktop, feed_id, page) if paginated_items else Div(P("No posts available"), cls='p-4 text-center text-muted-foreground'),
+        pagination_footer()
+    ]
+    
+    return Div(cls='p-0', id="feeds-list-container", uk_filter="target: .js-filter")(
+        *content_elements
+    )
 
 def MobileSidebar(session_id):
     """Create mobile sidebar overlay"""
@@ -1437,17 +1415,104 @@ def MobileHeader(session_id, show_back=False, feed_id=None, unread_view=False):
         id="mobile-nav-button"
     )
     
+    # Build icon bar URLs
+    all_posts_url = f"/?feed_id={feed_id}&unread=0" if feed_id else "/?unread=0"
+    unread_url = f"/?feed_id={feed_id}" if feed_id else "/"
+    
+    # Check if search is expanded (we'll use a simple approach)
+    search_expanded = False  # Default state
+    
+    # JavaScript for click-outside handler
+    click_outside_script = Script("""
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchBar = document.getElementById('search-bar');
+            const iconBar = document.getElementById('icon-bar');
+            const searchInput = document.getElementById('mobile-search-input');
+            const mobileTopBar = document.getElementById('mobile-top-bar');
+            
+            // Click outside handler
+            document.addEventListener('click', function(event) {
+                if (searchBar && iconBar) {
+                    const isSearchVisible = searchBar.style.display !== 'none';
+                    const clickedInsideSearch = searchBar.contains(event.target);
+                    const clickedSearchButton = event.target.closest('button[title="Search"]');
+                    
+                    if (isSearchVisible && !clickedInsideSearch && !clickedSearchButton) {
+                        // Clicked outside search bar - close it
+                        searchBar.style.display = 'none';
+                        iconBar.style.display = 'flex';
+                    }
+                }
+            });
+        });
+    """)
+    
     return Div(
-        # Fixed header bar
-        Div(cls="lg:hidden fixed top-0 left-0 right-0 bg-background border-b p-4 z-40")(
-            DivFullySpaced(
-                DivLAligned(
-                    nav_button,
-                    H3("RSS Reader", cls="ml-3")
+        # Fixed header bar with new icon-based design
+        Div(
+            cls="lg:hidden fixed top-0 left-0 right-0 bg-background border-b p-4 z-40",
+            id="mobile-top-bar"
+        )(
+            Div(
+                cls="flex items-center",
+                id="mobile-header-container"
+            )(
+                # Nav button is always visible on the left
+                nav_button,
+                # Icon bar (All Posts, Unread, Search) - shown when search is closed
+                Div(
+                    cls="flex items-center space-x-3 ml-auto",
+                    id="icon-bar",
+                    style="display: flex;" if not search_expanded else "display: none;"
+                )(
+                    Button(
+                        UkIcon('list'),
+                        hx_get=all_posts_url,
+                        hx_target=Targets.MOBILE_CONTENT,
+                        hx_push_url="true",
+                        cls="p-2 rounded hover:bg-secondary",
+                        title="All Posts"
+                    ),
+                    Button(
+                        UkIcon('mail'),
+                        hx_get=unread_url,
+                        hx_target=Targets.MOBILE_CONTENT,
+                        hx_push_url="true",
+                        cls="p-2 rounded hover:bg-secondary",
+                        title="Unread"
+                    ),
+                    Button(
+                        UkIcon('search'),
+                        hx_on_click="document.getElementById('icon-bar').style.display='none'; document.getElementById('search-bar').style.display='flex'; document.getElementById('mobile-search-input').focus();",
+                        cls="p-2 rounded hover:bg-secondary",
+                        title="Search"
+                    )
+                ),
+                # Expandable search bar - takes full width when shown
+                Div(
+                    cls="flex items-center flex-1 ml-4",
+                    id="search-bar",
+                    style="display: none;"
+                )(
+                    Div(cls="uk-inline w-full")(
+                        Input(
+                            placeholder="Search posts",
+                            cls="w-full pr-8",
+                            id="mobile-search-input",
+                            uk_filter_control=""
+                        ),
+                        Button(
+                            UkIcon('x', cls="w-4 h-4"),
+                            hx_on_click="document.getElementById('search-bar').style.display='none'; document.getElementById('icon-bar').style.display='flex';",
+                            cls="uk-form-icon uk-form-icon-flip p-1 hover:text-red-500 cursor-pointer absolute right-1 top-1/2 -translate-y-1/2",
+                            title="Close search"
+                        )
+                    )
                 )
             )
         ),
-        loading_spinner
+        loading_spinner,
+        click_outside_script
     )
 
 def ItemDetailView(item, show_back=False):
@@ -1528,16 +1593,16 @@ def index(htmx, sess, feed_id: int = None, unread: bool = True, folder_id: int =
     if htmx and getattr(htmx, 'request', None) and getattr(htmx, 'target', None):
         return route_htmx_fragment(htmx, data)
     
-    # FULL PAGE - From Step 5
-    return Titled("RSS Reader", *full_page_dual_layout(data))
+    # FULL PAGE - No title banner, direct content
+    return full_page_dual_layout(data)
 
 @rt('/item/{item_id}')
-def show_item(item_id: int, htmx, sess, unread_view: bool = False, feed_id: int = None, _scroll: int = None):
+def show_item(item_id: int, htmx, sess, unread_view: bool = False, feed_id: int = None, page: int = 1, _scroll: int = None):
     """Item detail route following same pattern"""
     session_id = sess.get('session_id')
     
     # Prepare item data
-    item_data = prepare_item_data(session_id, item_id, feed_id, unread_view)
+    item_data = prepare_item_data(session_id, item_id, feed_id, unread_view, page)
     
     if not item_data.item:
         if htmx and getattr(htmx, 'request', None) and getattr(htmx, 'target', None):
@@ -1606,8 +1671,8 @@ HTMX Target: {getattr(htmx, 'target', None) if htmx else None}""")
             )
         else:
             # Create empty PageData for not found case
-            page_data = PageData(session_id, feed_id, True, 1)
-            return Titled("RSS Reader", *full_page_dual_layout(page_data))
+            page_data = PageData(session_id, feed_id, True, page)
+            return full_page_dual_layout(page_data)
     
     # Mark as read
     item_data.mark_read_and_refresh()
@@ -1616,7 +1681,7 @@ HTMX Target: {getattr(htmx, 'target', None) if htmx else None}""")
     if htmx and getattr(htmx, 'request', None) and getattr(htmx, 'target', None):
         return htmx_item_response(htmx, item_data, _scroll)
     else:
-        return Titled("RSS Reader", *full_page_item_response(item_data))
+        return full_page_item_response(item_data)
 
 @rt('/api/feed/add')
 def add_feed(htmx, sess, new_feed_url: str = ""):
@@ -1835,6 +1900,20 @@ def add_folder(htmx, sess):
     return Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
         FeedsSidebar(session_id, for_mobile=False)
     )
+
+@rt('/api/session/reset')
+def reset_session(sess):
+    """Reset session and all user data, redirect to index"""
+    from fasthtml.common import RedirectResponse
+    
+    session_id = sess.get('session_id')
+    if session_id:
+        SessionModel.delete_session(session_id)
+        # Clear the session cookie
+        sess.clear()
+    
+    # Redirect to index page (will create new session)
+    return RedirectResponse(url="/", status_code=302)
 
 @rt('/api/update-status')
 def update_status():

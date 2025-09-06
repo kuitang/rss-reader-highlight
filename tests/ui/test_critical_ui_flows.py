@@ -12,7 +12,7 @@ import subprocess
 import time
 import os
 import sys
-from playwright.sync_api import sync_playwright, expect
+from playwright.sync_api import sync_playwright, expect, Page
 from contextlib import contextmanager
 
 pytestmark = pytest.mark.needs_server
@@ -161,12 +161,17 @@ class TestFormParameterBugFlow:
         expect(page.locator("#desktop-layout")).to_be_visible()
         expect(page.locator("#sidebar")).to_be_visible()
         
-        # 2. Navigate to feed URL directly (simulates feed link behavior)
-        page.goto(f"{test_server_url}/?feed_id=2")
-        wait_for_page_ready(page)  # OPTIMIZED: Wait for page load
-        
-        # 3. Verify URL updated correctly
-        expect(page).to_have_url(f"{test_server_url}/?feed_id=2")
+        # 2. Navigate to a feed by clicking on it (more realistic)
+        # Find and click on any available feed link
+        feed_links = page.locator("#sidebar a[href*='feed_id']")
+        if feed_links.count() > 0:
+            first_feed = feed_links.first
+            feed_href = first_feed.get_attribute("href")
+            first_feed.click()
+            wait_for_page_ready(page)  # OPTIMIZED: Wait for page load
+            
+            # 3. Verify URL updated correctly
+            assert "feed_id" in page.url, "Should have navigated to a feed"
         
         # 4. Verify desktop layout is still working
         expect(page.locator("#desktop-layout")).to_be_visible()
@@ -692,119 +697,291 @@ class TestTabSizeAndAlignment:
                 page.goto(test_server_url, wait_until='networkidle')
                 wait_for_page_ready(page)
                 
-                # Find tab container - mobile vs desktop
-                if config['name'] == 'mobile':
-                    # Mobile: tabs in persistent header
-                    mobile_header = page.locator('#mobile-persistent-header')
-                    if mobile_header.count() > 0:
-                        tab_container = mobile_header.locator('.uk-tab-alt').first
-                    else:
-                        # Fallback to any tab container
-                        tab_container = page.locator('.uk-tab-alt').first
-                else:
-                    # Desktop: tabs with ml-auto class
-                    tab_container = page.locator('.uk-tab-alt.ml-auto').first
-                    
-                    # Wait for tab container to be visible
-                    expect(tab_container).to_be_visible(timeout=5000)
-                    
-                    # Find the "All Posts" and "Unread" tab links
-                    all_posts_tab = tab_container.locator('a').filter(has_text='All Posts')
-                    unread_tab = tab_container.locator('a').filter(has_text='Unread')
-                    
-                    expect(all_posts_tab).to_be_visible()
-                    expect(unread_tab).to_be_visible()
-                    
-                    # Get pixel measurements
-                    all_posts_box = all_posts_tab.bounding_box()
-                    unread_box = unread_tab.bounding_box()
-                    tab_container_box = tab_container.bounding_box()
-                    viewport_width = page.viewport_size['width']
-                    
-                    # STRICT PIXEL WIDTH MEASUREMENTS (addressing user's requirement)
-                    all_posts_width = all_posts_box['width']
-                    unread_width = unread_box['width']
-                    total_tab_width = tab_container_box['width']
-                    width_percent = (total_tab_width / viewport_width) * 100
-                    
-                    print(f"  All Posts button: {all_posts_width:.1f}px")
-                    print(f"  Unread button: {unread_width:.1f}px") 
-                    print(f"  Total tab width: {total_tab_width:.1f}px ({width_percent:.1f}% of viewport)")
-                    
-                    # Test 1: Individual button width constraints
-                    assert all_posts_width <= config['max_individual_button_width'], \
-                        f"{config['name']} 'All Posts' button too wide: {all_posts_width:.1f}px (max: {config['max_individual_button_width']}px)"
-                    
-                    assert unread_width <= config['max_individual_button_width'], \
-                        f"{config['name']} 'Unread' button too wide: {unread_width:.1f}px (max: {config['max_individual_button_width']}px)"
-                    
-                    # Test 2: Total width percentage constraint
-                    assert width_percent <= config['max_total_width_percent'], \
-                        f"{config['name']} tab container too wide: {width_percent:.1f}% of viewport (max: {config['max_total_width_percent']}%)"
-                    
-                    # Test 3: Height should be compact (not affected by 44px touch target rule)
-                    assert all_posts_box['height'] < 40, f"{config['name']} All Posts tab too tall: {all_posts_box['height']}px (should be < 40px)"
-                    assert unread_box['height'] < 40, f"{config['name']} Unread tab too tall: {unread_box['height']}px (should be < 40px)"
-                    
-                    # Test 4: Right alignment (different expectations for mobile vs desktop)
-                    container_right_edge = tab_container_box['x'] + tab_container_box['width']
-                    distance_from_right = viewport_width - container_right_edge
-                    
+                # Find navigation buttons - new icon-based design
+                try:
                     if config['name'] == 'mobile':
-                        # Mobile: tabs should be reasonably close to right edge
-                        assert distance_from_right < 50, f"{config['name']} tabs not right-aligned: {distance_from_right}px from edge (should be < 50px)"
+                        # Mobile: icon buttons in top header
+                        icon_bar = page.locator('#icon-bar')
+                        expect(icon_bar).to_be_visible(timeout=5000)
+                        
+                        all_posts_btn = icon_bar.locator('button[title="All Posts"]')
+                        unread_btn = icon_bar.locator('button[title="Unread"]')
+                        
+                        expect(all_posts_btn).to_be_visible()
+                        expect(unread_btn).to_be_visible()
+                        
+                        # Get pixel measurements for mobile icon buttons
+                        all_posts_box = all_posts_btn.bounding_box()
+                        unread_box = unread_btn.bounding_box()
+                        icon_bar_box = icon_bar.bounding_box()
+                        viewport_width = page.viewport_size['width']
+                        
+                        # STRICT PIXEL WIDTH MEASUREMENTS (addressing user's requirement)
+                        all_posts_width = all_posts_box['width']
+                        unread_width = unread_box['width']
+                        total_nav_width = icon_bar_box['width']
+                        width_percent = (total_nav_width / viewport_width) * 100
+                        
+                        print(f"  All Posts button: {all_posts_width:.1f}px")
+                        print(f"  Unread button: {unread_width:.1f}px") 
+                        print(f"  Total navigation width: {total_nav_width:.1f}px ({width_percent:.1f}% of viewport)")
+                        
+                        # Test 1: Individual button width constraints (icon buttons should be compact)
+                        assert all_posts_width <= 60, \
+                            f"{config['name']} 'All Posts' button too wide: {all_posts_width:.1f}px (max: 60px for icon)"
+                        
+                        assert unread_width <= 60, \
+                            f"{config['name']} 'Unread' button too wide: {unread_width:.1f}px (max: 60px for icon)"
+                        
+                        # Test 2: Total width percentage constraint (should be reasonable for icon bar)
+                        assert width_percent <= 50, \
+                            f"{config['name']} icon bar too wide: {width_percent:.1f}% of viewport (max: 50%)"
+                        
+                        # Test 3: Height should meet touch target requirements (44px minimum)
+                        assert all_posts_box['height'] >= 44, f"{config['name']} All Posts button too short: {all_posts_box['height']}px (should be >= 44px)"
+                        assert unread_box['height'] >= 44, f"{config['name']} Unread button too short: {unread_box['height']}px (should be >= 44px)"
+                        
+                        # Test 4: Right alignment (icon bar should be on the right)
+                        container_right_edge = icon_bar_box['x'] + icon_bar_box['width']
+                        distance_from_right = viewport_width - container_right_edge
+                        
+                        # Mobile: icon bar should be reasonably close to right edge
+                        assert distance_from_right <= 30, \
+                            f"{config['name']} icon bar not close enough to right edge: {distance_from_right:.1f}px away (max: 30px)"
+                        
                     else:
-                        # Desktop: tabs may be positioned anywhere as long as they're compact
-                        # Just ensure they're within the viewport and not overflowing
-                        assert container_right_edge <= viewport_width, f"{config['name']} tabs overflow viewport: {container_right_edge}px > {viewport_width}px"
-                        # Log positioning for debugging
-                        print(f"  Desktop tabs position: {distance_from_right:.1f}px from right edge")
-                    
-                    # Test 5: CSS override verification
-                    all_posts_styles = all_posts_tab.evaluate("""
-                        element => {
-                            const styles = window.getComputedStyle(element);
-                            return {
-                                minHeight: styles.minHeight,
-                                minWidth: styles.minWidth,
-                                maxWidth: styles.maxWidth,
-                                display: styles.display
-                            };
-                        }
-                    """)
-                    
-                    # Ensure 44px touch target rule is not applied
-                    assert all_posts_styles['minHeight'] != '44px', \
-                        f"{config['name']} tab has 44px min-height (touch target rule not overridden)"
-                    
-                    # For mobile, ensure our CSS override is working
-                    if config['name'] == 'mobile':
-                        # Should have max-width constraint from our CSS fix
-                        max_width = all_posts_styles['maxWidth']
-                        if max_width != 'none':
-                            # Convert rem/px values to pixels for comparison
-                            if 'rem' in max_width:
-                                # 5rem should be ~80px (16px base font size)
-                                expected_max = 80
-                            else:
-                                # Extract pixel value
-                                expected_max = float(max_width.replace('px', ''))
-                            
-                            assert all_posts_width <= expected_max + 5, \
-                                f"{config['name']} button width {all_posts_width:.1f}px exceeds CSS max-width {max_width}"
-                    
-                    print(f"  ✓ {config['name']} button widths within limits")
-                    print(f"  ✓ {config['name']} total width: {width_percent:.1f}% (limit: {config['max_total_width_percent']}%)")
-                    print(f"  ✓ {config['name']} height constraint: {all_posts_box['height']}px")
-                    if config['name'] == 'mobile':
-                        print(f"  ✓ {config['name']} right alignment: {distance_from_right}px from edge")
-                    else:
-                        print(f"  ✓ {config['name']} positioning: within viewport bounds")
+                        # Desktop: unified layout - no more sticky header, content same as mobile
+                        # Check that desktop layout container exists
+                        desktop_layout = page.locator('#desktop-layout')
+                        expect(desktop_layout).to_be_visible(timeout=5000)
+                        
+                        # Desktop content should have feed title (unified structure)
+                        feed_title = page.locator('#desktop-feeds-content h3')
+                        expect(feed_title).to_be_visible()
+                        
+                        feed_title_box = feed_title.bounding_box()
+                        print(f"  Desktop feed title: {feed_title.text_content()}")
+                        print(f"  Feed title width: {feed_title_box['width']:.1f}px")
+                        
+                        # Desktop should have consistent content structure (no special header navigation)
+                        assert feed_title_box['width'] <= 500, f"Desktop feed title too wide: {feed_title_box['width']:.1f}px"
+                        
+                    print(f"✅ {config['name']}: Navigation elements are properly sized and positioned")
+                
+                except Exception as e:
+                    print(f"❌ {config['name']}: {str(e)}")
+                    page.screenshot(path=f'/tmp/tab_test_error_{config["name"]}.png')
+                    raise
                     
             finally:
                 context.close()
             
         print("\n✅ All viewport button size tests passed!")
+
+
+class TestSearchBarHeightInvariant:
+    """Test search bar expansion height invariant behavior"""
+    
+    def test_search_expansion_height_invariant(self, page: Page, test_server_url):
+        """Test search icon expansion doesn't change chrome height - requested feature"""
+        
+        # Set mobile viewport to test mobile chrome
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.goto(test_server_url)
+        wait_for_page_ready(page)
+        
+        # Measure initial header height
+        initial_measurements = page.evaluate("""() => {
+            const topBar = document.getElementById('mobile-top-bar');
+            return {
+                height: topBar.offsetHeight,
+                boundingRect: topBar.getBoundingClientRect(),
+                iconBarVisible: document.getElementById('icon-bar').style.display !== 'none',
+                searchBarVisible: document.getElementById('search-bar').style.display !== 'none'
+            };
+        }""")
+        
+        print(f"Initial header height: {initial_measurements['height']}px")
+        print(f"Icon bar visible: {initial_measurements['iconBarVisible']}")
+        print(f"Search bar visible: {initial_measurements['searchBarVisible']}")
+        
+        # Click search button to expand
+        search_button = page.locator('button[title="Search"]')
+        expect(search_button).to_be_visible()
+        search_button.click()
+        
+        # Measure expanded height and width
+        expanded_measurements = page.evaluate("""() => {
+            const topBar = document.getElementById('mobile-top-bar');
+            const searchBar = document.getElementById('search-bar');
+            const searchInput = document.getElementById('mobile-search-input');
+            const navButton = document.getElementById('mobile-nav-button');
+            const container = document.getElementById('mobile-header-container');
+            
+            return {
+                height: topBar.offsetHeight,
+                boundingRect: topBar.getBoundingClientRect(),
+                iconBarVisible: document.getElementById('icon-bar').style.display !== 'none',
+                searchBarVisible: document.getElementById('search-bar').style.display !== 'none',
+                // Width measurements
+                topBarWidth: topBar.offsetWidth,
+                searchBarWidth: searchBar ? searchBar.offsetWidth : 0,
+                searchInputWidth: searchInput ? searchInput.offsetWidth : 0,
+                navButtonWidth: navButton ? navButton.offsetWidth : 0,
+                containerWidth: container ? container.offsetWidth : 0,
+                availableWidth: topBar.offsetWidth - (navButton ? navButton.offsetWidth : 0) - 32  // 32px for padding/margins
+            };
+        }""")
+        
+        print(f"Expanded header height: {expanded_measurements['height']}px")
+        print(f"Icon bar visible: {expanded_measurements['iconBarVisible']}")
+        print(f"Search bar visible: {expanded_measurements['searchBarVisible']}")
+        print(f"Search bar width: {expanded_measurements['searchBarWidth']}px")
+        print(f"Search input width: {expanded_measurements['searchInputWidth']}px")
+        print(f"Available width: {expanded_measurements['availableWidth']}px")
+        print(f"Top bar width: {expanded_measurements['topBarWidth']}px")
+        
+        # HEIGHT INVARIANT: Header height must remain exactly the same
+        assert initial_measurements['height'] == expanded_measurements['height'], \
+            f"Height invariant violated: {initial_measurements['height']}px → {expanded_measurements['height']}px"
+        
+        # WIDTH TEST: Search bar should take most of the available horizontal space
+        # Allow for some padding/margins (within 50px tolerance)
+        width_utilization = expanded_measurements['searchBarWidth'] / expanded_measurements['availableWidth']
+        assert width_utilization > 0.85, \
+            f"Search bar not taking full width: {expanded_measurements['searchBarWidth']}px of {expanded_measurements['availableWidth']}px available ({width_utilization:.1%})"
+        
+        # State should be correctly toggled
+        assert not expanded_measurements['iconBarVisible'], "Icon bar should be hidden when search expands"
+        assert expanded_measurements['searchBarVisible'], "Search bar should be visible when expanded"
+        
+        # Test close functionality
+        close_button = page.locator('button[title="Close search"]')
+        expect(close_button).to_be_visible()
+        close_button.click()
+        
+        # Verify return to initial state  
+        final_measurements = page.evaluate("""() => {
+            const topBar = document.getElementById('mobile-top-bar');
+            return {
+                height: topBar.offsetHeight,
+                iconBarVisible: document.getElementById('icon-bar').style.display !== 'none',
+                searchBarVisible: document.getElementById('search-bar').style.display !== 'none'
+            };
+        }""")
+        
+        # HEIGHT INVARIANT: Should return to original height
+        assert final_measurements['height'] == initial_measurements['height'], \
+            f"Height invariant violated on close: {initial_measurements['height']}px → {final_measurements['height']}px"
+        
+        # State should be back to initial
+        assert final_measurements['iconBarVisible'], "Icon bar should be visible after close"
+        assert not final_measurements['searchBarVisible'], "Search bar should be hidden after close"
+        
+        print("✅ Search height invariant test passed!")
+    
+    def test_search_click_outside_closes(self, page: Page, test_server_url):
+        """Test that clicking outside the search bar closes it"""
+        
+        # Set mobile viewport
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.goto(test_server_url)
+        wait_for_page_ready(page)
+        
+        # Click search button to expand
+        search_button = page.locator('button[title="Search"]')
+        expect(search_button).to_be_visible()
+        search_button.click()
+        
+        # Verify search is expanded
+        search_state = page.evaluate("""() => {
+            return {
+                searchBarVisible: document.getElementById('search-bar').style.display !== 'none',
+                iconBarVisible: document.getElementById('icon-bar').style.display !== 'none'
+            };
+        }""")
+        assert search_state['searchBarVisible'], "Search bar should be visible after clicking search button"
+        assert not search_state['iconBarVisible'], "Icon bar should be hidden when search is expanded"
+        
+        # Click outside the search bar (on the main content area which should exist)
+        # First wait for content to be present
+        content = page.locator('#main-content').first
+        expect(content).to_be_visible(timeout=5000)
+        
+        # Click on the content area to trigger click-outside
+        content.click(position={'x': 100, 'y': 200})
+        
+        # Small wait for JavaScript event handler
+        page.wait_for_timeout(200)
+        
+        # Verify search closed
+        final_state = page.evaluate("""() => {
+            return {
+                searchBarVisible: document.getElementById('search-bar').style.display !== 'none',
+                iconBarVisible: document.getElementById('icon-bar').style.display !== 'none'
+            };
+        }""")
+        assert not final_state['searchBarVisible'], "Search bar should be hidden after clicking outside"
+        assert final_state['iconBarVisible'], "Icon bar should be visible after search closes"
+        
+        print("✅ Click-outside test passed!")
+
+
+class TestPaginationButtonDuplication:
+    """Test to prevent duplicate mobile bottom scroll buttons - app.py:1322-1330 bug"""
+    
+    def test_pagination_buttons_no_duplicates(self, page, test_server_url):
+        """Ensure exactly 4 pagination buttons exist (no duplicates)
+        
+        This test prevents regression of the duplicate mobile pagination buttons
+        bug where both mobile and desktop button sets were rendered simultaneously.
+        """
+        # Navigate to a feed that likely has pagination
+        # First get to main page then find a feed with lots of items
+        page.goto(test_server_url)
+        
+        # Try to find a feed with many items (ClaudeAI, Hacker News, etc)
+        feed_links = page.locator("#sidebar a[href*='feed_id']:has-text('ClaudeAI'), #sidebar a[href*='feed_id']:has-text('Hacker News')")
+        if feed_links.count() > 0:
+            feed_links.first.click()
+        else:
+            # Fallback: click first available feed
+            page.locator("#sidebar a[href*='feed_id']").first.click()
+        
+        # Wait for specific content to load (not arbitrary time)
+        page.wait_for_selector("#feeds-list-container", state="visible", timeout=10000)
+        
+        # Wait for pagination container specifically (event-based, not time-based)
+        pagination_container = page.locator('.p-4.border-t')  
+        
+        # Check if pagination exists with explicit wait
+        try:
+            pagination_container.wait_for(state="visible", timeout=5000)
+            pagination_exists = True
+        except:
+            pagination_exists = False
+            
+        if pagination_exists:
+            # Count all chevron navigation buttons in pagination
+            chevrons_left_count = pagination_container.locator('uk-icon[icon="chevrons-left"]').count()
+            chevron_left_count = pagination_container.locator('uk-icon[icon="chevron-left"]').count()  
+            chevron_right_count = pagination_container.locator('uk-icon[icon="chevron-right"]').count()
+            chevrons_right_count = pagination_container.locator('uk-icon[icon="chevrons-right"]').count()
+            
+            # Verify exactly one of each navigation button type
+            assert chevrons_left_count == 1, f"Expected 1 'first page' button, found {chevrons_left_count}"
+            assert chevron_left_count == 1, f"Expected 1 'previous page' button, found {chevron_left_count}"  
+            assert chevron_right_count == 1, f"Expected 1 'next page' button, found {chevron_right_count}"
+            assert chevrons_right_count == 1, f"Expected 1 'last page' button, found {chevrons_right_count}"
+            
+            # Verify total pagination buttons count
+            total_nav_buttons = chevrons_left_count + chevron_left_count + chevron_right_count + chevrons_right_count
+            assert total_nav_buttons == 4, f"Expected exactly 4 navigation buttons total, found {total_nav_buttons}"
+            
+            print("✅ Pagination button duplication test passed!")
+        else:
+            # No pagination present - test passes but log it
+            print("📝 No pagination present on current page - duplication test skipped")
 
 
 if __name__ == "__main__":

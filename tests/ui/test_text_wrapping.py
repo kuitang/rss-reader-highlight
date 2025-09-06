@@ -32,10 +32,10 @@ class TestTextWrapping:
             processed = process_urls_in_content(test_content)
             
             # Verify URL replacement occurred
-            assert 'external-link' in processed, f"Case {i+1}: Should contain external link icon"
-            assert 'Copy' in processed, f"Case {i+1}: Should contain copy button"
-            assert 'min-h-[44px]' in processed, f"Case {i+1}: Should meet 44px minimum touch target"
-            assert 'min-w-[44px]' in processed, f"Case {i+1}: Should meet 44px minimum touch target width"
+            assert '🔗' in processed, f"Case {i+1}: Should contain external link emoji"
+            assert '📋' in processed, f"Case {i+1}: Should contain copy button emoji"
+            assert 'cursor-pointer' in processed, f"Case {i+1}: Should be clickable"
+            assert 'uk-btn' in processed, f"Case {i+1}: Should use MonsterUI button classes"
             
             # Verify original plain URLs are not visible (unless in href attributes)
             import re
@@ -95,7 +95,7 @@ class TestTextWrapping:
         
         # Should use MonsterUI components, not raw HTML strings
         assert 'DivLAligned' in str(processed) or 'uk-btn' in processed, "Should use MonsterUI Button components"
-        assert 'external-link' in processed, "Should use UkIcon for external link"
+        assert '🔗' in processed, "Should use emoji for external link"
         
         # Should not contain raw HTML strings
         assert '<svg class="w-4 h-4"' not in processed, "Should not contain raw HTML SVG"
