@@ -10,6 +10,11 @@ from playwright.sync_api import Page, expect
 import random
 
 
+def wait_for_htmx_complete(page, timeout=5000):
+    """Wait for any HTMX requests to complete"""
+    page.wait_for_selector("body:not(.htmx-request)", timeout=timeout)
+
+
 def ensure_mobile_sidebar_open(page: Page):
     """Helper function to ensure mobile sidebar is open before accessing feed links"""
     # Check if mobile nav button exists and is visible
@@ -215,7 +220,7 @@ class TestRefactoringRegression:
                 print(f"Feed link not visible, skipping")
                 continue
             # Wait for feed content to load
-            page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
+            page.wait_for_selector("li[id^='mobile-feed-item-']", state="visible", timeout=10000)
             
             # Verify sidebar closed automatically (mobile behavior)
             # Take screenshot after feed selection
@@ -240,9 +245,9 @@ class TestRefactoringRegression:
                 print(f"Clicking article: {article_title}")
                 
                 article_item.click()
-                page.wait_for_load_state("networkidle")
-                # Wait for feed list to update
-                page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
+                wait_for_htmx_complete(page)
+                # Wait for article view to load (mobile shows full screen)
+                page.wait_for_selector("#main-content", state="visible", timeout=10000)
                 
                 # Verify we're in mobile article view
                 # Take screenshot of article view
@@ -254,16 +259,16 @@ class TestRefactoringRegression:
                 if back_buttons:
                     print("Clicking back button")
                     back_buttons[0].click()
-                    page.wait_for_load_state("networkidle")
+                    wait_for_htmx_complete(page)
                     # Wait for feed list to update
-                    page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
+                    page.wait_for_selector("li[id^='mobile-feed-item-']", state="visible", timeout=10000)
                 else:
                     # If no back button, use browser back
                     print("Using browser back navigation")
                     page.go_back()
-                    page.wait_for_load_state("networkidle")
+                    wait_for_htmx_complete(page)
                     # Wait for feed list to update
-                page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
+                    page.wait_for_selector("li[id^='mobile-feed-item-']", state="visible", timeout=10000)
                 
                 # Verify we're back at feed list
                 expect(feed_container).to_be_visible()
@@ -316,7 +321,7 @@ class TestRefactoringRegression:
         This test focuses on the HTMX functionality that could break from refactoring.
         """
         page.goto(test_server_url)
-        page.wait_for_load_state("networkidle")
+        page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=10000)
         
         # Monitor network requests
         requests = []
@@ -342,8 +347,8 @@ class TestRefactoringRegression:
         if feed_links:
             print("Clicking feed to trigger HTMX update")
             feed_links[0].click()
-            page.wait_for_load_state("networkidle")
-            # Wait for feed content to load
+            wait_for_htmx_complete(page)
+            # Wait for feed content to load (could be mobile or desktop)
             page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
         
         # 2. Click on an article (should trigger HTMX update)
@@ -351,17 +356,17 @@ class TestRefactoringRegression:
         if article_items:
             print("Clicking article to trigger HTMX update")
             article_items[0].click()
-            page.wait_for_load_state("networkidle")
-            # Wait for feed content to load
-            page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
+            wait_for_htmx_complete(page)
+            # Wait for content to load after article click
+            page.wait_for_selector("#main-content", state="visible", timeout=10000)
         
         # 3. Toggle between tabs (should trigger HTMX update)
-        unread_tab = page.locator("text=Unread").first
+        unread_tab = page.locator("button[title='Unread']")
         if unread_tab.is_visible():
             print("Toggling to Unread tab")
             unread_tab.click()
-            page.wait_for_load_state("networkidle")
-            # Wait for feed content to load
+            wait_for_htmx_complete(page)
+            # Wait for feed content to load (could be mobile or desktop)
             page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
         
         # Analyze requests for HTMX patterns
@@ -386,15 +391,15 @@ class TestRefactoringRegression:
         This is critical functionality that could break with database changes.
         """
         page.goto(test_server_url)
-        page.wait_for_load_state("networkidle")
+        page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=10000)
         
         # Click on a feed
         ensure_mobile_sidebar_open(page)  # Open mobile sidebar if needed
         feed_links = get_feed_links(page).all()
         if feed_links:
             feed_links[0].click()
-            page.wait_for_load_state("networkidle")
-            # Wait for feed content to load
+            wait_for_htmx_complete(page)
+            # Wait for feed content to load (could be mobile or desktop)
             page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
         
         # Find articles with blue dots (unread indicators)
@@ -411,7 +416,7 @@ class TestRefactoringRegression:
             page.screenshot(path="/tmp/before_article_click.png")
             
             first_unread.click()  # Click the whole list item
-            page.wait_for_load_state("networkidle")
+            wait_for_htmx_complete(page)
             # Wait for detail panel to load
             page.wait_for_selector("#desktop-item-detail", state="visible", timeout=5000)
             
@@ -434,7 +439,7 @@ class TestRefactoringRegression:
             unread_tab.click()
             page.wait_for_load_state("networkidle")
             # Wait for feed content to load
-            page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
+            page.wait_for_selector("li[id^='mobile-feed-item-']", state="visible", timeout=10000)
             
             # Take screenshot of unread view
             page.screenshot(path="/tmp/unread_view.png")

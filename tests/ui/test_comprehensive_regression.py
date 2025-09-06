@@ -106,14 +106,15 @@ class TestComprehensiveRegression:
                     feed_links[iteration % len(feed_links)].click()
                     
                     # Wait for sidebar to close and content to load
-                    page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
+                    page.wait_for_selector("li[id^='mobile-feed-item-']", state="visible", timeout=10000)
                     expect(page.locator("#mobile-sidebar")).to_be_hidden()
                     
                     # Scroll down in feed list
                     main_content = page.locator("#main-content")
                     main_content.scroll_into_view_if_needed()
                     page.mouse.wheel(0, 800)
-                    page.wait_for_timeout(500)
+                    # Wait for any HTMX updates after scroll
+                    page.wait_for_selector("body:not(.htmx-request)", timeout=2000)
                     
                     # Click on an article
                     article_items = page.locator("li[id*='mobile-feed-item']").all()
