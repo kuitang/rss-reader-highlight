@@ -373,6 +373,19 @@ class SessionModel:
                 DELETE FROM user_feeds 
                 WHERE session_id = ? AND feed_id = ?
             """, (session_id, feed_id))
+    
+    @staticmethod
+    def delete_session(session_id: str):
+        """Delete session and all associated user data"""
+        with get_db() as conn:
+            # Delete from user_items first (foreign key references)
+            conn.execute("DELETE FROM user_items WHERE session_id = ?", (session_id,))
+            # Delete from user_feeds
+            conn.execute("DELETE FROM user_feeds WHERE session_id = ?", (session_id,))
+            # Delete from folders
+            conn.execute("DELETE FROM folders WHERE session_id = ?", (session_id,))
+            # Delete the session itself
+            conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
 
 class UserItemModel:
     @staticmethod
