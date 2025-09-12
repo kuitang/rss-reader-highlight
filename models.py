@@ -284,17 +284,35 @@ class FeedModel:
 
 class FeedItemModel:
     @staticmethod
-    def create_item(feed_id: int, guid: str, title: str, link: str, 
-                   description: str = None, content: str = None, 
+    def create_item(feed_id: int, guid: str, title: str, link: str,
+                   description: str = None, content: str = None,
                    published: datetime = None) -> int:
-        """Create feed item"""
+        """Create or update a feed item without changing its ID.
+
+        Using ``INSERT OR REPLACE`` would delete the existing row and insert a
+        new one, giving the item a new primary key. When the background worker
+        refreshes feeds concurrently with a user clicking an item, this ID
+        change could make the item suddenly "disappear" for the detail query
+        even though it was visible in the summary list.  To keep IDs stable we
+        use an UPSERT that updates the existing row in place.
+        """
         with get_db() as conn:
-            cursor = conn.execute("""
-                INSERT OR REPLACE INTO feed_items 
-                (feed_id, guid, title, link, description, content, published)
+            cursor = conn.execute(
+                """
+                INSERT INTO feed_items
+                    (feed_id, guid, title, link, description, content, published)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (feed_id, guid, title, link, description, content, published))
-            return cursor.lastrowid
+                ON CONFLICT(feed_id, guid) DO UPDATE SET
+                    title=excluded.title,
+                    link=excluded.link,
+                    description=excluded.description,
+                    content=excluded.content,
+                    published=excluded.published
+                RETURNING id
+                """,
+                (feed_id, guid, title, link, description, content, published),
+            )
+            return cursor.fetchone()[0]
     
     @staticmethod
     def get_items_for_user(session_id: str, feed_id: int = None, unread_only: bool = False, page: int = 1, page_size: int = 20) -> List[Dict]:
