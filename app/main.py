@@ -11,13 +11,13 @@ from bs4 import BeautifulSoup
 import asyncio
 import re
 import logging
-from models import (
+from .models import (
     SessionModel, FeedModel, FeedItemModel, UserItemModel, FolderModel,
     init_db, get_db, MINIMAL_MODE
 )
-from feed_parser import FeedParser, setup_default_feeds
-from background_worker import initialize_worker_system, shutdown_worker_system
-import background_worker
+from .feed_parser import FeedParser, setup_default_feeds
+from .background_worker import initialize_worker_system, shutdown_worker_system
+from . import background_worker
 from dateutil.relativedelta import relativedelta
 import contextlib
 

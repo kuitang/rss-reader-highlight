@@ -9,7 +9,7 @@ import logging
 import trafilatura
 from bs4 import BeautifulSoup
 import urllib.parse
-from models import FeedModel, FeedItemModel
+from .models import FeedModel, FeedItemModel
 
 import os
 # Configure logging level from environment variable

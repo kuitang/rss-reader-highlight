@@ -11,6 +11,9 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
+# Install app package in editable mode (for imports to work)
+pip install -e .
+
 # For E2E tests - install Playwright browsers
 python -m playwright install
 ```
@@ -20,16 +23,19 @@ python -m playwright install
 # IMPORTANT: Always activate virtual environment first
 source venv/bin/activate
 
-# Start main application (default port 8080)
-python app.py
+# Start main application as module (default port 8080)
+python -m app
+
+# With environment variables
+PORT=8080 PRODUCTION=true python -m app
 
 # Fast startup for integration tests (minimal database with 2 feeds)
-MINIMAL_MODE=true python app.py
+MINIMAL_MODE=true python -m app
 # OR use the helper script:
-python quick_start.py
+python scripts/quick_start.py
 
 # Clear and reset database
-python clear_db.py
+python scripts/clear_db.py
 ```
 
 ### Testing Commands
@@ -104,10 +110,10 @@ coverage report --show-missing
 source venv/bin/activate
 
 # Reset database completely
-python clear_db.py
+python scripts/clear_db.py
 
 # Create minimal seed database for fast testing (run after normal startup)
-python create_minimal_db.py
+python scripts/create_minimal_db.py
 
 # Manual database inspection
 sqlite3 data/rss.db
@@ -127,6 +133,26 @@ These files provide comprehensive information about the frameworks used in this 
 
 ## Architecture
 
+### Project Structure
+```
+rss-reader-highlight/
+├── app/                     # Main application package
+│   ├── __init__.py         # Package marker
+│   ├── __main__.py         # Entry point for python -m app
+│   ├── main.py             # Main FastHTML application
+│   ├── models.py           # Database models
+│   ├── feed_parser.py      # Feed parsing logic
+│   └── background_worker.py # Background task system
+├── scripts/                 # Utility scripts
+│   ├── clear_db.py
+│   ├── create_minimal_db.py
+│   └── quick_start.py
+├── tests/                   # Test suite
+├── setup.py                # Package setup for editable install
+├── requirements.txt        # Dependencies
+└── Dockerfile              # Optimized multi-stage build
+```
+
 ### High-Level Structure
 - **FastHTML + MonsterUI**: Python-first web framework with styled components
 - **Session-Based Users**: No authentication - each browser gets unique session
@@ -136,24 +162,24 @@ These files provide comprehensive information about the frameworks used in this 
 
 ### Core Components
 
-#### Application Entry (`app.py`)
+#### Application Entry (`app/main.py`)
 - Main FastHTML application with middleware for timing and session management
 - Three-panel email-like UI: feeds sidebar, post list, detail view
 - Routes for feed management, item interaction, and API endpoints
 - Integrates background worker for async feed updates
 
-#### Database Layer (`models.py`)
+#### Database Layer (`app/models.py`)
 - SQLite schema: `feeds` (global), `feed_items`, `sessions`, `user_feeds`, `folders`, `user_items`
 - Context managers for database operations
 - Optimized for read-heavy RSS workloads with strategic indexes
 
-#### Feed Processing (`feed_parser.py`)
+#### Feed Processing (`app/feed_parser.py`)
 - RSS/Atom parsing with `feedparser` library
 - HTTP caching using ETags and Last-Modified headers
 - Content extraction with `trafilatura` for full article text
 - Handles redirects, malformed feeds, and various date formats
 
-#### Background Worker (`background_worker.py`)
+#### Background Worker (`app/background_worker.py`)
 - Async feed updates with domain-based rate limiting
 - Queue-based processing to avoid blocking main application
 - Automatic setup of default feeds (Hacker News, Reddit, WSJ)
@@ -261,10 +287,21 @@ python -m pytest tests/ui/test_critical_ui_flows.py -v
 
 ### Local Docker
 ```bash
-# Build and run with Docker
-docker build -t rss-reader .
-docker run -p 8080:8080 -v ./data:/data rss-reader
+# Build optimized image (398MB vs old 722MB)
+docker build -t rss-reader:latest .
+
+# Run with persistent data
+docker run -p 8080:8080 -v ./data:/data rss-reader:latest
+
+# Run with custom database path
+docker run -p 8080:8080 -e DATABASE_PATH=/data/custom.db -v ./data:/data rss-reader:latest
 ```
+
+### Docker Optimization
+The multi-stage Dockerfile reduces image size by ~45%:
+- **Build stage**: Installs dependencies with build tools
+- **Runtime stage**: Only copies installed packages, not build tools
+- **Result**: 398MB (vs 722MB before optimization)
 
 ### Fly.io Deployment
 ```bash

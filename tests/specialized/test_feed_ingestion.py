@@ -10,7 +10,7 @@ Combines functionality from:
 import pytest
 from unittest.mock import patch, MagicMock
 import httpx
-from feed_parser import FeedParser
+from app.feed_parser import FeedParser
 
 
 class TestFeedIngestion:

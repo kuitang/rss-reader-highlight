@@ -17,8 +17,8 @@ from urllib.parse import urlparse
 import trafilatura
 from bs4 import BeautifulSoup
 
-from models import FeedModel
-from feed_parser import FeedParser
+from .models import FeedModel
+from .feed_parser import FeedParser
 
 logger = logging.getLogger(__name__)
 
@@ -356,7 +356,7 @@ class FeedUpdateWorker(threading.Thread):
         # Process feed entries with FULL extraction logic
         items_added = 0
         if hasattr(feed_data, 'entries'):
-            from models import FeedItemModel
+            from .models import FeedItemModel
             
             for entry in feed_data.entries:
                 try:

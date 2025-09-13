@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import Mock, patch, MagicMock
 import trafilatura
 from bs4 import BeautifulSoup
-from feed_parser import FeedParser
+from app.feed_parser import FeedParser
 
 
 class TestImageExtraction(unittest.TestCase):
@@ -208,7 +208,7 @@ class TestImageExtraction(unittest.TestCase):
         self.assertIn('![Thumbnail](https://cdn.example.com/thumb.jpg)', description)
         self.assertIn('This is the article summary', description)
     
-    @patch('feed_parser.trafilatura.extract')
+    @patch('app.feed_parser.trafilatura.extract')
     def test_fallback_when_no_text_only_images(self, mock_extract):
         """Test that items with only images are still saved"""
         # Mock trafilatura returning None (no text content)

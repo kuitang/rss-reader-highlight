@@ -1,0 +1,42 @@
+# Virtual environment (298MB!)
+venv/
+env/
+.venv/
+
+# Data and databases (114MB)
+data/
+*.db
+*.sqlite
+
+# Development/test files
+tests/
+scripts/
+setup.py
+conftest.py
+*.png
+*.html
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Version control
+.git/
+.gitignore
+
+# Documentation
+*.md
+*.txt
+!requirements.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Other
+.claude/
+.playwright-mcp/
+*.sh

@@ -4,8 +4,8 @@ import unittest
 from unittest.mock import patch, MagicMock
 import trafilatura
 import mistletoe
-from feed_parser import FeedParser
-from app import ItemDetailView
+from app.feed_parser import FeedParser
+from app.main import ItemDetailView
 
 
 class TestHtmlSanitization(unittest.TestCase):

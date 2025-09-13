@@ -1,7 +1,7 @@
 """Unit tests for smart_truncate_html function"""
 
 import pytest
-from app import smart_truncate_html
+from app.main import smart_truncate_html
 
 class TestSmartTruncateHtml:
     """Test the smart HTML truncation function"""
