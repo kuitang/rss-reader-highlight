@@ -204,7 +204,65 @@ rss-reader-highlight/
 
 ## Testing Strategy
 
+### Philosophy
+Tests focus on **complex workflows that broke during development**, not trivial framework functionality.
+
 ### CRITICAL Playwright Testing Guidelines
+
+#### Viewport-Specific Selectors
+**The application renders both mobile and desktop layouts simultaneously**. Tests MUST use viewport-specific selectors:
+
+**Desktop viewport (width ≥ 1024px):**
+- Use `#desktop-icon-bar` for navigation buttons
+- Use `#desktop-chrome-container` or `#desktop-chrome-content` for chrome elements
+- Use `#desktop-search-bar` for search functionality
+- Use `#desktop-feeds-content` for feed list
+- Use `#desktop-item-detail` for article detail
+- Use `#sidebar` for feed sidebar
+
+**Mobile viewport (width < 1024px):**
+- Use `#mobile-icon-bar` for navigation buttons
+- Use `#mobile-top-bar` for header elements
+- Use `#mobile-search-bar` for search functionality
+- Use `#mobile-sidebar` for navigation drawer
+- Use `#main-content` for main content area
+- Use `li[id^='mobile-feed-item-']` for mobile feed items
+
+**NEVER use generic selectors like:**
+- `button[title="..."]` without context
+- `#icon-bar` (doesn't exist - use mobile/desktop specific)
+- `#search-bar` (doesn't exist - use mobile/desktop specific)
+
+#### Testing Both Viewports
+**By default, tests should verify functionality in BOTH desktop and mobile viewports** unless the test explicitly targets one viewport:
+
+```python
+# Test both viewports
+viewports = [
+    {"width": 1400, "height": 900},  # Desktop
+    {"width": 390, "height": 844}    # Mobile
+]
+for viewport in viewports:
+    page.set_viewport_size(viewport)
+    # Run test assertions
+```
+
+**Exception:** Tests with names like `test_mobile_*` or `test_desktop_*` should only test their specific viewport.
+
+#### Element Visibility Checks
+When checking element visibility with dual layouts:
+```python
+# Check style.display for dynamic show/hide
+const element = document.getElementById('mobile-search-bar');
+return element && element.style.display !== 'none';
+```
+
+#### Strict Mode Handling
+Use `.first` when both mobile and desktop elements exist but only one is needed:
+```python
+# When you know both exist but need one
+element = page.locator('#mobile-icon-bar, #desktop-icon-bar').first
+```
 
 #### ⚠️ MANDATORY Rules for Writing Playwright Tests
 

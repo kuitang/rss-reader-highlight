@@ -161,8 +161,8 @@ class TestUnifiedChromeResponsive:
         desktop_feed_name = page.locator("#desktop-chrome-container h3")
         expect(desktop_feed_name).to_contain_text("All Feeds")
 
-        # Click on a specific feed in sidebar (if available)
-        feed_link = page.locator("a[href*='feed_id']").first
+        # Click on a specific feed in desktop sidebar (if available)
+        feed_link = page.locator("#sidebar a[href*='feed_id']").first
         if feed_link.count() > 0:
             feed_text = feed_link.inner_text()
             feed_link.click()

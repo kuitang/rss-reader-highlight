@@ -63,8 +63,9 @@ class TestWorkingRegression:
         
         # Verify feed filtering worked - heading should change to ClaudeAI
         assert "feed_id" in page.url, "Should be viewing a specific feed"
-        feed_heading = page.locator("#desktop-feeds-content h3").filter(has_text="ClaudeAI")
-        expect(feed_heading).to_be_visible(timeout=5000)
+        # Desktop h3 is in chrome container
+        feed_heading = page.locator("#desktop-chrome-container h3, #desktop-chrome-content h3").filter(has_text="ClaudeAI")
+        expect(feed_heading.first).to_be_visible(timeout=5000)
         print(f"Successfully navigated to ClaudeAI feed: {page.url}")
         
         page.screenshot(path="/tmp/regression_feed_selected.png")
@@ -108,7 +109,8 @@ class TestWorkingRegression:
         print("=== Testing Tab Switching ===")
         
         # Test Unread tab
-        unread_tab = page.locator("#desktop-icon-bar button[title='Unread'], #mobile-icon-bar button[title='Unread']").first
+        # Desktop viewport test - use desktop elements
+        unread_tab = page.locator("#desktop-icon-bar button[title='Unread']")
         if unread_tab.is_visible():
             unread_tab.click()
             wait_for_htmx_complete(page)
@@ -117,7 +119,8 @@ class TestWorkingRegression:
             page.screenshot(path="/tmp/regression_unread_tab.png")
         
         # Test All Posts tab  
-        all_posts_tab = page.locator("#desktop-icon-bar button[title='All Posts'], #mobile-icon-bar button[title='All Posts']").first
+        # Desktop viewport test - use desktop elements
+        all_posts_tab = page.locator("#desktop-icon-bar button[title='All Posts']")
         if all_posts_tab.is_visible():
             all_posts_tab.click()
             wait_for_htmx_complete(page)
