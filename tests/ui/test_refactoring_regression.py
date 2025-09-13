@@ -10,11 +10,7 @@ import os
 from playwright.sync_api import Page, expect
 import random
 
-# Skip these resource-intensive tests in CI, but allow local execution
-pytestmark = [
-    pytest.mark.needs_server,
-    pytest.mark.skipif(os.getenv("CI") == "true", reason="Skipping in CI - resource intensive tests, run locally")
-]
+pytestmark = pytest.mark.needs_server
 
 
 def wait_for_htmx_complete(page, timeout=5000):
@@ -47,6 +43,7 @@ def get_feed_links(page: Page):
 class TestRefactoringRegression:
     """Comprehensive regression tests for desktop and mobile workflows."""
     
+    @pytest.mark.skipif(os.getenv("CI") == "true", reason="Resource intensive - run locally")
     def test_desktop_repetitive_workflow(self, page: Page, test_server_url):
         """
         Desktop workflow: Click feeds, scroll, view articles, toggle tabs - 3 cycles.
@@ -189,6 +186,7 @@ class TestRefactoringRegression:
         # Assert no critical errors
         assert len(error_messages) == 0, f"Console errors detected: {error_messages}"
 
+    @pytest.mark.skipif(os.getenv("CI") == "true", reason="Resource intensive - run locally")
     def test_mobile_repetitive_workflow(self, page: Page, test_server_url):
         """
         Mobile workflow: Hamburger menu, feeds, scroll, articles, back navigation - 3 cycles.
@@ -356,6 +354,7 @@ class TestRefactoringRegression:
         # Assert no critical errors
         assert len(error_messages) == 0, f"Console errors detected: {error_messages}"
 
+    @pytest.mark.skipif(os.getenv("CI") == "true", reason="Resource intensive - run locally")
     def test_htmx_request_monitoring(self, page: Page, test_server_url):
         """
         Monitor HTMX requests and responses for any failures or incorrect targets.
@@ -438,6 +437,7 @@ class TestRefactoringRegression:
         # Assert no failed requests
         assert len(failed_responses) == 0, f"Found {len(failed_responses)} failed HTTP responses"
 
+    @pytest.mark.skipif(os.getenv("CI") == "true", reason="Resource intensive - run locally")
     def test_read_unread_state_management(self, page: Page, test_server_url):
         """
         Test that read/unread state is properly managed after refactoring.
