@@ -51,8 +51,8 @@ class TestRefactoringRegression:
             try:
                 page.goto(test_server_url, timeout=20000)  # Increased from 10s to 20s
                 page.wait_for_load_state("networkidle", timeout=15000)  # Added explicit timeout
-                # Verify server is responsive by checking for key elements
-                page.wait_for_selector("#mobile-layout, #desktop-layout", timeout=5000)
+                # Verify server is responsive by checking for desktop layout (desktop viewport test)
+                page.wait_for_selector("#desktop-layout", timeout=5000)
                 break
             except Exception as e:
                 if attempt == max_retries - 1:
@@ -189,15 +189,15 @@ class TestRefactoringRegression:
         """
         # Set mobile viewport
         page.set_viewport_size({"width": 390, "height": 844})
-        
+
         # Navigate to app with robust retry and increased timeout for CI
         max_retries = 3
         for attempt in range(max_retries):
             try:
                 page.goto(test_server_url, timeout=20000)  # Increased from 10s to 20s
                 page.wait_for_load_state("networkidle", timeout=15000)  # Added explicit timeout
-                # Verify server is responsive by checking for key elements
-                page.wait_for_selector("#mobile-layout, #desktop-layout", timeout=5000)
+                # Verify server is responsive by checking for mobile layout (mobile viewport test)
+                page.wait_for_selector("#mobile-layout", timeout=5000)
                 break
             except Exception as e:
                 if attempt == max_retries - 1:
