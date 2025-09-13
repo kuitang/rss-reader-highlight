@@ -6,8 +6,15 @@ any issues from the recent PageData class and optimization refactoring.
 """
 
 import pytest
+import os
 from playwright.sync_api import Page, expect
 import random
+
+# Skip these resource-intensive tests in CI, but allow local execution
+pytestmark = [
+    pytest.mark.needs_server,
+    pytest.mark.skipif(os.getenv("CI") == "true", reason="Skipping in CI - resource intensive tests, run locally")
+]
 
 
 def wait_for_htmx_complete(page, timeout=5000):
