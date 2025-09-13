@@ -309,7 +309,7 @@ class TestWorkingRegression:
         env.update({'MINIMAL_MODE': 'true', 'PORT': str(port)})
         
         server_process = subprocess.Popen([
-            'python', 'app.py'
+            'python', '-m', 'app'
         ], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=os.getcwd())
         
         try:
