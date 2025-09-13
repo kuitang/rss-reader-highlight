@@ -32,7 +32,7 @@ class TestWorkingRegression:
         """
         # Navigate and wait for page load
         page.set_viewport_size({"width": 1200, "height": 800})  # Ensure desktop layout
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         wait_for_page_ready(page)
         
         # Take screenshot of initial state
@@ -166,8 +166,10 @@ class TestWorkingRegression:
         """Test mobile-specific functionality and layout."""
         # Set mobile viewport
         page.set_viewport_size({"width": 390, "height": 844})
-        
-        page.goto(test_server_url)
+
+        page.goto(test_server_url, timeout=10000)
+        # Wait for specific mobile layout element to ensure page is loaded
+        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
         wait_for_htmx_complete(page)
         
         page.screenshot(path="/tmp/regression_mobile_initial.png")
@@ -206,7 +208,9 @@ class TestWorkingRegression:
 
     def test_htmx_requests_monitoring(self, page: Page, test_server_url):
         """Monitor HTMX requests to ensure they're working properly."""
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
+        # Wait for either mobile or desktop layout element to be visible
+        page.wait_for_selector("li[id^='desktop-feed-item-'], li[id^='mobile-feed-item-']", state="visible", timeout=5000)
         wait_for_htmx_complete(page)
         
         # Monitor network activity
@@ -294,7 +298,7 @@ class TestWorkingRegression:
             else:
                 pytest.skip("Failed to start isolated test server - CI resource issue")
                 
-            page.goto(server_url)
+            page.goto(server_url, timeout=10000)
             wait_for_htmx_complete(page)
             
             # Select a feed first - handle both layouts

@@ -23,7 +23,7 @@ class TestComprehensiveRegression:
     
     def test_desktop_comprehensive_workflow(self, page: Page, test_server_url):
         """Test complete desktop workflow: feed selection, article reading, tab switching"""
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         page.set_viewport_size({"width": 1200, "height": 800})
         
         # Wait for page load
@@ -80,7 +80,7 @@ class TestComprehensiveRegression:
     
     def test_mobile_comprehensive_workflow(self, page: Page, test_server_url):
         """Test complete mobile workflow: navigation, feed selection, article reading"""
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         page.set_viewport_size({"width": 390, "height": 844})
         
         # Wait for page load and verify mobile layout
@@ -152,7 +152,7 @@ class TestComprehensiveRegression:
     
     def test_responsive_layout_switching(self, page: Page, test_server_url):
         """Test layout adaptation when switching between desktop and mobile viewports"""
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         
         # Start with desktop
         page.set_viewport_size({"width": 1200, "height": 800})
@@ -182,7 +182,7 @@ class TestComprehensiveRegression:
     
     def test_htmx_state_management(self, page: Page, test_server_url):
         """Test HTMX state updates and out-of-band swaps"""
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         page.set_viewport_size({"width": 1200, "height": 800})
         
         # Wait for page load
@@ -206,7 +206,7 @@ class TestComprehensiveRegression:
     
     def test_rapid_interaction_stability(self, page: Page, test_server_url):
         """Test stability under rapid user interactions"""
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         page.set_viewport_size({"width": 1200, "height": 800})
         
         # Wait for initial load
@@ -242,7 +242,7 @@ class TestComprehensiveRegression:
     
     def test_feed_content_and_pagination(self, page: Page, test_server_url):
         """Test feed content loading and pagination behavior"""
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         page.set_viewport_size({"width": 1200, "height": 800})
         
         # Wait for content load
@@ -270,7 +270,7 @@ class TestComprehensiveRegression:
     
     def test_session_and_state_persistence(self, page: Page, test_server_url):
         """Test session management and state persistence across navigation"""
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         
         # Wait for initial session setup
         wait_for_page_ready(page)
@@ -313,16 +313,16 @@ class TestComprehensiveRegression:
                 assert "/item/" in page.url
                 
                 # Go back to main page
-                page.goto(test_server_url)
+                page.goto(test_server_url, timeout=10000)
                 wait_for_page_ready(page)
     
     def test_error_resilience_and_recovery(self, page: Page, test_server_url):
         """Test application resilience under various error conditions"""
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         
         # Test invalid item URL (use very high number unlikely to exist)
         invalid_item_id = 999999
-        page.goto(f"{test_server_url}/item/{invalid_item_id}")
+        page.goto(f"{test_server_url}/item/{invalid_item_id}", timeout=10000)
         wait_for_page_ready(page)
         
         # Should gracefully handle non-existent items
@@ -330,14 +330,14 @@ class TestComprehensiveRegression:
         
         # Test invalid feed ID (use very high number unlikely to exist)
         invalid_feed_id = 999999
-        page.goto(f"{test_server_url}/?feed_id={invalid_feed_id}")
+        page.goto(f"{test_server_url}/?feed_id={invalid_feed_id}", timeout=10000)
         wait_for_page_ready(page)
         
         # Should gracefully handle invalid feed IDs
         # Page loads successfully (title may be default FastHTML page now)
         
         # Return to valid state
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         wait_for_page_ready(page)
         # Page loads successfully (title may be default FastHTML page now)
 
@@ -347,7 +347,7 @@ class TestHTMXArchitectureValidation:
     
     def test_mobile_handlers_routing(self, page: Page, test_server_url):
         """Test MobileHandlers routing and content swapping"""
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         page.set_viewport_size({"width": 390, "height": 844})
         
         # Test mobile content handler
@@ -366,7 +366,7 @@ class TestHTMXArchitectureValidation:
     
     def test_desktop_handlers_routing(self, page: Page, test_server_url):
         """Test DesktopHandlers routing and column updates"""
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         page.set_viewport_size({"width": 1200, "height": 800})
         
         # Test desktop feeds column handler
@@ -392,7 +392,7 @@ class TestHTMXArchitectureValidation:
     def test_unified_tab_container_behavior(self, page: Page, test_server_url):
         """Test the unified create_tab_container function for both mobile and desktop"""
         # Test desktop tab behavior
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         page.set_viewport_size({"width": 1200, "height": 800})
         wait_for_page_ready(page)
         

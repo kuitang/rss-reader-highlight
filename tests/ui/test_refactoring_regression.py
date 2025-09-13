@@ -46,7 +46,7 @@ class TestRefactoringRegression:
         Tests the core three-panel layout functionality.
         """
         # Navigate to app
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         page.wait_for_load_state("networkidle")
         
         # Take initial screenshot
@@ -174,7 +174,7 @@ class TestRefactoringRegression:
         page.set_viewport_size({"width": 390, "height": 844})
         
         # Navigate to app
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         page.wait_for_load_state("networkidle")
         
         # Take initial mobile screenshot
@@ -320,7 +320,7 @@ class TestRefactoringRegression:
         Monitor HTMX requests and responses for any failures or incorrect targets.
         This test focuses on the HTMX functionality that could break from refactoring.
         """
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=10000)
         
         # Monitor network requests
@@ -390,7 +390,7 @@ class TestRefactoringRegression:
         Test that read/unread state is properly managed after refactoring.
         This is critical functionality that could break with database changes.
         """
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=10000)
         
         # Click on a feed

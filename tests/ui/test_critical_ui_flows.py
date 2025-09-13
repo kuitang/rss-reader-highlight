@@ -44,7 +44,7 @@ class TestFormParameterBugFlow:
         """
         # Set desktop viewport to ensure desktop layout
         page.set_viewport_size({"width": 1200, "height": 800})
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle instead of 3 seconds
         
         # 1. Verify desktop layout is visible first
@@ -90,7 +90,7 @@ class TestFormParameterBugFlow:
         """
         # Set mobile viewport
         page.set_viewport_size({"width": 375, "height": 667})
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
         
         # 1. Open mobile sidebar - UPDATED SELECTOR using filter
@@ -122,7 +122,7 @@ class TestFormParameterBugFlow:
         """
         # Set mobile viewport
         page.set_viewport_size({"width": 375, "height": 667})
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
         
         # 1. Open mobile sidebar - UPDATED SELECTOR
@@ -154,7 +154,7 @@ class TestFormParameterBugFlow:
         """
         # Set desktop viewport
         page.set_viewport_size({"width": 1920, "height": 1080})
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
         
         # 1. Verify we start with main view (check desktop-specific elements)
@@ -185,7 +185,7 @@ class TestFormParameterBugFlow:
         """
         # Set desktop viewport for consistency
         page.set_viewport_size({"width": 1200, "height": 800})
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
         page.wait_for_selector("a[href*='feed_id']", timeout=10000)  # OPTIMIZED: Wait for feeds to load
         
@@ -211,7 +211,7 @@ class TestBBCRedirectHandlingFlow:
         """
         # Set desktop viewport for consistency
         page.set_viewport_size({"width": 1200, "height": 800})
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
         
         # Count initial feeds
@@ -255,7 +255,7 @@ class TestBlueIndicatorHTMXFlow:
         ]:
             print(f"\n--- Testing {viewport_name} blue indicator behavior ---")
             page.set_viewport_size(viewport_size)
-            page.goto(test_server_url)
+            page.goto(test_server_url, timeout=10000)
             wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
             
             # Verify correct layout is active
@@ -311,7 +311,7 @@ class TestBlueIndicatorHTMXFlow:
         """
         # Set desktop viewport for consistency
         page.set_viewport_size({"width": 1200, "height": 800})
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         wait_for_page_ready(page)
         
         # 1. Switch to Unread view - UPDATED: Use link with role=button
@@ -345,7 +345,7 @@ class TestBlueIndicatorHTMXFlow:
         """
         # Set desktop viewport for consistency
         page.set_viewport_size({"width": 1200, "height": 800})
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         wait_for_page_ready(page)
         
         # Get articles with blue dots
@@ -399,7 +399,7 @@ class TestSessionAndSubscriptionFlow:
             print(f"\n--- Testing {viewport_name} auto-subscription flow ---")
             page.set_viewport_size(viewport_size)
             # 1. Fresh browser visit
-            page.goto(test_server_url)
+            page.goto(test_server_url, timeout=10000)
             wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
             
             # Verify correct layout is active
@@ -490,7 +490,7 @@ class TestFullViewportHeightFlow:
         ]:
             print(f"\n--- Testing {viewport_name} viewport layout ---")
             page.set_viewport_size(viewport_size)
-            page.goto(test_server_url)
+            page.goto(test_server_url, timeout=10000)
             wait_for_page_ready(page)
             
             if viewport_name == "desktop":
@@ -530,7 +530,7 @@ class TestErrorHandlingUIFeedback:
     def test_network_error_handling_ui_feedback(self, page, test_server_url):
         """Test: Network errors → Proper user feedback → No broken UI"""
 
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         wait_for_page_ready(page)
         
         # Test adding feed that will definitely fail
@@ -559,7 +559,7 @@ class TestErrorHandlingUIFeedback:
     def test_malformed_url_error_handling(self, page, test_server_url):
         """Test: Invalid URLs → Proper validation → User-friendly errors"""
 
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         wait_for_page_ready(page)
         
         invalid_urls = [
@@ -593,7 +593,7 @@ class TestComplexNavigationFlows:
         """Test: Deep navigation → Browser back → State consistency → No broken UI"""
 
         page.set_viewport_size({"width": 1200, "height": 800})  # Desktop viewport for consistency
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         wait_for_page_ready(page)
         
         # 1. Navigate through different views (desktop-specific)
@@ -632,7 +632,7 @@ class TestComplexNavigationFlows:
         """Test: Rapid clicking → Multiple HTMX requests → UI stability → No race conditions"""
 
         page.set_viewport_size({"width": 1200, "height": 800})  # Desktop viewport for consistency
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         wait_for_page_ready(page)
         
         # Collect clickable elements safely (desktop-specific)
@@ -698,7 +698,7 @@ class TestTabSizeAndAlignment:
             
             try:
                 # Navigate to the app
-                page.goto(test_server_url, wait_until='networkidle')
+                page.goto(test_server_url, wait_until='networkidle', timeout=10000)
                 wait_for_page_ready(page)
                 
                 # Find navigation buttons - new icon-based design
@@ -791,7 +791,7 @@ class TestSearchBarHeightInvariant:
         
         # Set mobile viewport to test mobile chrome
         page.set_viewport_size({"width": 390, "height": 844})
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         wait_for_page_ready(page)
         
         # Measure initial header height
@@ -889,7 +889,7 @@ class TestSearchBarHeightInvariant:
         
         # Set mobile viewport
         page.set_viewport_size({"width": 390, "height": 844})
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         wait_for_page_ready(page)
         
         # Click search button to expand
@@ -942,7 +942,7 @@ class TestPaginationButtonDuplication:
         """
         # Navigate to a feed that likely has pagination
         # First get to main page then find a feed with lots of items
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         
         # Try to find a feed with many items (ClaudeAI, Hacker News, etc)
         feed_links = page.locator("#sidebar a[href*='feed_id']:has-text('ClaudeAI'), #sidebar a[href*='feed_id']:has-text('Hacker News')")

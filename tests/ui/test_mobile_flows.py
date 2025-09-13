@@ -30,7 +30,9 @@ class TestMobileFlows:
     def setup(self, page: Page, test_server_url):
         """Set mobile viewport for all tests"""
         page.set_viewport_size({"width": 375, "height": 667})
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
+        # Wait for mobile layout to be visible
+        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
     
     # Navigation Tests (from test_mobile_navigation.py)
@@ -322,11 +324,15 @@ class TestMobileFlows:
         article_title = page.locator("#item-detail strong").first.text_content()
         
         # Navigate away and then back to test direct URL access
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
+        # Wait for mobile layout to be visible
+        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)  # FIXED: Don't expect sidebar visible on main page
         
         # Now navigate directly to the article URL
-        page.goto(article_url)
+        page.goto(article_url, timeout=10000)
+        # Wait for article detail to be visible
+        page.wait_for_selector("#item-detail", state="visible", timeout=5000)
         wait_for_page_ready(page)
         
         # Should show the same article
@@ -365,11 +371,15 @@ class TestMobileFlows:
             assert "feed_id=" in current_url, "Should be on filtered feed view"
             
             # Navigate away and back to test sharing
-            page.goto(test_server_url)
+            page.goto(test_server_url, timeout=10000)
+            # Wait for mobile layout to be visible
+            page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
             wait_for_page_ready(page)  # OPTIMIZED: Wait for page to load, sidebar is hidden by default
             
             # Navigate directly to the feed URL
-            page.goto(current_url)
+            page.goto(current_url, timeout=10000)
+            # Wait for mobile layout to be visible
+            page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
             wait_for_page_ready(page)
             
             # Should be back on the filtered view
@@ -398,11 +408,13 @@ class TestMobileFlows:
             if feed_link.is_visible():
                 feed_link.click()
             else:
-                page.goto(test_server_url + "/")  # Go to home as fallback
+                page.goto(test_server_url + "/", timeout=10000)  # Go to home as fallback
             page.wait_for_selector("#mobile-sidebar", state="visible")
             
             # Navigate back to unread view
-            page.goto(current_url)
+            page.goto(current_url, timeout=10000)
+            # Wait for mobile layout to be visible
+            page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
             wait_for_htmx_complete(page)
             
             # Should be back in unread view

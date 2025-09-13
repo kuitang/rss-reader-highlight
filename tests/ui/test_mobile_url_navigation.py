@@ -25,7 +25,9 @@ class TestMobileNavigationComplete:
         page.set_viewport_size({"width": 390, "height": 844})  # iPhone 13 size
         
         # Navigate to clean starting state (preserves session cookies automatically)
-        page.goto(f"{test_server_url}/?unread=0", wait_until="networkidle")
+        page.goto(f"{test_server_url}/?unread=0", wait_until="networkidle", timeout=10000)
+        # Wait for specific mobile layout element
+        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)
         
         # Ensure clean DOM state - mobile sidebar should be closed by default
@@ -47,7 +49,9 @@ class TestMobileNavigationComplete:
         page.set_viewport_size({"width": 390, "height": 844})
         
         # Start at All Posts view
-        page.goto(f"{test_server_url}/?unread=0")
+        page.goto(f"{test_server_url}/?unread=0", timeout=10000)
+        # Wait for specific mobile layout element
+        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)
         
         # CRITICAL: Set and verify scroll position on the feeds list container
@@ -164,7 +168,9 @@ class TestMobileNavigationComplete:
         """Test hamburger <-> chevron button toggling works correctly"""
         
         # Start at list view
-        page.goto(f"{test_server_url}/?unread=0")  
+        page.goto(f"{test_server_url}/?unread=0", timeout=10000)
+        # Wait for specific mobile layout element
+        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)
         
         # Test navigation by direct URL (more reliable than element clicking)
@@ -199,7 +205,9 @@ class TestMobileNavigationComplete:
         assert chevron_icon == 'arrow-left', f"FAILED: Expected arrow-left icon in article view, got: {chevron_icon}"
         
         # Step 2: Go back to list view
-        page.goto(f"{test_server_url}/?unread=0")
+        page.goto(f"{test_server_url}/?unread=0", timeout=10000)
+        # Wait for specific mobile layout element
+        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)
         
         # Verify hamburger restored
@@ -221,7 +229,9 @@ class TestMobileNavigationComplete:
         """Test mobile persistent header shows/hides correctly (regression fix)"""
         
         # Start at list view - header should be visible
-        page.goto(f"{test_server_url}/?unread=0")
+        page.goto(f"{test_server_url}/?unread=0", timeout=10000)
+        # Wait for specific mobile layout element
+        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)
         
         mobile_header = page.locator('#mobile-persistent-header')
@@ -263,7 +273,9 @@ class TestMobileNavigationComplete:
             print("📱 HEADER NOT IMPLEMENTED: mobile-persistent-header element not found, test passes")
         
         # Navigate back to list view - header should be visible again
-        page.goto(f"{test_server_url}/?unread=0")
+        page.goto(f"{test_server_url}/?unread=0", timeout=10000)
+        # Wait for specific mobile layout element
+        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)
         
         expect(mobile_header).to_be_hidden()  # Header remains hidden per current design
@@ -274,7 +286,9 @@ class TestMobileNavigationComplete:
         """Test the core bug fix: All Posts vs Unread state preservation"""
         
         # Test 1: All Posts -> Article -> Back should return to All Posts
-        page.goto(f"{test_server_url}/?unread=0")
+        page.goto(f"{test_server_url}/?unread=0", timeout=10000)
+        # Wait for specific mobile layout element
+        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)
         
         # Click on an article from All Posts view (don't hardcode ID)
@@ -298,8 +312,10 @@ class TestMobileNavigationComplete:
         assert "unread=0" in page.url, "Should return to All Posts view"
         print("✅ ALL POSTS: State preserved after back navigation")
         
-        # Test 2: Unread -> Article -> Back should return to Unread  
-        page.goto(f"{test_server_url}/")
+        # Test 2: Unread -> Article -> Back should return to Unread
+        page.goto(f"{test_server_url}/", timeout=10000)
+        # Wait for specific mobile layout element
+        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)
         
         # Click on an article from Unread view (don't hardcode ID)
