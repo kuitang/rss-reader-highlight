@@ -19,6 +19,14 @@ cd "$(dirname "$0")"
 # Activate virtual environment
 source venv/bin/activate
 
+# Create minimal seed database for UI tests if it doesn't exist
+if [ ! -f "data/minimal_seed.db" ]; then
+    echo "📦 Creating minimal seed database for UI tests..."
+    mkdir -p data
+    python scripts/create_minimal_db.py
+    echo ""
+fi
+
 # Use pytest-xdist for parallelization
 PYTEST_ARGS="-n auto --dist=loadfile"
 
