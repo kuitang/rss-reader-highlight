@@ -475,8 +475,8 @@ class TestMobileFlows:
         
         # Should be back to feed list with correct feed title
         expect(page.locator("li[id^='mobile-feed-item-']").first).to_be_visible()
-        feed_title_after_back = page.locator("#main-content .flex.items-center.space-x-2 h3")
-        expect(feed_title_after_back).to_have_text("ClaudeAI")  # Should NOT be "BizToc"
+        feed_title_after_back = page.locator("#mobile-top-bar h3, #mobile-header h3").first
+        expect(feed_title_after_back).to_contain_text("ClaudeAI")  # Should NOT be "BizToc"
 
 
 

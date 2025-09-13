@@ -394,8 +394,8 @@ class TestRefactoringRegression:
             # Wait for content to load after article click
             page.wait_for_selector("#main-content", state="visible", timeout=10000)
         
-        # 3. Toggle between tabs (should trigger HTMX update)
-        unread_tab = page.locator("button[title='Unread']")
+        # 3. Toggle between tabs (should trigger HTMX update) - desktop viewport
+        unread_tab = page.locator("#desktop-icon-bar button[title='Unread']")
         if unread_tab.is_visible():
             print("Toggling to Unread tab")
             unread_tab.click()
