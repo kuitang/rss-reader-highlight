@@ -454,9 +454,9 @@ class TestMobileFlows:
         claudeai_feed.click()
         wait_for_htmx_complete(page)
         
-        # Verify we're viewing ClaudeAI feed
-        feed_title = page.locator("#main-content .flex.items-center.space-x-2 h3")
-        expect(feed_title).to_have_text("ClaudeAI")
+        # Verify we're viewing ClaudeAI feed - mobile feed title is in header
+        feed_title = page.locator("#mobile-top-bar h3, #mobile-header h3").first
+        expect(feed_title).to_contain_text("ClaudeAI")
         
         # Click on an article
         first_article = page.locator("li[id^='mobile-feed-item-']").first

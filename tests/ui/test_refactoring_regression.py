@@ -45,19 +45,21 @@ class TestRefactoringRegression:
         Desktop workflow: Click feeds, scroll, view articles, toggle tabs - 3 cycles.
         Tests the core three-panel layout functionality.
         """
-        # Navigate to app with robust retry for CI
+        # Navigate to app with robust retry and increased timeout for CI
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                page.goto(test_server_url, timeout=10000)
-                page.wait_for_load_state("networkidle")
+                page.goto(test_server_url, timeout=20000)  # Increased from 10s to 20s
+                page.wait_for_load_state("networkidle", timeout=15000)  # Added explicit timeout
+                # Verify server is responsive by checking for key elements
+                page.wait_for_selector("#mobile-layout, #desktop-layout", timeout=5000)
                 break
             except Exception as e:
                 if attempt == max_retries - 1:
                     raise
                 print(f"Server connection attempt {attempt + 1} failed, retrying...")
                 import time
-                time.sleep(2)
+                time.sleep(3)  # Slightly longer between retries
         
         # Take initial screenshot
         page.screenshot(path="/tmp/desktop_initial.png")
@@ -79,6 +81,11 @@ class TestRefactoringRegression:
         
         for cycle in range(3):
             print(f"\n=== Desktop Cycle {cycle + 1} ===")
+
+            # Add delay between cycles to reduce server stress in CI
+            if cycle > 0:
+                import time
+                time.sleep(1)
             
             # 1. Click on a random feed in sidebar
             feed_index = cycle % min(feed_count, 3)  # Cycle through first 3 feeds
@@ -183,19 +190,21 @@ class TestRefactoringRegression:
         # Set mobile viewport
         page.set_viewport_size({"width": 390, "height": 844})
         
-        # Navigate to app with robust retry for CI
+        # Navigate to app with robust retry and increased timeout for CI
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                page.goto(test_server_url, timeout=10000)
-                page.wait_for_load_state("networkidle")
+                page.goto(test_server_url, timeout=20000)  # Increased from 10s to 20s
+                page.wait_for_load_state("networkidle", timeout=15000)  # Added explicit timeout
+                # Verify server is responsive by checking for key elements
+                page.wait_for_selector("#mobile-layout, #desktop-layout", timeout=5000)
                 break
             except Exception as e:
                 if attempt == max_retries - 1:
                     raise
                 print(f"Server connection attempt {attempt + 1} failed, retrying...")
                 import time
-                time.sleep(2)
+                time.sleep(3)  # Slightly longer between retries
         
         # Take initial mobile screenshot
         page.screenshot(path="/tmp/mobile_initial.png")
@@ -206,6 +215,11 @@ class TestRefactoringRegression:
         
         for cycle in range(3):
             print(f"\n=== Mobile Cycle {cycle + 1} ===")
+
+            # Add delay between cycles to reduce server stress in CI
+            if cycle > 0:
+                import time
+                time.sleep(1)
             
             # 1. Click hamburger menu to open sidebar
             hamburger_menu = page.locator("button#mobile-nav-button")  # Mobile nav button
