@@ -1,11 +1,11 @@
 import tempfile
 import os
 import pytest
-from models import init_db, get_db, FeedModel, FeedItemModel
+from app.models import init_db, get_db, FeedModel, FeedItemModel
 
 @pytest.fixture
 def temp_db():
-    import models
+    import app.models as models
     with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
         tmp_db = tmp.name
     original_db = models.DB_PATH
