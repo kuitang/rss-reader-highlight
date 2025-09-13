@@ -84,7 +84,7 @@ class Styling:
     FEED_ITEM_READ = 'bg-muted tag-read'
     FEED_ITEM_UNREAD = 'tag-unread'
     SIDEBAR_DESKTOP = 'col-span-1 h-screen overflow-y-auto border-r px-2'
-    DESKTOP_FEEDS_COLUMN = 'col-span-2 h-screen flex flex-col overflow-hidden border-r px-4'
+    DESKTOP_FEEDS_COLUMN = 'col-span-2 h-screen flex flex-col overflow-y-auto border-r px-4'
     DESKTOP_DETAIL_COLUMN = 'col-span-2 h-screen overflow-y-auto px-6'
     MOBILE_SIDEBAR_OVERLAY = 'fixed inset-0 z-50 lg:hidden'
     MOBILE_PERSISTENT_HEADER = 'flex-shrink-0 bg-background border-b z-10 lg:hidden'
