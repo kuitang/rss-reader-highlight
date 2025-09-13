@@ -167,7 +167,17 @@ class TestWorkingRegression:
         # Set mobile viewport
         page.set_viewport_size({"width": 390, "height": 844})
 
-        page.goto(test_server_url, timeout=10000)
+        # Retry page navigation in case server is slow to respond in CI
+        for attempt in range(2):
+            try:
+                page.goto(test_server_url, timeout=10000)
+                break
+            except Exception as e:
+                if attempt == 1:
+                    raise
+                import time
+                time.sleep(2)  # Wait before retry
+
         # Wait for specific mobile layout element to ensure page is loaded
         page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
         wait_for_htmx_complete(page)
@@ -208,7 +218,17 @@ class TestWorkingRegression:
 
     def test_htmx_requests_monitoring(self, page: Page, test_server_url):
         """Monitor HTMX requests to ensure they're working properly."""
-        page.goto(test_server_url, timeout=10000)
+        # Retry page navigation in case server is slow to respond in CI
+        for attempt in range(2):
+            try:
+                page.goto(test_server_url, timeout=10000)
+                break
+            except Exception as e:
+                if attempt == 1:
+                    raise
+                import time
+                time.sleep(2)  # Wait before retry
+
         # Wait for either mobile or desktop layout element to be visible
         page.wait_for_selector("li[id^='desktop-feed-item-'], li[id^='mobile-feed-item-']", state="visible", timeout=5000)
         wait_for_htmx_complete(page)
