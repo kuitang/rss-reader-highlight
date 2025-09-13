@@ -22,7 +22,7 @@ def ensure_mobile_sidebar_open(page: Page):
     if mobile_nav_button.is_visible():
         # We're in mobile layout, need to open sidebar first
         mobile_nav_button.click()
-        page.wait_for_timeout(300)  # Wait for sidebar animation
+        wait_for_htmx_complete(page)  # Wait for sidebar animation
         return True
     return False  # Desktop layout, no need to open sidebar
 
@@ -100,7 +100,7 @@ class TestRefactoringRegression:
             # Scroll down multiple times to load more items
             for scroll in range(3):
                 page.keyboard.press("PageDown")
-                page.wait_for_timeout(500)  # Short wait for scroll animation
+                wait_for_htmx_complete(page)  # Short wait for scroll animation
             
             # 3. Click on an article to view details in right panel
             article_links = middle_panel.locator("#feeds-list-container .js-filter li").all()  # Each article is in a listitem
@@ -124,7 +124,7 @@ class TestRefactoringRegression:
                 
                 # Check that blue dot disappeared (article marked as read)
                 # This tests the critical read/unread state functionality
-                page.wait_for_timeout(1000)  # Brief wait for state update
+                wait_for_htmx_complete(page)  # Brief wait for state update
             
             # 4. Toggle between "All Posts" and "Unread" tabs
             all_posts_tab = page.locator("text=All Posts").first
@@ -193,7 +193,7 @@ class TestRefactoringRegression:
             
             print("Opening hamburger menu")
             hamburger_menu.click()
-            page.wait_for_timeout(500)  # Allow animation
+            wait_for_htmx_complete(page)  # Allow animation
             
             # Verify sidebar is visible (first column on mobile)
             sidebar = page.locator("#mobile-sidebar")
@@ -234,7 +234,7 @@ class TestRefactoringRegression:
             # Scroll down multiple times
             for scroll in range(3):
                 page.mouse.wheel(0, 500)
-                page.wait_for_timeout(500)  # Short wait for scroll animation
+                wait_for_htmx_complete(page)  # Short wait for scroll animation
             
             # 4. Click on an article (should navigate to full-screen view)
             article_links = feed_container.locator("li[id^='mobile-feed-item-']").all()

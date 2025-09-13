@@ -74,7 +74,7 @@ def test_server_url():
     })
     
     server_process = subprocess.Popen([
-        'python', 'app.py'
+        'python', '-m', 'app'
     ], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=os.getcwd())
     
     # Register cleanup function
@@ -104,7 +104,7 @@ def test_server_url():
     atexit.register(cleanup_server)
     
     # Wait for server to start
-    for _ in range(30):  # 30 seconds timeout
+    for _ in range(10):  # 30 seconds timeout
         try:
             response = httpx.get(server_url, timeout=2)
             if response.status_code == 200:

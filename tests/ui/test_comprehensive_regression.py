@@ -97,7 +97,7 @@ class TestComprehensiveRegression:
                 hamburger.click()
                 
                 # Wait for sidebar to open
-                page.wait_for_timeout(500)
+                wait_for_htmx_complete(page)
                 expect(page.locator("#mobile-sidebar")).to_be_visible()
                 
                 # Click on a feed
@@ -136,7 +136,7 @@ class TestComprehensiveRegression:
                             back_button.click()
                             
                             # Wait for navigation back to feed list
-                            page.wait_for_timeout(1000)
+                            wait_for_htmx_complete(page)
                             
                             # Toggle between tabs (use visible one for mobile)
                             all_posts_tab = page.locator("#mobile-layout a:has-text('All Posts')").first
@@ -144,11 +144,11 @@ class TestComprehensiveRegression:
                             
                             if all_posts_tab.is_visible():
                                 all_posts_tab.click()
-                                page.wait_for_timeout(500)
+                                wait_for_htmx_complete(page)
                                 
                             if unread_tab.is_visible():
                                 unread_tab.click()
-                                page.wait_for_timeout(500)
+                                wait_for_htmx_complete(page)
     
     def test_responsive_layout_switching(self, page: Page, test_server_url):
         """Test layout adaptation when switching between desktop and mobile viewports"""
@@ -168,14 +168,14 @@ class TestComprehensiveRegression:
         
         # Switch to mobile viewport
         page.set_viewport_size({"width": 390, "height": 844})
-        page.wait_for_timeout(1000)
+        wait_for_htmx_complete(page)
         
         expect(page.locator("#mobile-layout")).to_be_visible()
         expect(page.locator("#desktop-layout")).to_be_hidden()
         
         # Switch back to desktop
         page.set_viewport_size({"width": 1200, "height": 800})
-        page.wait_for_timeout(1000)
+        wait_for_htmx_complete(page)
         
         expect(page.locator("#desktop-layout")).to_be_visible()
         expect(page.locator("#mobile-layout")).to_be_hidden()
@@ -186,7 +186,7 @@ class TestComprehensiveRegression:
         page.set_viewport_size({"width": 1200, "height": 800})
         
         # Wait for page load
-        page.wait_for_timeout(2000)
+        wait_for_htmx_complete(page)
         
         # Test blue indicator state changes
         unread_items = page.locator("#desktop-feeds-content li[id*='feed-item'] .w-2.h-2.bg-blue-500")
@@ -198,7 +198,7 @@ class TestComprehensiveRegression:
             first_unread_item.click()
             
             # Wait for HTMX update
-            page.wait_for_timeout(1000)
+            wait_for_htmx_complete(page)
             
             # Verify blue dot disappeared (out-of-band update)
             final_count = unread_items.count()
@@ -210,7 +210,7 @@ class TestComprehensiveRegression:
         page.set_viewport_size({"width": 1200, "height": 800})
         
         # Wait for initial load
-        page.wait_for_timeout(2000)
+        wait_for_htmx_complete(page)
         
         # Rapid clicking test
         for i in range(5):
@@ -219,13 +219,13 @@ class TestComprehensiveRegression:
             feed_links = page.locator("#sidebar a[href*='feed_id']").all()
             if len(feed_links) > 0:
                 feed_links[i % len(feed_links)].click()
-                page.wait_for_timeout(200)
+                wait_for_htmx_complete(page)
             
             # Quick article clicks (desktop layout)
             article_items = page.locator("li[id^='desktop-feed-item-']").all()
             if len(article_items) > 0:
                 article_items[0].click()
-                page.wait_for_timeout(200)
+                wait_for_htmx_complete(page)
         
         # Verify app is still responsive
         # Page loads successfully (title may be default FastHTML page now)
@@ -233,7 +233,7 @@ class TestComprehensiveRegression:
         # Check for JavaScript errors
         errors = []
         page.on("pageerror", lambda error: errors.append(str(error)))
-        page.wait_for_timeout(1000)
+        wait_for_htmx_complete(page)
         
         assert len(errors) == 0, f"JavaScript errors detected: {errors}"
     
@@ -283,7 +283,7 @@ class TestComprehensiveRegression:
         if is_mobile:
             # Mobile: open sidebar and get mobile feed links
             mobile_nav_button.click()
-            page.wait_for_timeout(300)
+            wait_for_htmx_complete(page)
             feed_links = page.locator("#mobile-sidebar a[href*='feed_id']").all()
         else:
             # Desktop: get sidebar feed links directly
@@ -293,7 +293,7 @@ class TestComprehensiveRegression:
             # Reopen mobile sidebar before each feed click if mobile
             if is_mobile and not page.locator("#mobile-sidebar").is_visible():
                 mobile_nav_button.click()
-                page.wait_for_timeout(300)
+                wait_for_htmx_complete(page)
                 
             feed_link.click()
             wait_for_htmx_complete(page)
@@ -307,7 +307,7 @@ class TestComprehensiveRegression:
             if len(article_items) > 0:
                 article_items[0].click()
                 wait_for_htmx_complete(page)
-                page.wait_for_timeout(500)  # Additional wait for URL update
+                wait_for_htmx_complete(page)  # Additional wait for URL update
                 
                 # Verify article loads
                 assert "/item/" in page.url
@@ -382,7 +382,7 @@ class TestHTMXArchitectureValidation:
         article_items = page.locator("li[id*='desktop-feed-item']").all()
         if len(article_items) > 0:
             article_items[0].click()
-            page.wait_for_timeout(1000)
+            wait_for_htmx_complete(page)
             
             # Verify detail column updates while other columns remain
             expect(page.locator("#desktop-item-detail")).to_contain_text("From:")

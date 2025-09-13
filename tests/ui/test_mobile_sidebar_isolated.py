@@ -39,7 +39,7 @@ class TestMobileSidebarIsolated:
         # Ensure mobile layout and JavaScript are ready
         expect(page.locator("#mobile-layout")).to_be_visible()
         expect(page.locator("#mobile-nav-button")).to_be_visible()
-        page.wait_for_timeout(500)  # Ensure JS is loaded
+        wait_for_htmx_complete(page)  # Ensure JS is loaded
         
         # Test sidebar open/close cycle
         for i in range(3):
@@ -65,7 +65,7 @@ class TestMobileSidebarIsolated:
                         
                         # Verify full-screen article view
                         wait_for_htmx_complete(page)
-                        page.wait_for_timeout(500)  # Additional wait for URL update
+                        wait_for_htmx_complete(page)  # Additional wait for URL update
                         assert "/item/" in page.url
                         
                         # Navigate back

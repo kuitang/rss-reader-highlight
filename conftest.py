@@ -86,13 +86,13 @@ def start_test_server(minimal: bool = True, timeout: int = 20) -> Optional[subpr
     
     try:
         # Kill any existing servers
-        subprocess.run(['pkill', '-f', 'python app.py'], 
+        subprocess.run(['pkill', '-f', 'python -m app'],
                       capture_output=True, check=False)
         time.sleep(1)
         
         # Start new server
         server_process = subprocess.Popen([
-            sys.executable, 'app.py'
+            sys.executable, '-m', 'app'
         ], env=env, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         
         # Wait for server to be ready

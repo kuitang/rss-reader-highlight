@@ -204,6 +204,86 @@ rss-reader-highlight/
 
 ## Testing Strategy
 
+### CRITICAL Playwright Testing Guidelines
+
+#### ⚠️ MANDATORY Rules for Writing Playwright Tests
+
+1. **Selector Strategy - Use Semantic, Not Styling**
+   ```python
+   # ❌ BAD - Brittle, tied to styling classes
+   page.locator(".uk-button.uk-button-primary.uk-margin-small")
+
+   # ✅ GOOD - Semantic, structure-based
+   page.locator("button[type='submit']")
+   page.locator("a[href*='feed_id']")
+   page.locator("#sidebar")  # IDs are stable
+   page.locator("[role='button']:has-text('Submit')")  # Role + text
+   ```
+
+2. **NEVER Use Static Timeouts - Wait for Specific Conditions**
+   ```python
+   # ❌ BAD - Arbitrary wait time
+   page.wait_for_timeout(2000)
+   time.sleep(3)
+
+   # ✅ GOOD - Wait for specific selector/condition
+   page.wait_for_selector("#content", state="visible", timeout=10000)
+   wait_for_htmx_complete(page)  # Waits for HTMX requests to complete
+   page.wait_for_function("() => !document.body.classList.contains('htmx-request')")
+   ```
+
+3. **Maximum Timeout: 10 Seconds**
+   ```python
+   # ❌ BAD - Long timeout masks real issues
+   page.wait_for_selector("#slow-element", timeout=30000)
+
+   # ✅ GOOD - Max 10s, fail fast if something is wrong
+   page.wait_for_selector("#element", timeout=10000)
+   ```
+
+4. **Handle Layout Variations**
+   ```python
+   # ❌ BAD - Assumes single layout
+   expect(page.locator("#desktop-layout")).to_be_visible()
+
+   # ✅ GOOD - Handles both desktop and mobile
+   page.wait_for_selector("#desktop-layout, #mobile-layout", state="visible")
+   ```
+
+5. **Use Flexible Selectors for Dynamic Content**
+   ```python
+   # ❌ BAD - Exact ID match
+   page.locator("#desktop-feed-item-123")
+
+   # ✅ GOOD - Pattern matching
+   page.locator("li[id^='desktop-feed-item-']")  # Starts with
+   page.locator("li[id*='feed-item']")  # Contains
+   ```
+
+#### Essential Helper Functions
+
+```python
+def wait_for_htmx_complete(page, timeout=5000):
+    """Wait for all HTMX requests to complete"""
+    page.wait_for_function(
+        "() => !document.body.classList.contains('htmx-request')",
+        timeout=timeout
+    )
+
+def wait_for_page_ready(page):
+    """Wait for page to be fully loaded"""
+    page.wait_for_load_state('domcontentloaded')
+    page.wait_for_load_state('networkidle')
+```
+
+#### Testing Principles
+
+- **NEVER** fix a failing test by increasing timeouts
+- **ALWAYS** identify the root cause of timing issues
+- **PREFER** waiting for specific elements over generic waits
+- **USE** semantic selectors based on purpose, not presentation
+- **TEST** both desktop and mobile viewports where applicable
+
 ### Philosophy
 Tests focus on **complex workflows that broke during development**, not trivial framework functionality.
 

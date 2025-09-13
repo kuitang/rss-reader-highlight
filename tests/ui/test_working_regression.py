@@ -179,7 +179,7 @@ class TestWorkingRegression:
             
             # Click hamburger menu
             mobile_nav.click()
-            page.wait_for_timeout(500)
+            wait_for_htmx_complete(page)
             page.screenshot(path="/tmp/regression_mobile_nav_open.png")
             
             # Click on a feed - use dynamic selector
@@ -223,7 +223,7 @@ class TestWorkingRegression:
         if mobile_nav_button.is_visible():
             # Mobile: open sidebar and get mobile feed links
             mobile_nav_button.click()
-            page.wait_for_timeout(300)
+            wait_for_htmx_complete(page)
             claudeai_link = page.locator("#mobile-sidebar a[href*='feed_id']:has-text('ClaudeAI')").first
         else:
             # Desktop: get sidebar feed links directly
@@ -284,7 +284,7 @@ class TestWorkingRegression:
         
         try:
             # Wait for server to start
-            for _ in range(15):  # 15 seconds timeout
+            for _ in range(10):  # 10 seconds timeout
                 try:
                     response = httpx.get(server_url, timeout=2)
                     if response.status_code == 200:
@@ -302,7 +302,7 @@ class TestWorkingRegression:
             if mobile_nav_button.is_visible():
                 # Mobile: open sidebar and get mobile feed links
                 mobile_nav_button.click()
-                page.wait_for_timeout(300)
+                wait_for_htmx_complete(page)
                 claudeai_link = page.locator("#mobile-sidebar a[href*='feed_id']:has-text('ClaudeAI')").first
             else:
                 # Desktop: get sidebar feed links directly

@@ -8,7 +8,7 @@ class TestTextWrapping:
     def test_comprehensive_ui_fixes(self):
         """Comprehensive test of all UI fixes implemented"""
         # Test URL processing function with contrived long URLs
-        from app import process_urls_in_content
+        from app.main import process_urls_in_content
         
         # Create test content with multiple scenarios
         test_cases = [
@@ -65,7 +65,7 @@ class TestTextWrapping:
     def test_css_rules_applied(self):
         """Test that CSS rules for text wrapping and touch targets exist"""
         # Verify that viewport_styles function contains the right CSS rules
-        from app import viewport_styles
+        from app.main import viewport_styles
         
         css_style = viewport_styles()
         css_content = str(css_style)
@@ -88,7 +88,7 @@ class TestTextWrapping:
     
     def test_monsterui_components_used(self):
         """Test that MonsterUI components are used instead of raw HTML"""
-        from app import process_urls_in_content
+        from app.main import process_urls_in_content
         
         test_url = "https://example.com/test"
         processed = process_urls_in_content(f"Check this: {test_url}")

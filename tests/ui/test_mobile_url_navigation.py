@@ -38,7 +38,7 @@ class TestMobileNavigationComplete:
                 window.history.replaceState(null, '', '/?unread=0');
             }
         }""")
-        page.wait_for_timeout(200)  # Increased wait for state settlement
+        wait_for_htmx_complete(page)  # Increased wait for state settlement
     
     def test_scroll_position_preservation_critical(self, page: Page, test_server_url):
         """CRITICAL: Mobile scroll position must be preserved on back navigation"""
@@ -98,7 +98,7 @@ class TestMobileNavigationComplete:
         assert "unread=0" in page.url, "Should return to All Posts view"
         
         # Wait for DOM to settle after back navigation
-        page.wait_for_timeout(100)
+        wait_for_htmx_complete(page)
         
         # CRITICAL: Check scroll position preserved on the feeds list container
         scroll_check = page.evaluate("""() => {
@@ -138,7 +138,7 @@ class TestMobileNavigationComplete:
         
         if not scroll_check['element']:
             # Browser back may have triggered full page reload - check if we can find feeds list
-            page.wait_for_timeout(500)  # Additional wait
+            wait_for_htmx_complete(page)  # Additional wait
             final_scroll = page.evaluate("""() => {
                 const feedsList = document.getElementById('feeds-list-container') || 
                                  document.querySelector('.js-filter') ||
@@ -182,7 +182,7 @@ class TestMobileNavigationComplete:
         feed_item = page.locator(f"#{first_article_id}")
         feed_item.click()
         wait_for_htmx_complete(page)
-        page.wait_for_timeout(200)  # Additional wait for out-of-band button swap
+        wait_for_htmx_complete(page)  # Additional wait for out-of-band button swap
         
         # Verify chevron button appears (arrow-left icon)
         chevron_icon = page.evaluate("""() => {
