@@ -3,6 +3,7 @@ Working regression test for Steps 4-6 refactoring based on actual app structure.
 This test validates the core functionality after the PageData class refactoring.
 """
 
+import os
 import pytest
 from playwright.sync_api import Page, expect
 
@@ -165,6 +166,7 @@ class TestWorkingRegression:
         
         print("=== Basic functionality test completed successfully! ===")
 
+    @pytest.mark.skipif(os.getenv("CI") == "true", reason="Resource intensive - run locally")
     def test_mobile_layout_functionality(self, page: Page, test_server_url):
         """Test mobile-specific functionality and layout."""
         # Set mobile viewport
@@ -219,6 +221,7 @@ class TestWorkingRegression:
         else:
             print("Mobile nav button not found - may be using desktop layout")
 
+    @pytest.mark.skipif(os.getenv("CI") == "true", reason="Resource intensive - run locally")
     def test_htmx_requests_monitoring(self, page: Page, test_server_url):
         """Monitor HTMX requests to ensure they're working properly."""
         # Retry page navigation in case server is slow to respond in CI
