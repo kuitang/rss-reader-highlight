@@ -708,8 +708,8 @@ class TestTabSizeAndAlignment:
                         icon_bar = page.locator('#icon-bar')
                         expect(icon_bar).to_be_visible(timeout=5000)
                         
-                        all_posts_btn = icon_bar.locator('button[title="All Posts"]')
-                        unread_btn = icon_bar.locator('button[title="Unread"]')
+                        all_posts_btn = icon_bar.locator('button[title="All Posts"]').first
+                        unread_btn = icon_bar.locator('button[title="Unread"]').first
                         
                         expect(all_posts_btn).to_be_visible()
                         expect(unread_btn).to_be_visible()
@@ -810,7 +810,8 @@ class TestSearchBarHeightInvariant:
         print(f"Search bar visible: {initial_measurements['searchBarVisible']}")
         
         # Click search button to expand
-        search_button = page.locator('button[title="Search"]')
+        # Use desktop search button for desktop viewport
+        search_button = page.locator('#desktop-icon-bar button[title="Search"], #mobile-icon-bar button[title="Search"]').first
         expect(search_button).to_be_visible()
         search_button.click()
         
@@ -893,7 +894,8 @@ class TestSearchBarHeightInvariant:
         wait_for_page_ready(page)
         
         # Click search button to expand
-        search_button = page.locator('button[title="Search"]')
+        # Use desktop search button for desktop viewport
+        search_button = page.locator('#desktop-icon-bar button[title="Search"], #mobile-icon-bar button[title="Search"]').first
         expect(search_button).to_be_visible()
         search_button.click()
         

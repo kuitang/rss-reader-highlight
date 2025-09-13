@@ -150,7 +150,7 @@ class TestMobileFlows:
         expect(mobile_top_bar).to_be_visible()
         
         # Click search button to expand search
-        search_button = page.locator('button[title="Search"]')
+        search_button = page.locator('#mobile-icon-bar button[title="Search"], #desktop-icon-bar button[title="Search"]').first
         expect(search_button).to_be_visible()
         search_button.click()
         
@@ -194,14 +194,14 @@ class TestMobileFlows:
             expect(icon_bar).to_be_visible()
             
             # Search functionality should be accessible again
-            search_button = page.locator('button[title="Search"]')
+            search_button = page.locator('#mobile-icon-bar button[title="Search"], #desktop-icon-bar button[title="Search"]').first
             expect(search_button).to_be_visible()
     
     def test_mobile_search_form_functionality(self, page: Page, test_server_url):
         """Test that mobile search form works correctly"""
         
         # Click search button to expand search
-        search_button = page.locator('button[title="Search"]')
+        search_button = page.locator('#mobile-icon-bar button[title="Search"], #desktop-icon-bar button[title="Search"]').first
         expect(search_button).to_be_visible()
         search_button.click()
         

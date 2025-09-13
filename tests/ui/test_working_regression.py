@@ -108,7 +108,7 @@ class TestWorkingRegression:
         print("=== Testing Tab Switching ===")
         
         # Test Unread tab
-        unread_tab = page.locator("button[title='Unread']")
+        unread_tab = page.locator("#desktop-icon-bar button[title='Unread'], #mobile-icon-bar button[title='Unread']").first
         if unread_tab.is_visible():
             unread_tab.click()
             wait_for_htmx_complete(page)
@@ -117,7 +117,7 @@ class TestWorkingRegression:
             page.screenshot(path="/tmp/regression_unread_tab.png")
         
         # Test All Posts tab  
-        all_posts_tab = page.locator("button[title='All Posts']")
+        all_posts_tab = page.locator("#desktop-icon-bar button[title='All Posts'], #mobile-icon-bar button[title='All Posts']").first
         if all_posts_tab.is_visible():
             all_posts_tab.click()
             wait_for_htmx_complete(page)
