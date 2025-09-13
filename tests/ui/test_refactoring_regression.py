@@ -49,8 +49,8 @@ class TestRefactoringRegression:
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                page.goto(test_server_url, timeout=20000)  # Increased from 10s to 20s
-                page.wait_for_load_state("networkidle", timeout=15000)  # Added explicit timeout
+                page.goto(test_server_url, timeout=15000)  # Balanced timeout for CI
+                page.wait_for_load_state("networkidle", timeout=10000)  # Reduced timeout
                 # Verify server is responsive by checking for desktop layout (desktop viewport test)
                 page.wait_for_selector("#desktop-layout", timeout=5000)
                 break
@@ -194,8 +194,8 @@ class TestRefactoringRegression:
         max_retries = 3
         for attempt in range(max_retries):
             try:
-                page.goto(test_server_url, timeout=20000)  # Increased from 10s to 20s
-                page.wait_for_load_state("networkidle", timeout=15000)  # Added explicit timeout
+                page.goto(test_server_url, timeout=15000)  # Balanced timeout for CI
+                page.wait_for_load_state("networkidle", timeout=10000)  # Reduced timeout
                 # Verify server is responsive by checking for mobile layout (mobile viewport test)
                 page.wait_for_selector("#mobile-layout", timeout=5000)
                 break
