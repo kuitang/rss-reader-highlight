@@ -96,7 +96,7 @@ class TestRefactoringRegression:
             # Check if visible before clicking
             if feed_link.is_visible():
                 feed_link.click()
-                page.wait_for_load_state("networkidle")
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
             else:
                 print(f"Feed link not visible, skipping")
                 continue
@@ -128,7 +128,7 @@ class TestRefactoringRegression:
                 print(f"Clicking article: {article_title}")
                 
                 article_item.click()  # Click the whole list item
-                page.wait_for_load_state("networkidle")
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Wait for feed content to update instead of arbitrary sleep
                 page.wait_for_selector("#desktop-feeds-content", state="visible", timeout=5000)
                 
@@ -150,7 +150,7 @@ class TestRefactoringRegression:
             if unread_tab.is_visible():
                 print("Clicking Unread tab")
                 unread_tab.click()
-                page.wait_for_load_state("networkidle")
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Wait for feed list to update
                 page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 
@@ -160,7 +160,7 @@ class TestRefactoringRegression:
             if all_posts_tab.is_visible():
                 print("Clicking All Posts tab")
                 all_posts_tab.click()
-                page.wait_for_load_state("networkidle")
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Wait for feed list to update
                 page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 
@@ -249,7 +249,7 @@ class TestRefactoringRegression:
             # Check if visible before clicking
             if feed_link.is_visible():
                 feed_link.click()
-                page.wait_for_load_state("networkidle")
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
             else:
                 print(f"Feed link not visible, skipping")
                 continue
@@ -317,7 +317,7 @@ class TestRefactoringRegression:
             if unread_tab.is_visible():
                 print("Clicking Unread tab (mobile)")
                 unread_tab.click()
-                page.wait_for_load_state("networkidle")
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Wait for feed list to update
                 page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 
@@ -327,7 +327,7 @@ class TestRefactoringRegression:
             if all_posts_tab.is_visible():
                 print("Clicking All Posts tab (mobile)")
                 all_posts_tab.click()
-                page.wait_for_load_state("networkidle")
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Wait for feed list to update
                 page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 
@@ -482,13 +482,13 @@ class TestRefactoringRegression:
             unread_articles_in_view = page.locator("main > div:nth-child(2) li").all()
             if unread_articles_in_view:
                 unread_articles_in_view[0].click()
-                page.wait_for_load_state("networkidle")
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Wait for feed list to update
                 page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 
                 # Go back to unread view
                 unread_tab.click()
-                page.wait_for_load_state("networkidle")
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Wait for feed list to update
                 page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 
