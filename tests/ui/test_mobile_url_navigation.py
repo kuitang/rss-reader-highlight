@@ -87,7 +87,9 @@ class TestMobileNavigationComplete:
         feed_item = page.locator(f"#{first_article_id}")
         feed_item.click()
         wait_for_htmx_complete(page)
-        
+
+        # Wait for navigation to article view
+        page.wait_for_url("**/item/**", timeout=10000)
         assert "/item/" in page.url, "Should be in article view"
         
         # CRITICAL: Use browser back 
