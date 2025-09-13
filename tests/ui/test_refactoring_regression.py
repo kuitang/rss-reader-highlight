@@ -50,7 +50,7 @@ class TestRefactoringRegression:
         for attempt in range(max_retries):
             try:
                 page.goto(test_server_url, timeout=15000)  # Balanced timeout for CI
-                page.wait_for_load_state("networkidle", timeout=10000)  # Reduced timeout
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Verify server is responsive by checking for desktop layout (desktop viewport test)
                 page.wait_for_selector("#desktop-layout", timeout=5000)
                 break
@@ -195,7 +195,7 @@ class TestRefactoringRegression:
         for attempt in range(max_retries):
             try:
                 page.goto(test_server_url, timeout=15000)  # Balanced timeout for CI
-                page.wait_for_load_state("networkidle", timeout=10000)  # Reduced timeout
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Verify server is responsive by checking for mobile layout (mobile viewport test)
                 page.wait_for_selector("#mobile-layout", timeout=5000)
                 break
@@ -354,8 +354,20 @@ class TestRefactoringRegression:
         Monitor HTMX requests and responses for any failures or incorrect targets.
         This test focuses on the HTMX functionality that could break from refactoring.
         """
-        page.goto(test_server_url, timeout=10000)
-        page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=10000)
+        # Navigate with robust retry for CI
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                page.goto(test_server_url, timeout=15000)
+                page.wait_for_load_state("networkidle", timeout=10000)
+                page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=5000)
+                break
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    raise
+                print(f"Server connection attempt {attempt + 1} failed, retrying...")
+                import time
+                time.sleep(3)
         
         # Monitor network requests
         requests = []
@@ -424,8 +436,20 @@ class TestRefactoringRegression:
         Test that read/unread state is properly managed after refactoring.
         This is critical functionality that could break with database changes.
         """
-        page.goto(test_server_url, timeout=10000)
-        page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=10000)
+        # Navigate with robust retry for CI
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                page.goto(test_server_url, timeout=15000)
+                page.wait_for_load_state("networkidle", timeout=10000)
+                page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=5000)
+                break
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    raise
+                print(f"Server connection attempt {attempt + 1} failed, retrying...")
+                import time
+                time.sleep(3)
         
         # Click on a feed
         ensure_mobile_sidebar_open(page)  # Open mobile sidebar if needed
