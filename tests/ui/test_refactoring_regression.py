@@ -45,9 +45,19 @@ class TestRefactoringRegression:
         Desktop workflow: Click feeds, scroll, view articles, toggle tabs - 3 cycles.
         Tests the core three-panel layout functionality.
         """
-        # Navigate to app
-        page.goto(test_server_url, timeout=10000)
-        page.wait_for_load_state("networkidle")
+        # Navigate to app with robust retry for CI
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                page.goto(test_server_url, timeout=10000)
+                page.wait_for_load_state("networkidle")
+                break
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    raise
+                print(f"Server connection attempt {attempt + 1} failed, retrying...")
+                import time
+                time.sleep(2)
         
         # Take initial screenshot
         page.screenshot(path="/tmp/desktop_initial.png")
@@ -173,9 +183,19 @@ class TestRefactoringRegression:
         # Set mobile viewport
         page.set_viewport_size({"width": 390, "height": 844})
         
-        # Navigate to app
-        page.goto(test_server_url, timeout=10000)
-        page.wait_for_load_state("networkidle")
+        # Navigate to app with robust retry for CI
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                page.goto(test_server_url, timeout=10000)
+                page.wait_for_load_state("networkidle")
+                break
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    raise
+                print(f"Server connection attempt {attempt + 1} failed, retrying...")
+                import time
+                time.sleep(2)
         
         # Take initial mobile screenshot
         page.screenshot(path="/tmp/mobile_initial.png")

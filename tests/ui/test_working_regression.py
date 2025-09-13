@@ -142,9 +142,9 @@ class TestWorkingRegression:
         # Wait for feed content to update
         page.wait_for_selector("#desktop-feeds-content", state="visible", timeout=5000)
         
-        # Verify feed changed to Hacker News
-        hn_heading = page.locator("#desktop-feeds-content h3").filter(has_text="Hacker News")
-        expect(hn_heading).to_be_visible()
+        # Verify feed changed to Hacker News - use .first to handle multiple matches
+        hn_heading = page.locator("#desktop-chrome-container h3, #desktop-chrome-content h3").filter(has_text="Hacker News")
+        expect(hn_heading.first).to_be_visible()
         
         page.screenshot(path="/tmp/regression_hackernews_selected.png")
         
