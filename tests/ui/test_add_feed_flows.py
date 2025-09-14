@@ -36,7 +36,7 @@ class TestAddFeedFlows:
         ]:
             print(f"\n{('📱' if viewport_name == 'mobile' else '🖥️')} TESTING {viewport_name.upper()} ADD FEED FLOW")
             page.set_viewport_size(viewport_size)
-            page.goto(test_server_url)
+            page.goto(test_server_url, timeout=10000)
             wait_for_page_ready(page)
             
             if viewport_name == "mobile":
@@ -123,7 +123,7 @@ class TestAddFeedFlows:
         ]:
             print(f"\n{('🖥️' if viewport_name == 'desktop' else '📱')} TESTING {viewport_name.upper()} NAVIGATION AFTER FEED ADD")
             page.set_viewport_size(viewport_size)
-            page.goto(test_server_url)
+            page.goto(test_server_url, timeout=10000)
             wait_for_page_ready(page)
             
             if viewport_name == "desktop":
@@ -210,7 +210,7 @@ class TestAddFeedFlows:
     def test_duplicate_feed_handling(self, page):
         """Test handling of duplicate feed additions"""
         page.set_viewport_size({"width": 1200, "height": 800})  # Desktop for simplicity
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         wait_for_page_ready(page)
         
         print("🔄 TESTING DUPLICATE FEED HANDLING")
@@ -238,7 +238,7 @@ class TestAddFeedFlows:
     def test_invalid_url_handling(self, page):
         """Test handling of invalid URLs"""
         page.set_viewport_size({"width": 1200, "height": 800})  # Desktop
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         wait_for_page_ready(page)
         
         print("❌ TESTING INVALID URL HANDLING")
@@ -279,7 +279,7 @@ class TestAddFeedFlows:
     def test_empty_form_submission(self, page):
         """Test submission of empty form"""
         page.set_viewport_size({"width": 1200, "height": 800})  # Desktop
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         wait_for_page_ready(page)
         
         print("⭕ TESTING EMPTY FORM SUBMISSION")

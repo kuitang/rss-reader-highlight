@@ -33,13 +33,15 @@ class TestMobileSidebarIsolated:
     def test_mobile_sidebar_and_navigation_flow(self, page: Page, test_server_url):
         """Test mobile-specific navigation patterns"""
         page.set_viewport_size({"width": 390, "height": 844})
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
+        # Wait for specific mobile layout element
+        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)
         
         # Ensure mobile layout and JavaScript are ready
         expect(page.locator("#mobile-layout")).to_be_visible()
         expect(page.locator("#mobile-nav-button")).to_be_visible()
-        page.wait_for_timeout(500)  # Ensure JS is loaded
+        wait_for_htmx_complete(page)  # Ensure JS is loaded
         
         # Test sidebar open/close cycle
         for i in range(3):
@@ -65,7 +67,7 @@ class TestMobileSidebarIsolated:
                         
                         # Verify full-screen article view
                         wait_for_htmx_complete(page)
-                        page.wait_for_timeout(500)  # Additional wait for URL update
+                        wait_for_htmx_complete(page)  # Additional wait for URL update
                         assert "/item/" in page.url
                         
                         # Navigate back

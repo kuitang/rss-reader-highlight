@@ -7,8 +7,8 @@ import json
 from unittest.mock import Mock
 
 # Import the functions we need to test
-from models import init_db, get_db, FeedModel, SessionModel, FeedItemModel, UserItemModel
-from app import prepare_item_data
+from app.models import init_db, get_db, FeedModel, SessionModel, FeedItemModel, UserItemModel
+from app.main import prepare_item_data
 
 
 class TestItemNotFoundDiagnostics:
@@ -17,7 +17,7 @@ class TestItemNotFoundDiagnostics:
     @pytest.fixture
     def temp_db(self):
         """Temporary database for testing"""
-        import models
+        from app import models
         
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
             tmp_db = tmp.name

@@ -3,7 +3,7 @@
 
 import os
 import sqlite3
-from models import DB_PATH, init_db
+from app.models import DB_PATH, init_db
 
 def clear_database():
     """Remove database file and reinitialize empty database"""

@@ -18,9 +18,9 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 
 # Import our modules
-from models import init_db, get_db, FeedModel, FeedItemModel
-from feed_parser import FeedParser
-from background_worker import FeedUpdateWorker, FeedQueueManager, DomainRateLimiter
+from app.models import init_db, get_db, FeedModel, FeedItemModel
+from app.feed_parser import FeedParser
+from app.background_worker import FeedUpdateWorker, FeedQueueManager, DomainRateLimiter
 
 
 class TestBackgroundWorkerIntegration:
@@ -34,7 +34,7 @@ class TestBackgroundWorkerIntegration:
         os.close(db_fd)
         
         # Patch the DB_PATH in models module
-        import models
+        from app import models
         original_path = models.DB_PATH
         
         with patch.object(models, 'DB_PATH', db_path):

@@ -14,7 +14,7 @@ def wait_for_page_ready(page):
     """Wait for initial page load to stabilize"""
     page.wait_for_load_state('domcontentloaded')
     page.wait_for_load_state('networkidle')
-    page.wait_for_timeout(100)
+    wait_for_htmx_complete(page)
 
 @contextmanager
 def mobile_page_context(browser, width=390, height=844):
@@ -160,7 +160,7 @@ class TestSpacingValidation:
                 if feed_items.count() > 0:
                     # Close any blocking sidebar
                     page.evaluate("document.querySelector('#mobile-sidebar')?.setAttribute('hidden', 'true')")
-                    page.wait_for_timeout(100)
+                    wait_for_htmx_complete(page)
                     
                     first_item = feed_items.first
                     first_item.click(force=True)

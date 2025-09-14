@@ -6,8 +6,8 @@ import os
 from datetime import datetime, timezone, timedelta
 
 # Import functions to test directly
-from models import init_db, get_db, FeedModel, SessionModel, FeedItemModel, UserItemModel, FolderModel
-from app import human_time_diff
+from app.models import init_db, get_db, FeedModel, SessionModel, FeedItemModel, UserItemModel, FolderModel
+from app.main import human_time_diff
 
 class TestDatabaseOperations:
     """Test database operations directly"""
@@ -15,7 +15,7 @@ class TestDatabaseOperations:
     @pytest.fixture
     def temp_db(self):
         """Temporary database for testing"""
-        import models
+        from app import models
         
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
             tmp_db = tmp.name
@@ -123,7 +123,7 @@ class TestFeedManagementLogic:
     @pytest.fixture
     def temp_db(self):
         """Temporary database"""
-        import models
+        from app import models
         
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
             tmp_db = tmp.name

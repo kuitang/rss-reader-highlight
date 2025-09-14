@@ -25,7 +25,7 @@ def test_add_feed_edge_cases(page: Page, test_server_url):
     ]:
         print(f"\n--- Testing {viewport_name} add feed edge cases ---")
         page.set_viewport_size(viewport_size)
-        page.goto(test_server_url)
+        page.goto(test_server_url, timeout=10000)
         wait_for_page_ready(page)
         
         # Debug: Check if correct layout is visible

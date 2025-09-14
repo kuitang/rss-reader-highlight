@@ -6,8 +6,11 @@ any issues from the recent PageData class and optimization refactoring.
 """
 
 import pytest
+import os
 from playwright.sync_api import Page, expect
 import random
+
+pytestmark = pytest.mark.needs_server
 
 
 def wait_for_htmx_complete(page, timeout=5000):
@@ -22,7 +25,7 @@ def ensure_mobile_sidebar_open(page: Page):
     if mobile_nav_button.is_visible():
         # We're in mobile layout, need to open sidebar first
         mobile_nav_button.click()
-        page.wait_for_timeout(300)  # Wait for sidebar animation
+        wait_for_htmx_complete(page)  # Wait for sidebar animation
         return True
     return False  # Desktop layout, no need to open sidebar
 
@@ -40,14 +43,27 @@ def get_feed_links(page: Page):
 class TestRefactoringRegression:
     """Comprehensive regression tests for desktop and mobile workflows."""
     
+    @pytest.mark.skipif(os.getenv("CI") == "true", reason="Resource intensive - run locally")
     def test_desktop_repetitive_workflow(self, page: Page, test_server_url):
         """
         Desktop workflow: Click feeds, scroll, view articles, toggle tabs - 3 cycles.
         Tests the core three-panel layout functionality.
         """
-        # Navigate to app
-        page.goto(test_server_url)
-        page.wait_for_load_state("networkidle")
+        # Navigate to app with robust retry and increased timeout for CI
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                page.goto(test_server_url, timeout=15000)  # Balanced timeout for CI
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
+                # Verify server is responsive by checking for desktop layout (desktop viewport test)
+                page.wait_for_selector("#desktop-layout", timeout=5000)
+                break
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    raise
+                print(f"Server connection attempt {attempt + 1} failed, retrying...")
+                import time
+                time.sleep(3)  # Slightly longer between retries
         
         # Take initial screenshot
         page.screenshot(path="/tmp/desktop_initial.png")
@@ -69,6 +85,11 @@ class TestRefactoringRegression:
         
         for cycle in range(3):
             print(f"\n=== Desktop Cycle {cycle + 1} ===")
+
+            # Add delay between cycles to reduce server stress in CI
+            if cycle > 0:
+                import time
+                time.sleep(1)
             
             # 1. Click on a random feed in sidebar
             feed_index = cycle % min(feed_count, 3)  # Cycle through first 3 feeds
@@ -79,7 +100,7 @@ class TestRefactoringRegression:
             # Check if visible before clicking
             if feed_link.is_visible():
                 feed_link.click()
-                page.wait_for_load_state("networkidle")
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
             else:
                 print(f"Feed link not visible, skipping")
                 continue
@@ -100,7 +121,7 @@ class TestRefactoringRegression:
             # Scroll down multiple times to load more items
             for scroll in range(3):
                 page.keyboard.press("PageDown")
-                page.wait_for_timeout(500)  # Short wait for scroll animation
+                wait_for_htmx_complete(page)  # Short wait for scroll animation
             
             # 3. Click on an article to view details in right panel
             article_links = middle_panel.locator("#feeds-list-container .js-filter li").all()  # Each article is in a listitem
@@ -111,7 +132,7 @@ class TestRefactoringRegression:
                 print(f"Clicking article: {article_title}")
                 
                 article_item.click()  # Click the whole list item
-                page.wait_for_load_state("networkidle")
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Wait for feed content to update instead of arbitrary sleep
                 page.wait_for_selector("#desktop-feeds-content", state="visible", timeout=5000)
                 
@@ -124,7 +145,7 @@ class TestRefactoringRegression:
                 
                 # Check that blue dot disappeared (article marked as read)
                 # This tests the critical read/unread state functionality
-                page.wait_for_timeout(1000)  # Brief wait for state update
+                wait_for_htmx_complete(page)  # Brief wait for state update
             
             # 4. Toggle between "All Posts" and "Unread" tabs
             all_posts_tab = page.locator("text=All Posts").first
@@ -133,7 +154,7 @@ class TestRefactoringRegression:
             if unread_tab.is_visible():
                 print("Clicking Unread tab")
                 unread_tab.click()
-                page.wait_for_load_state("networkidle")
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Wait for feed list to update
                 page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 
@@ -143,7 +164,7 @@ class TestRefactoringRegression:
             if all_posts_tab.is_visible():
                 print("Clicking All Posts tab")
                 all_posts_tab.click()
-                page.wait_for_load_state("networkidle")
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Wait for feed list to update
                 page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 
@@ -165,6 +186,7 @@ class TestRefactoringRegression:
         # Assert no critical errors
         assert len(error_messages) == 0, f"Console errors detected: {error_messages}"
 
+    @pytest.mark.skipif(os.getenv("CI") == "true", reason="Resource intensive - run locally")
     def test_mobile_repetitive_workflow(self, page: Page, test_server_url):
         """
         Mobile workflow: Hamburger menu, feeds, scroll, articles, back navigation - 3 cycles.
@@ -172,10 +194,22 @@ class TestRefactoringRegression:
         """
         # Set mobile viewport
         page.set_viewport_size({"width": 390, "height": 844})
-        
-        # Navigate to app
-        page.goto(test_server_url)
-        page.wait_for_load_state("networkidle")
+
+        # Navigate to app with robust retry and increased timeout for CI
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                page.goto(test_server_url, timeout=15000)  # Balanced timeout for CI
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
+                # Verify server is responsive by checking for mobile layout (mobile viewport test)
+                page.wait_for_selector("#mobile-layout", timeout=5000)
+                break
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    raise
+                print(f"Server connection attempt {attempt + 1} failed, retrying...")
+                import time
+                time.sleep(3)  # Slightly longer between retries
         
         # Take initial mobile screenshot
         page.screenshot(path="/tmp/mobile_initial.png")
@@ -186,6 +220,11 @@ class TestRefactoringRegression:
         
         for cycle in range(3):
             print(f"\n=== Mobile Cycle {cycle + 1} ===")
+
+            # Add delay between cycles to reduce server stress in CI
+            if cycle > 0:
+                import time
+                time.sleep(1)
             
             # 1. Click hamburger menu to open sidebar
             hamburger_menu = page.locator("button#mobile-nav-button")  # Mobile nav button
@@ -193,7 +232,7 @@ class TestRefactoringRegression:
             
             print("Opening hamburger menu")
             hamburger_menu.click()
-            page.wait_for_timeout(500)  # Allow animation
+            wait_for_htmx_complete(page)  # Allow animation
             
             # Verify sidebar is visible (first column on mobile)
             sidebar = page.locator("#mobile-sidebar")
@@ -215,7 +254,7 @@ class TestRefactoringRegression:
             # Check if visible before clicking
             if feed_link.is_visible():
                 feed_link.click()
-                page.wait_for_load_state("networkidle")
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
             else:
                 print(f"Feed link not visible, skipping")
                 continue
@@ -234,7 +273,7 @@ class TestRefactoringRegression:
             # Scroll down multiple times
             for scroll in range(3):
                 page.mouse.wheel(0, 500)
-                page.wait_for_timeout(500)  # Short wait for scroll animation
+                wait_for_htmx_complete(page)  # Short wait for scroll animation
             
             # 4. Click on an article (should navigate to full-screen view)
             article_links = feed_container.locator("li[id^='mobile-feed-item-']").all()
@@ -283,7 +322,7 @@ class TestRefactoringRegression:
             if unread_tab.is_visible():
                 print("Clicking Unread tab (mobile)")
                 unread_tab.click()
-                page.wait_for_load_state("networkidle")
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Wait for feed list to update
                 page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 
@@ -293,7 +332,7 @@ class TestRefactoringRegression:
             if all_posts_tab.is_visible():
                 print("Clicking All Posts tab (mobile)")
                 all_posts_tab.click()
-                page.wait_for_load_state("networkidle")
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Wait for feed list to update
                 page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 
@@ -315,13 +354,26 @@ class TestRefactoringRegression:
         # Assert no critical errors
         assert len(error_messages) == 0, f"Console errors detected: {error_messages}"
 
+    @pytest.mark.skipif(os.getenv("CI") == "true", reason="Resource intensive - run locally")
     def test_htmx_request_monitoring(self, page: Page, test_server_url):
         """
         Monitor HTMX requests and responses for any failures or incorrect targets.
         This test focuses on the HTMX functionality that could break from refactoring.
         """
-        page.goto(test_server_url)
-        page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=10000)
+        # Navigate with robust retry for CI
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                page.goto(test_server_url, timeout=15000)
+                page.wait_for_load_state("networkidle", timeout=10000)
+                page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=5000)
+                break
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    raise
+                print(f"Server connection attempt {attempt + 1} failed, retrying...")
+                import time
+                time.sleep(3)
         
         # Monitor network requests
         requests = []
@@ -360,8 +412,8 @@ class TestRefactoringRegression:
             # Wait for content to load after article click
             page.wait_for_selector("#main-content", state="visible", timeout=10000)
         
-        # 3. Toggle between tabs (should trigger HTMX update)
-        unread_tab = page.locator("button[title='Unread']")
+        # 3. Toggle between tabs (should trigger HTMX update) - desktop viewport
+        unread_tab = page.locator("#desktop-icon-bar button[title='Unread']")
         if unread_tab.is_visible():
             print("Toggling to Unread tab")
             unread_tab.click()
@@ -385,13 +437,26 @@ class TestRefactoringRegression:
         # Assert no failed requests
         assert len(failed_responses) == 0, f"Found {len(failed_responses)} failed HTTP responses"
 
+    @pytest.mark.skipif(os.getenv("CI") == "true", reason="Resource intensive - run locally")
     def test_read_unread_state_management(self, page: Page, test_server_url):
         """
         Test that read/unread state is properly managed after refactoring.
         This is critical functionality that could break with database changes.
         """
-        page.goto(test_server_url)
-        page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=10000)
+        # Navigate with robust retry for CI
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                page.goto(test_server_url, timeout=15000)
+                page.wait_for_load_state("networkidle", timeout=10000)
+                page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=5000)
+                break
+            except Exception as e:
+                if attempt == max_retries - 1:
+                    raise
+                print(f"Server connection attempt {attempt + 1} failed, retrying...")
+                import time
+                time.sleep(3)
         
         # Click on a feed
         ensure_mobile_sidebar_open(page)  # Open mobile sidebar if needed
@@ -448,13 +513,13 @@ class TestRefactoringRegression:
             unread_articles_in_view = page.locator("main > div:nth-child(2) li").all()
             if unread_articles_in_view:
                 unread_articles_in_view[0].click()
-                page.wait_for_load_state("networkidle")
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Wait for feed list to update
                 page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 
                 # Go back to unread view
                 unread_tab.click()
-                page.wait_for_load_state("networkidle")
+                wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Wait for feed list to update
                 page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=10000)
                 

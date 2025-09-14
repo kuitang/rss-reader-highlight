@@ -30,6 +30,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        pip install -e .
 
     - name: Install Playwright browsers
       run: |
@@ -61,25 +62,19 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - name: Build Docker image
-      run: docker build -t rss-reader-test .
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v5
+      with:
+        python-version: "3.11"
 
-    - name: Run Docker smoke test
+    - name: Install test dependencies
       run: |
-        docker run --rm -d -p 8081:8080 --name rss-reader-test rss-reader-test
-        sleep 10
-        
-        # Test that the server starts and responds
-        if curl -f http://localhost:8081; then
-          echo "✅ Docker container serving successfully"
-        else
-          echo "❌ Docker container failed to serve"
-          exit 1
-        fi
-        
-        docker stop rss-reader-test
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -e .
+        python -m playwright install chromium
 
-    - name: Run core tests in Docker
+    - name: Run Docker integration tests
       run: |
-        docker run --rm rss-reader-test bash -c "python -m pytest tests/core/test_direct_functions.py tests/core/test_essential_mocks.py -v --tb=short"
+        python -m pytest tests/specialized/test_docker_integration.py -v
 

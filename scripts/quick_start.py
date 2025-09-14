@@ -17,8 +17,8 @@ def main():
     env['MINIMAL_MODE'] = 'true'
     
     try:
-        # Start the app
-        subprocess.run([sys.executable, 'app.py'], env=env)
+        # Start the app using module syntax
+        subprocess.run([sys.executable, '-m', 'app'], env=env)
     except KeyboardInterrupt:
         print("\n👋 Shutting down minimal RSS Reader")
 

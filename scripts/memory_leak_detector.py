@@ -11,8 +11,8 @@ import threading
 from collections import defaultdict
 import tracemalloc
 import sqlite3
-from background_worker import FeedUpdateWorker, FeedQueueManager
-from models import init_db, FeedModel
+from app.background_worker import FeedUpdateWorker, FeedQueueManager
+from app.models import init_db, FeedModel
 
 def monitor_memory_usage(duration_minutes=10, check_interval_seconds=30):
     """Monitor memory usage over time to detect leaks"""

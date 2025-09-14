@@ -11,6 +11,9 @@ python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 
+# Install app package in editable mode (for imports to work)
+pip install -e .
+
 # For E2E tests - install Playwright browsers
 python -m playwright install
 ```
@@ -20,16 +23,19 @@ python -m playwright install
 # IMPORTANT: Always activate virtual environment first
 source venv/bin/activate
 
-# Start main application (default port 8080)
-python app.py
+# Start main application as module (default port 8080)
+python -m app
+
+# With environment variables
+PORT=8080 PRODUCTION=true python -m app
 
 # Fast startup for integration tests (minimal database with 2 feeds)
-MINIMAL_MODE=true python app.py
+MINIMAL_MODE=true python -m app
 # OR use the helper script:
-python quick_start.py
+python scripts/quick_start.py
 
 # Clear and reset database
-python clear_db.py
+python scripts/clear_db.py
 ```
 
 ### Testing Commands
@@ -104,10 +110,10 @@ coverage report --show-missing
 source venv/bin/activate
 
 # Reset database completely
-python clear_db.py
+python scripts/clear_db.py
 
 # Create minimal seed database for fast testing (run after normal startup)
-python create_minimal_db.py
+python scripts/create_minimal_db.py
 
 # Manual database inspection
 sqlite3 data/rss.db
@@ -127,6 +133,26 @@ These files provide comprehensive information about the frameworks used in this 
 
 ## Architecture
 
+### Project Structure
+```
+rss-reader-highlight/
+├── app/                     # Main application package
+│   ├── __init__.py         # Package marker
+│   ├── __main__.py         # Entry point for python -m app
+│   ├── main.py             # Main FastHTML application
+│   ├── models.py           # Database models
+│   ├── feed_parser.py      # Feed parsing logic
+│   └── background_worker.py # Background task system
+├── scripts/                 # Utility scripts
+│   ├── clear_db.py
+│   ├── create_minimal_db.py
+│   └── quick_start.py
+├── tests/                   # Test suite
+├── setup.py                # Package setup for editable install
+├── requirements.txt        # Dependencies
+└── Dockerfile              # Optimized multi-stage build
+```
+
 ### High-Level Structure
 - **FastHTML + MonsterUI**: Python-first web framework with styled components
 - **Session-Based Users**: No authentication - each browser gets unique session
@@ -136,24 +162,24 @@ These files provide comprehensive information about the frameworks used in this 
 
 ### Core Components
 
-#### Application Entry (`app.py`)
+#### Application Entry (`app/main.py`)
 - Main FastHTML application with middleware for timing and session management
 - Three-panel email-like UI: feeds sidebar, post list, detail view
 - Routes for feed management, item interaction, and API endpoints
 - Integrates background worker for async feed updates
 
-#### Database Layer (`models.py`)
+#### Database Layer (`app/models.py`)
 - SQLite schema: `feeds` (global), `feed_items`, `sessions`, `user_feeds`, `folders`, `user_items`
 - Context managers for database operations
 - Optimized for read-heavy RSS workloads with strategic indexes
 
-#### Feed Processing (`feed_parser.py`)
+#### Feed Processing (`app/feed_parser.py`)
 - RSS/Atom parsing with `feedparser` library
 - HTTP caching using ETags and Last-Modified headers
 - Content extraction with `trafilatura` for full article text
 - Handles redirects, malformed feeds, and various date formats
 
-#### Background Worker (`background_worker.py`)
+#### Background Worker (`app/background_worker.py`)
 - Async feed updates with domain-based rate limiting
 - Queue-based processing to avoid blocking main application
 - Automatic setup of default feeds (Hacker News, Reddit, WSJ)
@@ -177,6 +203,144 @@ These files provide comprehensive information about the frameworks used in this 
 - Domain rate limiting prevents overwhelming RSS sources
 
 ## Testing Strategy
+
+### Philosophy
+Tests focus on **complex workflows that broke during development**, not trivial framework functionality.
+
+### CRITICAL Playwright Testing Guidelines
+
+#### Viewport-Specific Selectors
+**The application renders both mobile and desktop layouts simultaneously**. Tests MUST use viewport-specific selectors:
+
+**Desktop viewport (width ≥ 1024px):**
+- Use `#desktop-icon-bar` for navigation buttons
+- Use `#desktop-chrome-container` or `#desktop-chrome-content` for chrome elements
+- Use `#desktop-search-bar` for search functionality
+- Use `#desktop-feeds-content` for feed list
+- Use `#desktop-item-detail` for article detail
+- Use `#sidebar` for feed sidebar
+
+**Mobile viewport (width < 1024px):**
+- Use `#mobile-icon-bar` for navigation buttons
+- Use `#mobile-top-bar` for header elements
+- Use `#mobile-search-bar` for search functionality
+- Use `#mobile-sidebar` for navigation drawer
+- Use `#main-content` for main content area
+- Use `li[id^='mobile-feed-item-']` for mobile feed items
+
+**NEVER use generic selectors like:**
+- `button[title="..."]` without context
+- `#icon-bar` (doesn't exist - use mobile/desktop specific)
+- `#search-bar` (doesn't exist - use mobile/desktop specific)
+
+#### Testing Both Viewports
+**By default, tests should verify functionality in BOTH desktop and mobile viewports** unless the test explicitly targets one viewport:
+
+```python
+# Test both viewports
+viewports = [
+    {"width": 1400, "height": 900},  # Desktop
+    {"width": 390, "height": 844}    # Mobile
+]
+for viewport in viewports:
+    page.set_viewport_size(viewport)
+    # Run test assertions
+```
+
+**Exception:** Tests with names like `test_mobile_*` or `test_desktop_*` should only test their specific viewport.
+
+#### Element Visibility Checks
+When checking element visibility with dual layouts:
+```python
+# Check style.display for dynamic show/hide
+const element = document.getElementById('mobile-search-bar');
+return element && element.style.display !== 'none';
+```
+
+#### Strict Mode Handling
+Use `.first` when both mobile and desktop elements exist but only one is needed:
+```python
+# When you know both exist but need one
+element = page.locator('#mobile-icon-bar, #desktop-icon-bar').first
+```
+
+#### ⚠️ MANDATORY Rules for Writing Playwright Tests
+
+1. **Selector Strategy - Use Semantic, Not Styling**
+   ```python
+   # ❌ BAD - Brittle, tied to styling classes
+   page.locator(".uk-button.uk-button-primary.uk-margin-small")
+
+   # ✅ GOOD - Semantic, structure-based
+   page.locator("button[type='submit']")
+   page.locator("a[href*='feed_id']")
+   page.locator("#sidebar")  # IDs are stable
+   page.locator("[role='button']:has-text('Submit')")  # Role + text
+   ```
+
+2. **NEVER Use Static Timeouts - Wait for Specific Conditions**
+   ```python
+   # ❌ BAD - Arbitrary wait time
+   page.wait_for_timeout(2000)
+   time.sleep(3)
+
+   # ✅ GOOD - Wait for specific selector/condition
+   page.wait_for_selector("#content", state="visible", timeout=10000)
+   wait_for_htmx_complete(page)  # Waits for HTMX requests to complete
+   page.wait_for_function("() => !document.body.classList.contains('htmx-request')")
+   ```
+
+3. **Maximum Timeout: 10 Seconds**
+   ```python
+   # ❌ BAD - Long timeout masks real issues
+   page.wait_for_selector("#slow-element", timeout=30000)
+
+   # ✅ GOOD - Max 10s, fail fast if something is wrong
+   page.wait_for_selector("#element", timeout=10000)
+   ```
+
+4. **Handle Layout Variations**
+   ```python
+   # ❌ BAD - Assumes single layout
+   expect(page.locator("#desktop-layout")).to_be_visible()
+
+   # ✅ GOOD - Handles both desktop and mobile
+   page.wait_for_selector("#desktop-layout, #mobile-layout", state="visible")
+   ```
+
+5. **Use Flexible Selectors for Dynamic Content**
+   ```python
+   # ❌ BAD - Exact ID match
+   page.locator("#desktop-feed-item-123")
+
+   # ✅ GOOD - Pattern matching
+   page.locator("li[id^='desktop-feed-item-']")  # Starts with
+   page.locator("li[id*='feed-item']")  # Contains
+   ```
+
+#### Essential Helper Functions
+
+```python
+def wait_for_htmx_complete(page, timeout=5000):
+    """Wait for all HTMX requests to complete"""
+    page.wait_for_function(
+        "() => !document.body.classList.contains('htmx-request')",
+        timeout=timeout
+    )
+
+def wait_for_page_ready(page):
+    """Wait for page to be fully loaded"""
+    page.wait_for_load_state('domcontentloaded')
+    page.wait_for_load_state('networkidle')
+```
+
+#### Testing Principles
+
+- **NEVER** fix a failing test by increasing timeouts
+- **ALWAYS** identify the root cause of timing issues
+- **PREFER** waiting for specific elements over generic waits
+- **USE** semantic selectors based on purpose, not presentation
+- **TEST** both desktop and mobile viewports where applicable
 
 ### Philosophy
 Tests focus on **complex workflows that broke during development**, not trivial framework functionality.
@@ -261,10 +425,21 @@ python -m pytest tests/ui/test_critical_ui_flows.py -v
 
 ### Local Docker
 ```bash
-# Build and run with Docker
-docker build -t rss-reader .
-docker run -p 8080:8080 -v ./data:/data rss-reader
+# Build optimized image (398MB vs old 722MB)
+docker build -t rss-reader:latest .
+
+# Run with persistent data
+docker run -p 8080:8080 -v ./data:/data rss-reader:latest
+
+# Run with custom database path
+docker run -p 8080:8080 -e DATABASE_PATH=/data/custom.db -v ./data:/data rss-reader:latest
 ```
+
+### Docker Optimization
+The multi-stage Dockerfile reduces image size by ~45%:
+- **Build stage**: Installs dependencies with build tools
+- **Runtime stage**: Only copies installed packages, not build tools
+- **Result**: 398MB (vs 722MB before optimization)
 
 ### Fly.io Deployment
 ```bash

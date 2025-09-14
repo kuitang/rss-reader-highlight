@@ -7,8 +7,8 @@ from unittest.mock import patch, Mock
 from datetime import datetime
 
 # Import only what we need to test
-from feed_parser import FeedParser
-from models import init_db, get_db, SessionModel, FeedModel
+from app.feed_parser import FeedParser
+from app.models import init_db, get_db, SessionModel, FeedModel
 
 class TestNetworkErrorScenarios:
     """Test network failures that are hard to reproduce in HTTP tests"""
@@ -78,7 +78,7 @@ class TestDatabaseConstraintScenarios:
         
         try:
             # Setup isolated test database
-            import models
+            from app import models
             original_db = models.DB_PATH
             models.DB_PATH = tmp_db
             init_db()
@@ -108,7 +108,7 @@ class TestDatabaseConstraintScenarios:
             tmp_db = tmp.name
         
         try:
-            import models
+            from app import models
             original_db = models.DB_PATH
             models.DB_PATH = tmp_db
             init_db()
@@ -180,9 +180,9 @@ class TestFeedParsingEdgeCases:
         
         This prevents 'Untitled Feed updated Unknown' errors.
         """
-        from feed_parser import FeedParser
+        from app.feed_parser import FeedParser
         import tempfile
-        import models
+        from app import models
         
         # Use temporary database  
         with tempfile.NamedTemporaryFile(suffix='.db', delete=False) as tmp:
@@ -306,7 +306,7 @@ class TestFeedParsingEdgeCases:
             tmp_db = tmp.name
         
         try:
-            import models
+            from app import models
             original_db = models.DB_PATH  
             models.DB_PATH = tmp_db
             init_db()
