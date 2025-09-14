@@ -1397,16 +1397,14 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
 
         return Div(cls='p-4 border-t')(
             DivFullySpaced(
+                DivCentered(f'Page {page} of {total_pages}', cls=TextT.sm),
                 DivLAligned(
-                    DivCentered(f'Page {page} of {total_pages}', cls=TextT.sm),
-                    DivLAligned(
-                        # Unified responsive pagination buttons
-                        _create_pagination_button('chevrons-left', first_url, target),
-                        _create_pagination_button('chevron-left', prev_url, target),
-                        _create_pagination_button('chevron-right', next_url, target),
-                        _create_pagination_button('chevrons-right', last_url, target),
-                        cls='space-x-1'
-                    )
+                    # Unified responsive pagination buttons
+                    _create_pagination_button('chevrons-left', first_url, target),
+                    _create_pagination_button('chevron-left', prev_url, target),
+                    _create_pagination_button('chevron-right', next_url, target),
+                    _create_pagination_button('chevrons-right', last_url, target),
+                    cls='space-x-1'
                 )
             )
         )
