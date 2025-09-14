@@ -698,8 +698,11 @@ class TestTabSizeAndAlignment:
             
             try:
                 # Navigate to the app
-                page.goto(test_server_url, wait_until='networkidle', timeout=10000)
-                wait_for_page_ready(page)
+                page.goto(test_server_url, timeout=10000)
+                if config['name'] == 'mobile':
+                    expect(page.locator("#mobile-layout")).to_be_visible(timeout=10000)
+                else:
+                    expect(page.locator("#desktop-layout")).to_be_visible(timeout=10000)
                 
                 # Find navigation buttons - new icon-based design
                 try:
@@ -994,3 +997,69 @@ class TestPaginationButtonDuplication:
 if __name__ == "__main__":
     # Run critical UI flow tests
     pytest.main([__file__, "-v", "--tb=short"])
+
+
+class TestPaginationScroll:
+    @pytest.mark.parametrize(
+        "viewport",
+        [
+            {"width": 1280, "height": 720},  # Desktop
+            {"width": 375, "height": 667},   # Mobile
+        ],
+    )
+    def test_pagination_scroll_to_top(self, page: Page, test_server_url, viewport):
+        """
+        Tests that when a user clicks a pagination button, the feed list scrolls to the top.
+        Also verifies that the "Showing X of Y posts" text is not present.
+        """
+        is_desktop = viewport["width"] > 1023
+        page.set_viewport_size(viewport)
+        page.goto(test_server_url, wait_until="networkidle")
+
+        # Define selectors based on viewport
+        if is_desktop:
+            feed_container_selector = "#desktop-feeds-content"
+            pagination_button_selector = '[hx-target="#desktop-feeds-content"]'
+        else:
+            feed_container_selector = "#main-content"
+            pagination_button_selector = '[hx-target="#main-content"]'
+
+        # Wait for the feed container to be visible
+        feed_container = page.locator(feed_container_selector)
+        expect(feed_container).to_be_visible()
+
+        # Find the pagination container within the visible feed container
+        pagination_container = feed_container.locator(".p-4.border-t")
+        if not pagination_container.is_visible():
+            pytest.skip("Pagination not visible, skipping test.")
+
+        # Check for "Showing X of Y posts" text
+        showing_text = page.locator('text="Showing"')
+        expect(showing_text).not_to_be_visible()
+
+        # Scroll down
+        feed_container.evaluate("node => node.scrollTop = 500")
+
+        # Verify scroll happened
+        scroll_top_before = feed_container.evaluate("node => node.scrollTop")
+        assert scroll_top_before > 0
+
+        # Click the next page button
+        next_button = page.locator(f'button{pagination_button_selector}[aria-label="Next page"], button{pagination_button_selector} > [uk-icon="chevron-right"]')
+        if not next_button.is_visible():
+             next_button = page.locator(f'button{pagination_button_selector}').filter(has=page.locator('[class*="chevron-right"]'))
+
+        if not next_button.is_visible():
+             # Fallback to a less specific selector if the above fail
+             next_button = page.locator(f'button{pagination_button_selector}').nth(2)
+
+        expect(next_button).to_be_visible()
+        next_button.click()
+
+        # Wait for the content to update
+        wait_for_htmx_complete(page)
+        page.wait_for_load_state("networkidle")
+
+        # Check that the scroll position is at the top
+        scroll_top_after = feed_container.evaluate("node => node.scrollTop")
+        assert scroll_top_after == 0
