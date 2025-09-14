@@ -890,6 +890,14 @@ app, rt = fast_app(
                         }
                     }, 50);
                 }
+            } else if (window.innerWidth >= 1024 && evt.detail.target && evt.detail.target.id === 'desktop-feeds-content') {
+                // Desktop pagination - reset scroll to top
+                setTimeout(() => {
+                    const desktopFeeds = document.getElementById('desktop-feeds-content');
+                    if (desktopFeeds) {
+                        desktopFeeds.scrollTop = 0;
+                    }
+                }, 50);
             }
         });
         
@@ -1375,19 +1383,28 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
         next_url = f"{base_url}{'&' if url_params else '?'}page={min(total_pages, page+1)}" if base_url != "/" else f"/?page={min(total_pages, page+1)}"
         last_url = f"{base_url}{'&' if url_params else '?'}page={total_pages}" if base_url != "/" else f"/?page={total_pages}"
         
+        def _create_pagination_button(icon, url, target):
+            """Helper to create a single pagination button"""
+            return Button(
+                UkIcon(icon),
+                hx_get=url,
+                hx_target=target,
+                hx_push_url="true",
+                cls="p-2 rounded border hover:bg-secondary"
+            )
+
+        target = Targets.DESKTOP_FEEDS if for_desktop else Targets.MOBILE_CONTENT
+
         return Div(cls='p-4 border-t')(
             DivFullySpaced(
-                Div(f"Showing {len(paginated_items)} of {total_items} posts", cls=TextPresets.muted_sm),
+                DivCentered(f'Page {page} of {total_pages}', cls=TextT.sm),
                 DivLAligned(
-                    DivCentered(f'Page {page} of {total_pages}', cls=TextT.sm),
-                    DivLAligned(
-                        # Unified responsive pagination buttons
-                        Button(UkIcon('chevrons-left'), hx_get=first_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary"),
-                        Button(UkIcon('chevron-left'), hx_get=prev_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary"),
-                        Button(UkIcon('chevron-right'), hx_get=next_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary"),
-                        Button(UkIcon('chevrons-right'), hx_get=last_url, hx_target=Targets.DESKTOP_FEEDS if for_desktop else Targets.MOBILE_CONTENT, hx_push_url="true", cls="p-2 rounded border hover:bg-secondary"),
-                        cls='space-x-1'
-                    )
+                    # Unified responsive pagination buttons
+                    _create_pagination_button('chevrons-left', first_url, target),
+                    _create_pagination_button('chevron-left', prev_url, target),
+                    _create_pagination_button('chevron-right', next_url, target),
+                    _create_pagination_button('chevrons-right', last_url, target),
+                    cls='space-x-1'
                 )
             )
         )
