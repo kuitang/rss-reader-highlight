@@ -303,12 +303,17 @@ class TestComprehensiveRegression:
             assert "feed_id" in page.url
             
             # Click an article to test state management
-            article_items = page.locator("li[id*='feed-item']").all()
+            # Use the correct selector based on viewport
+            if is_mobile:
+                article_items = page.locator("li[id*='mobile-feed-item']").all()
+            else:
+                article_items = page.locator("li[id*='desktop-feed-item']").all()
+
             if len(article_items) > 0:
                 article_items[0].click()
                 wait_for_htmx_complete(page)
                 wait_for_htmx_complete(page)  # Additional wait for URL update
-                
+
                 # Verify article loads
                 assert "/item/" in page.url
                 
