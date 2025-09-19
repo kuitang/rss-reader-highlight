@@ -130,7 +130,7 @@ async def test_toast_notifications():
     """Main test function for all toast notification scenarios"""
 
     async with async_playwright() as p:
-        browser = await p.chromium.launch(headless=False)  # Set to True for headless testing
+        browser = await p.chromium.launch(headless=True)  # Headless for CI compatibility
 
         # Test both desktop and mobile viewports
         viewports = [
