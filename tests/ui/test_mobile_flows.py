@@ -362,7 +362,7 @@ class TestMobileFlows:
 
             if is_mobile:
                 # Mobile should have mobile header
-                expect(page.locator("#universal-header")).to_be_visible()
+                expect(page.locator("#summary #universal-header")).to_be_visible()
                 # Article detail should be visible
                 expect(page.locator("#detail")).to_be_visible()
             else:
@@ -474,7 +474,7 @@ class TestMobileFlows:
         wait_for_htmx_complete(page)
         
         # Verify we're viewing ClaudeAI feed - mobile feed title is in header
-        feed_title = page.locator("#universal-header h1").first
+        feed_title = page.locator("#summary #universal-header h1").first
         expect(feed_title).to_contain_text("ClaudeAI")
         
         # Click on an article
@@ -494,7 +494,7 @@ class TestMobileFlows:
         
         # Should be back to feed list with correct feed title
         expect(page.locator("li[data-testid='feed-item']").first).to_be_visible()
-        feed_title_after_back = page.locator("#universal-header h1").first
+        feed_title_after_back = page.locator("#summary #universal-header h1").first
         expect(feed_title_after_back).to_contain_text("ClaudeAI")  # Should NOT be "BizToc"
 
 if __name__ == "__main__":

@@ -70,7 +70,7 @@ class TestWorkingRegression:
         # Verify feed filtering worked - heading should change to ClaudeAI
         assert "feed_id" in page.url, "Should be viewing a specific feed"
         # Desktop h3 is in chrome container
-        feed_heading = page.locator("#universal-header h1").filter(has_text="ClaudeAI")
+        feed_heading = page.locator("#summary #universal-header h1").filter(has_text="ClaudeAI")
         expect(feed_heading.first).to_be_visible(timeout=constants.MAX_WAIT_MS)
         print(f"Successfully navigated to ClaudeAI feed: {page.url}")
         
@@ -149,7 +149,7 @@ class TestWorkingRegression:
         page.wait_for_selector("#summary", state="visible", timeout=constants.MAX_WAIT_MS)
         
         # Verify feed changed to Hacker News - use .first to handle multiple matches
-        hn_heading = page.locator("#universal-header h1").filter(has_text="Hacker News")
+        hn_heading = page.locator("#summary #universal-header h1").filter(has_text="Hacker News")
         expect(hn_heading.first).to_be_visible()
         
         page.screenshot(path="/tmp/regression_hackernews_selected.png")
