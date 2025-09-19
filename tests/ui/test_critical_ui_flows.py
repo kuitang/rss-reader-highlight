@@ -326,7 +326,7 @@ class TestBlueIndicatorHTMXFlow:
         wait_for_page_ready(page)
         
         # 1. Switch to Unread view - UPDATED: Use data-testid for consistency
-        unread_tab = page.locator('[data-testid="unread-btn"]').first
+        unread_tab = page.locator('#summary [data-testid="unread-btn"]').first
         if unread_tab.is_visible():
             unread_tab.click()
             wait_for_htmx_complete(page)
@@ -429,7 +429,7 @@ class TestSessionAndSubscriptionFlow:
                 articles_selector = "li[id^='feed-item-']"
             else:
                 # Mobile: feeds are in off-canvas drawer
-                menu_button = page.locator('[data-testid="summary"] #summary [data-testid="hamburger-btn"]')
+                menu_button = page.locator('#summary [data-testid="hamburger-btn"]')
                 menu_button.click()
                 # Wait for drawer to open
                 page.wait_for_function("() => document.getElementById('app-root').getAttribute('data-drawer') === 'open'")
@@ -547,7 +547,7 @@ class TestFullViewportHeightFlow:
                         'matrix(1, 0, 0, 1, -288' in transform), f"Feeds should be off-canvas, got transform: {transform}"
 
                 # Should be able to interact with mobile elements
-                menu_button = page.locator('[data-testid="summary"] #summary [data-testid="hamburger-btn"]')
+                menu_button = page.locator('#summary [data-testid="hamburger-btn"]')
                 expect(menu_button).to_be_visible()
             
             print(f"  ✓ {viewport_name} layout test passed")
@@ -745,7 +745,7 @@ class TestTabSizeAndAlignment:
                         expect(icon_bar).to_be_visible(timeout=5000)
 
                         # Check for hamburger menu button (should be visible in summary section on mobile)
-                        hamburger_btn = page.locator('[data-testid="summary"] #summary [data-testid="hamburger-btn"]')
+                        hamburger_btn = page.locator('#summary [data-testid="hamburger-btn"]')
                         expect(hamburger_btn).to_be_visible()
 
                         # Check for feed name display

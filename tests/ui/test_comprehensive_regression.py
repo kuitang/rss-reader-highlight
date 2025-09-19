@@ -93,7 +93,7 @@ class TestComprehensiveRegression:
             print(f"Mobile iteration {iteration + 1}")
             
             # Open hamburger menu (now using data-testid)
-            hamburger = page.locator("#summary [data-testid='hamburger-btn']")
+            hamburger = page.locator("#summary [data-testid="hamburger-btn"]")
             if hamburger.is_visible():
                 hamburger.click()
                 
@@ -288,7 +288,7 @@ class TestComprehensiveRegression:
         
         # Navigate to different feeds and verify session persists
         # Handle both desktop and mobile layouts - scope to summary
-        mobile_nav_button = page.locator("#summary [data-testid='hamburger-btn']")
+        mobile_nav_button = page.locator("#summary [data-testid="hamburger-btn"]")
         is_mobile = mobile_nav_button.is_visible()
         
         if is_mobile:
@@ -375,7 +375,7 @@ class TestHTMXArchitectureValidation:
         expect(page.locator("#summary")).to_be_visible()
         
         # Test mobile sidebar handler - scope to summary
-        hamburger = page.locator("#summary [data-testid='hamburger-btn']")
+        hamburger = page.locator("#summary [data-testid="hamburger-btn"]")
         if hamburger.is_visible():
             hamburger.click()
             wait_for_htmx_complete(page)

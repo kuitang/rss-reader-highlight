@@ -24,8 +24,8 @@ def test_mobile_tab_active_style_updates(page: Page, test_server_url):
     
     # Find the navigation buttons in mobile icon bar (new structure)
     # Mobile viewport test - use mobile-specific selectors
-    all_posts_btn = page.locator('#icon-bar button[title="All Posts"]')
-    unread_btn = page.locator('#icon-bar button[title="Unread"]') 
+    all_posts_btn = page.locator('#summary [data-testid="all-posts-btn"]')
+    unread_btn = page.locator('#summary [data-testid="unread-btn"]') 
     
     # Verify buttons exist
     expect(all_posts_btn).to_be_visible()
@@ -49,7 +49,7 @@ def test_mobile_tab_active_style_updates(page: Page, test_server_url):
     print(f"✅ Unread navigation working - clicked successfully")
     
     # Verify navigation completed
-    expect(page.locator('#icon-bar button[title="Unread"]')).to_be_visible()
+    expect(page.locator('#summary [data-testid="unread-btn"]')).to_be_visible()
     print("✅ Unread button still accessible after navigation")
     
     # Test 3: Both buttons should remain visible and functional

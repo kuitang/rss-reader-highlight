@@ -64,7 +64,7 @@ class TestUnifiedChromeResponsive:
         expect(mobile_header).to_be_visible()
 
         # Check mobile header has hamburger button AND feed name
-        mobile_nav_button = page.locator("#summary [data-testid="hamburger-btn"]")
+        mobile_nav_button = page.locator("#summary [data-testid='hamburger-btn']")
         expect(mobile_nav_button).to_be_visible()
 
         # Verify hamburger icon is present
@@ -129,7 +129,7 @@ class TestUnifiedChromeResponsive:
                 expect(desktop_chrome).to_be_hidden()
                 expect(mobile_header).to_be_visible()
                 # Verify mobile chrome content
-                expect(page.locator("#summary [data-testid="hamburger-btn"]")).to_be_visible()
+                expect(page.locator("#summary [data-testid='hamburger-btn']")).to_be_visible()
                 expect(page.locator("#icon-bar")).to_be_visible()
 
     def test_chrome_action_buttons_consistent(self, page: Page, test_server_url: str):

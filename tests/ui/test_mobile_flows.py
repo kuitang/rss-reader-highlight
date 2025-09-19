@@ -89,7 +89,7 @@ class TestMobileFlows:
         """Test that feed filter state is preserved during navigation"""
         
         # Open mobile sidebar - updated selector
-        menu_button = page.locator('#summary [data-testid="hamburger-btn"]')
+        menu_button = page.locator('#summary [data-testid=\"hamburger-btn\"]')
         menu_button.click()
         
         # Wait for sidebar - check for hidden attribute
@@ -147,7 +147,7 @@ class TestMobileFlows:
         
         # Check for unified header and navigation (new structure)
         expect(page.locator("#summary")).to_be_visible()
-        expect(page.locator("[data-testid='hamburger-btn']")).to_be_visible()
+        expect(page.locator("[data-testid=\"hamburger-btn\"]")).to_be_visible()
         
         # Click search button to expand search
         # Mobile viewport test - use unified search button
@@ -187,7 +187,7 @@ class TestMobileFlows:
             wait_for_htmx_complete(page)
             
             # Should be in article view - verify back button appears
-            back_button = page.locator("#summary [data-testid="hamburger-btn"]")
+            back_button = page.locator("#summary [data-testid=\"hamburger-btn\"]")
             expect(back_button).to_be_visible()
             
             # Click back button to return to list
@@ -195,7 +195,7 @@ class TestMobileFlows:
             wait_for_htmx_complete(page)
             
             # Should be back in list view - verify hamburger button appears
-            hamburger_button = page.locator("#summary [data-testid="hamburger-btn"]")
+            hamburger_button = page.locator("#summary [data-testid=\"hamburger-btn\"]")
             expect(hamburger_button).to_be_visible()
             
             # Main header should be back to icon bar view
@@ -204,7 +204,7 @@ class TestMobileFlows:
             
             # Search functionality should be accessible again
             # Mobile viewport test - use mobile search button
-            search_button = page.locator('#icon-bar button[title="Search"]')
+            search_button = page.locator('[data-testid="search-btn"]')
             expect(search_button).to_be_visible()
     
     def test_mobile_search_form_functionality(self, page: Page, test_server_url):
@@ -212,7 +212,7 @@ class TestMobileFlows:
         
         # Click search button to expand search
         # Mobile viewport test - use mobile search button
-        search_button = page.locator('#icon-bar button[title="Search"]')
+        search_button = page.locator('[data-testid="search-btn"]')
         expect(search_button).to_be_visible()
         search_button.click()
         
@@ -288,7 +288,7 @@ class TestMobileFlows:
         """Test that mobile sidebar scrolls properly when opened"""
         
         # Open mobile sidebar
-        menu_button = page.locator('#summary [data-testid="hamburger-btn"]')
+        menu_button = page.locator('#summary [data-testid=\"hamburger-btn\"]')
         menu_button.click()
         page.wait_for_selector("#feeds", state="visible")
         
@@ -383,7 +383,7 @@ class TestMobileFlows:
         """Test that feed filter URLs are shareable"""
         
         # Open sidebar and select a feed
-        menu_button = page.locator('#summary [data-testid="hamburger-btn"]')
+        menu_button = page.locator('#summary [data-testid=\"hamburger-btn\"]')
         menu_button.click()
         page.wait_for_selector("#feeds", state="visible")
         
@@ -463,7 +463,7 @@ class TestMobileFlows:
         """Test that feed title shows correctly after navigating back from article when specific feed is selected"""
         
         # Open mobile sidebar first
-        hamburger_button = page.locator('#summary [data-testid="hamburger-btn"]')
+        hamburger_button = page.locator('#summary [data-testid=\"hamburger-btn\"]')
         hamburger_button.click()
         page.wait_for_selector("#feeds", state="visible")
         
@@ -487,7 +487,7 @@ class TestMobileFlows:
         expect(page.locator("#main-content #item-detail")).to_be_visible()
         
         # Click back button
-        back_button = page.locator("#summary [data-testid="hamburger-btn"]").filter(has=page.locator('uk-icon[icon="arrow-left"]'))
+        back_button = page.locator("#summary [data-testid=\"hamburger-btn\"]").filter(has=page.locator('uk-icon[icon="arrow-left"]'))
         expect(back_button).to_be_visible()
         back_button.click()
         wait_for_htmx_complete(page)
