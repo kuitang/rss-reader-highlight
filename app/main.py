@@ -1,7 +1,6 @@
 """RSS Reader built with FastHTML and MonsterUI - with auto-reload enabled"""
 
 from fasthtml.common import *
-from fasthtml.common import setup_toasts, add_toast
 from monsterui.all import *
 import uuid
 from datetime import datetime, timezone
@@ -27,9 +26,6 @@ logger = logging.getLogger(__name__)
 
 # Create FastHTML app instance
 app = FastHTML()
-
-# Setup toast notifications with 5 second duration
-setup_toasts(app, duration=5)
 
 # Initialize database and setup default feeds if needed
 init_db()
@@ -314,7 +310,7 @@ def viewport_styles():
         #universal-header {
             position: sticky;
             top: 0;
-            z-index: 40;
+            z-index: 30;  /* Lower than overlay (40) so clicks on header area close sidebar */
         }
 
         /* Simplified button visibility - each header has only one button */
@@ -585,6 +581,7 @@ def before(req, sess):
     
     # Store in request scope for easy access
     req.scope['session_id'] = session_id
+
 
 # Lifespan event handler for background worker
 @contextlib.asynccontextmanager
@@ -1296,7 +1293,6 @@ def add_feed(htmx, sess, new_feed_url: str = ""):
     """Add new feed"""
     session_id = sess.get('session_id')
     if not session_id:
-        add_toast(sess, "Session error", "error")
         return FeedsSidebar(session_id)
 
     url = new_feed_url.strip()
@@ -1306,7 +1302,6 @@ def add_feed(htmx, sess, new_feed_url: str = ""):
     hx_target = getattr(htmx, 'target', '') if htmx else ''
 
     if not url:
-        add_toast(sess, "Please enter a URL", "error")
         # For integration tests: include error message in response content
         feeds = FeedModel.get_user_feeds(session_id)
         folders = FolderModel.get_folders(session_id)
@@ -1415,7 +1410,6 @@ def add_feed(htmx, sess, new_feed_url: str = ""):
     existing_feed = FeedModel.user_has_feed_url(session_id, url)
 
     if existing_feed:
-        add_toast(sess, f"Already subscribed to: {existing_feed['title']}", "warning")
         return FeedsSidebar(session_id)
     
     try:
@@ -1448,20 +1442,17 @@ def add_feed(htmx, sess, new_feed_url: str = ""):
             try:
                 background_worker.queue_manager.worker.queue.put_nowait(feed_data)
                 # Success - show toast and return unified sidebar content
-                add_toast(sess, "Feed added successfully", "success")
+                # Success
+                pass
             except Exception as e:
                 # Feed was added but background update failed to queue
-                add_toast(sess, "Feed added but background update failed - refresh manually", "warning")
-        else:
-            # Success when not using background worker (MINIMAL_MODE or no queue manager)
-            add_toast(sess, "Feed added successfully", "success")
+                pass
 
         return FeedsSidebar(session_id)
 
     except Exception as e:
 
-        # Error - show toast and return unified sidebar content
-        add_toast(sess, f"Failed to add feed: {str(e)}", "error")
+        # Error - return unified sidebar content
         return FeedsSidebar(session_id)
 
 @rt('/api/item/{item_id}/star')
