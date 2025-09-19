@@ -884,12 +884,19 @@ class TestHeaderUpdateBugFixes:
         Before fix: Clicking a feed did not update the header (stayed "All Feeds")
         After fix: Header correctly shows the selected feed name
         """
-        # Create new page for clean state
+        # Create new page with completely fresh context for clean state
         page = browser.new_page()
+
         # Set desktop viewport for consistency
         page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)
         page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
+
+        # Clear any existing storage/cookies to ensure fresh session (after page loads)
+        page.evaluate("() => { try { localStorage.clear(); sessionStorage.clear(); } catch(e) {} }")
+
+        # Extra wait to ensure all initial HTMX requests complete
+        page.wait_for_function("() => !document.body.classList.contains('htmx-request')", timeout=5000)
 
         # 1. Verify we start with "All Feeds" header (target the one in summary pane)
         header = page.locator('[data-testid="summary"] #universal-header h1')
@@ -908,6 +915,12 @@ class TestHeaderUpdateBugFixes:
         # Click the feed
         first_feed_link.click()
         wait_for_htmx_complete(page)
+
+        # Extra robustness: Wait for header content to actually change
+        page.wait_for_function(
+            "() => document.querySelector('[data-testid=\"summary\"] #universal-header h1')?.textContent !== 'All Feeds'",
+            timeout=10000
+        )
 
         # 3. Verify header updated to show the feed name
         updated_header_text = header.text_content()
