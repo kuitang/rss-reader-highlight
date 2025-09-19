@@ -300,7 +300,7 @@ class TestButtonStateUpdates:
 class TestBlueIndicatorHTMXFlow:
     """Test the complex blue indicator HTMX update flow we implemented"""
 
-    def test_blue_indicator_disappears_on_article_click(self, page, test_server_url):
+    def test_blue_indicator_disappears_on_article_click(self, browser, test_server_url):
         """Test: Click article with blue dot → Dot disappears immediately → HTMX update working
         
         Tests both mobile and desktop layouts.
@@ -311,6 +311,8 @@ class TestBlueIndicatorHTMXFlow:
             ("mobile", constants.MOBILE_VIEWPORT_ALT, '[data-testid="app-root"]')
         ]:
             print(f"\n--- Testing {viewport_name} blue indicator behavior ---")
+            # Create new page for each viewport to ensure clean state
+            page = browser.new_page()
             page.set_viewport_size(viewport_size)
             page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
             wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
@@ -366,12 +368,17 @@ class TestBlueIndicatorHTMXFlow:
             expect(detail_view).to_be_visible()
             expect(detail_view.locator("strong").first).to_be_visible()
             print(f"  ✓ {viewport_name} blue indicator test passed")
+
+            # Clean up page for next iteration
+            page.close()
     
-    def test_unread_view_article_behavior(self, page, test_server_url):
+    def test_unread_view_article_behavior(self, browser, test_server_url):
         """Test: Unread view → Click article → Article marked as read
-        
+
         UPDATED SELECTORS to match current app.py implementation.
         """
+        # Create new page for clean state
+        page = browser.new_page()
         # Set desktop viewport for consistency
         page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)
         page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
@@ -400,12 +407,17 @@ class TestBlueIndicatorHTMXFlow:
             # 4. Article should be marked as read (blue dot gone)
             # Detail view should show content
             expect(page.locator('#item-detail, [data-testid="detail"]').first).to_be_visible()
+
+        # Clean up
+        page.close()
     
-    def test_multiple_article_clicks_blue_management(self, page, test_server_url):
+    def test_multiple_article_clicks_blue_management(self, browser, test_server_url):
         """Test: Click multiple articles → Each loses blue dot → UI updates correctly
-        
+
         UPDATED SELECTORS to match current app.py implementation.
         """
+        # Create new page for clean state
+        page = browser.new_page()
         # Set desktop viewport for consistency
         page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)
         page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
@@ -449,6 +461,9 @@ class TestBlueIndicatorHTMXFlow:
                     blue_dot = title_container.locator('.bg-blue-600')
                     blue_dot_opacity = blue_dot.evaluate('el => window.getComputedStyle(el).opacity')
                     assert blue_dot_opacity == '0', f"Article {article_id} blue dot should be hidden, got opacity: {blue_dot_opacity}"
+
+        # Clean up
+        page.close()
 
 class TestSessionAndSubscriptionFlow:
     """Test the session auto-subscription flow that caused 'No posts available'"""
@@ -859,6 +874,187 @@ class TestTabSizeAndAlignment:
                 context.close()
             
         print("\n✅ All viewport button size tests passed!")
+
+class TestHeaderUpdateBugFixes:
+    """Test the two critical header bugs that were fixed"""
+
+    def test_header_updates_when_clicking_feed(self, browser, test_server_url):
+        """Test: Click feed → Header updates to show feed name (Bug 1 fix)
+
+        Before fix: Clicking a feed did not update the header (stayed "All Feeds")
+        After fix: Header correctly shows the selected feed name
+        """
+        # Create new page for clean state
+        page = browser.new_page()
+        # Set desktop viewport for consistency
+        page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
+        wait_for_page_ready(page)
+
+        # 1. Verify we start with "All Feeds" header (target the one in summary pane)
+        header = page.locator('[data-testid="summary"] #universal-header h1')
+        expect(header).to_be_visible()
+        initial_header_text = header.text_content()
+        assert initial_header_text == "All Feeds", f"Expected 'All Feeds' initially, got '{initial_header_text}'"
+
+        # 2. Find and click a specific feed
+        feed_links = page.locator('[data-testid="feeds"] a[href*="feed_id"]')
+        expect(feed_links.first).to_be_visible()
+
+        # Get the feed name from the link text to verify header update
+        first_feed_link = feed_links.first
+        feed_link_text = first_feed_link.text_content().strip()
+
+        # Click the feed
+        first_feed_link.click()
+        wait_for_htmx_complete(page)
+
+        # 3. Verify header updated to show the feed name
+        updated_header_text = header.text_content()
+        assert updated_header_text != "All Feeds", f"Header should have changed from 'All Feeds', but still shows '{updated_header_text}'"
+        assert feed_link_text in updated_header_text or updated_header_text in feed_link_text, \
+            f"Header '{updated_header_text}' should match feed name '{feed_link_text}'"
+
+        print(f"✓ Header correctly updated from 'All Feeds' to '{updated_header_text}'")
+
+        # Clean up
+        page.close()
+
+    def test_header_persists_when_clicking_all_feeds_multiple_times(self, page, test_server_url):
+        """Test: Click "All Feeds" multiple times → Header remains visible (Bug 2 fix)
+
+        Before fix: Clicking "All Feeds" twice made the header disappear entirely
+        After fix: Header remains visible and shows "All Feeds" consistently
+        """
+        # Set desktop viewport for consistency
+        page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
+        wait_for_page_ready(page)
+
+        # 1. Verify initial header is visible (target the one in summary pane)
+        header = page.locator('[data-testid="summary"] #universal-header h1')
+        expect(header).to_be_visible()
+        initial_header_text = header.text_content()
+
+        # 2. Find the "All Feeds" link/button
+        all_feeds_link = page.locator('[data-testid="feeds"] a[href*="feed_id="]:not([href*="feed_id="])')
+        if all_feeds_link.count() == 0:
+            # Try alternative selector for "All Feeds" - look for link without specific feed_id
+            all_feeds_link = page.locator('[data-testid="feeds"] a[href="/"]:has-text("All"), [data-testid="feeds"] a[href="/?unread=false"]:has-text("All")')
+
+        if all_feeds_link.count() == 0:
+            # Try finding by text content
+            all_feeds_link = page.locator('[data-testid="feeds"] a').filter(has_text="All")
+
+        # If we still can't find "All Feeds" link, create the scenario by clicking a feed first, then going back
+        if all_feeds_link.count() == 0:
+            # First click a specific feed
+            specific_feed = page.locator('[data-testid="feeds"] a[href*="feed_id="]').first
+            if specific_feed.is_visible():
+                specific_feed.click()
+                wait_for_htmx_complete(page)
+
+                # Now look for a way to get back to "All Feeds" - check for "All Posts" button
+                all_posts_btn = page.locator('[data-testid="all-posts-btn"]')
+                if all_posts_btn.is_visible():
+                    all_feeds_link = all_posts_btn
+                else:
+                    # Try navigating back to root
+                    page.goto(test_server_url)
+                    wait_for_page_ready(page)
+                    all_feeds_link = page.locator('[data-testid="feeds"] a[href="/"]').first
+
+        # Skip test if we can't find the All Feeds mechanism
+        if all_feeds_link.count() == 0:
+            pytest.skip("Could not locate 'All Feeds' navigation mechanism")
+
+        # 3. Click "All Feeds" multiple times and verify header persists
+        for click_number in range(1, 4):  # Click 3 times
+            all_feeds_link.first.click()
+            wait_for_htmx_complete(page)
+
+            # Verify header is still visible after each click
+            expect(header).to_be_visible()
+            current_header_text = header.text_content()
+
+            # Header should show "All Feeds" or similar
+            assert "All" in current_header_text or current_header_text == initial_header_text, \
+                f"Click {click_number}: Header disappeared or changed unexpectedly to '{current_header_text}'"
+
+            print(f"✓ Click {click_number}: Header remains visible with text '{current_header_text}'")
+
+        # 4. Final verification - header should still be visible and functional
+        expect(header).to_be_visible()
+        final_header_text = header.text_content()
+        assert final_header_text, f"Header text is empty after multiple clicks"
+
+        print(f"✓ Header persists after multiple 'All Feeds' clicks: '{final_header_text}'")
+
+    def test_no_header_duplication_when_clicking_all_posts_unread(self, page, test_server_url):
+        """Test: Click All Posts/Unread buttons → No header duplication (Header duplication bug fix)
+
+        Before fix: Clicking All Posts or Unread buttons created duplicate headers
+        After fix: Only one header remains visible regardless of button clicks
+        """
+        # Set desktop viewport for consistency
+        page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
+        wait_for_page_ready(page)
+
+        # 1. Verify initial state has only one header
+        headers = page.locator('[data-testid="summary"] #universal-header')
+        expect(headers).to_have_count(1)
+        initial_header_text = headers.first.locator('h1').text_content()
+
+        # 2. Click "All Posts" button
+        all_posts_btn = page.locator('[data-testid="summary"] [data-testid="all-posts-btn"]')
+        expect(all_posts_btn).to_be_visible()
+        all_posts_btn.click()
+        wait_for_htmx_complete(page)
+
+        # 3. Verify still only one header after All Posts click
+        headers_after_all_posts = page.locator('[data-testid="summary"] #universal-header')
+        expect(headers_after_all_posts).to_have_count(1)
+
+        # Header should still be visible and functional
+        expect(headers_after_all_posts.first).to_be_visible()
+        header_text_after_all_posts = headers_after_all_posts.first.locator('h1').text_content()
+        assert header_text_after_all_posts == initial_header_text, \
+            f"Header text changed unexpectedly: '{initial_header_text}' → '{header_text_after_all_posts}'"
+
+        # 4. Click "Unread" button
+        unread_btn = page.locator('[data-testid="summary"] [data-testid="unread-btn"]')
+        expect(unread_btn).to_be_visible()
+        unread_btn.click()
+        wait_for_htmx_complete(page)
+
+        # 5. Verify still only one header after Unread click
+        headers_after_unread = page.locator('[data-testid="summary"] #universal-header')
+        expect(headers_after_unread).to_have_count(1)
+
+        # Header should still be visible and functional
+        expect(headers_after_unread.first).to_be_visible()
+        header_text_after_unread = headers_after_unread.first.locator('h1').text_content()
+        assert header_text_after_unread == initial_header_text, \
+            f"Header text changed unexpectedly: '{initial_header_text}' → '{header_text_after_unread}'"
+
+        # 6. Test multiple rapid clicks to ensure no duplication under stress
+        for i in range(3):
+            all_posts_btn.click()
+            wait_for_htmx_complete(page)
+
+            # Verify exactly one header exists
+            headers_stress_test = page.locator('[data-testid="summary"] #universal-header')
+            expect(headers_stress_test).to_have_count(1)
+
+            unread_btn.click()
+            wait_for_htmx_complete(page)
+
+            # Verify exactly one header exists
+            headers_stress_test = page.locator('[data-testid="summary"] #universal-header')
+            expect(headers_stress_test).to_have_count(1)
+
+        print(f"✓ Header duplication bug test passed - exactly 1 header maintained throughout all interactions")
 
 class TestSearchBarHeightInvariant:
     """Test search bar expansion height invariant behavior"""

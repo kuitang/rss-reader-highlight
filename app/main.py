@@ -181,12 +181,18 @@ def create_icon_bar(data, for_oob=False):
         )
     )
 
-def three_pane_layout(data, detail_content=None):
-    """Unified three-pane layout for all viewports"""
+def create_universal_header(data):
+    """Create the universal header component - DRY function for reuse
+
+    Args:
+        data: PageData object with feed_name attribute
+
+    Returns:
+        Div element containing the universal header
+    """
     feed_name = data.feed_name if hasattr(data, 'feed_name') else "All Feeds"
 
-    # Create universal header for both mobile and desktop
-    universal_header = Div(
+    return Div(
         id="universal-header",
         cls="bg-background border-b p-4"
     )(
@@ -239,6 +245,25 @@ def three_pane_layout(data, detail_content=None):
             )
         )
     )
+
+def create_summary_with_header(data):
+    """Create the summary section with header for HTMX responses - DRY function
+
+    Args:
+        data: PageData object with all necessary data
+
+    Returns:
+        Tuple of header and feeds content for HTMX target replacement
+    """
+    return (
+        create_universal_header(data),
+        FeedsContent(data.session_id, data.feed_id, data.unread, data.page, data=data)
+    )
+
+def three_pane_layout(data, detail_content=None):
+    """Unified three-pane layout for all viewports"""
+    # Use the DRY function to create header
+    universal_header = create_universal_header(data)
 
     # Overlay for mobile sidebar (click to close)
     overlay = Div(
@@ -854,7 +879,7 @@ def FeedSidebarItem(feed, unread=True, count=""):
             ),
             href=url,
             hx_get=url,
-            hx_target="#feeds-list-container",  # Changed from #summary
+            hx_target="#summary",  # Target full summary section to include header
             hx_push_url="true",
             cls=Styling.SIDEBAR_ITEM,
             onclick="if (window.innerWidth < 1024) { document.getElementById('app-root').removeAttribute('data-drawer'); }"
@@ -1213,10 +1238,14 @@ def index(htmx, sess, feed_id: int = None, unread: bool = True, folder_id: int =
     # HTMX fragment updates
     if htmx and getattr(htmx, 'request', None):
         # Return updated summary list for pagination/filtering
-        if getattr(htmx, 'target', None) in ['feeds-list-container', 'summary']:  # Handle both targets
-            # Include OOB update for button states using shared function
+        if getattr(htmx, 'target', None) == 'feeds-list-container':
+            # For feeds-list-container target: return only content, no header (prevents duplication)
             updated_icon_bar = create_icon_bar(data, for_oob=True)
             return (FeedsContent(data.session_id, data.feed_id, data.unread, data.page, data=data), updated_icon_bar)
+        elif getattr(htmx, 'target', None) == 'summary':
+            # For summary target: return header + content (for feed navigation)
+            updated_icon_bar = create_icon_bar(data, for_oob=True)
+            return (create_summary_with_header(data), updated_icon_bar)
         # Clear detail to show summary (for back button)
         elif getattr(htmx, 'target', None) == 'detail-content':
             return Div(cls="placeholder")
