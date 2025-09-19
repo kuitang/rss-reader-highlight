@@ -7,7 +7,7 @@ import os
 import httpx
 import pytest
 from playwright.sync_api import Page, expect
-from test_constants import MAX_WAIT_MS, RETRY_DELAY_SECONDS, SERVER_STARTUP_RETRY_DELAY
+import test_constants as constants
 from test_helpers import (
     wait_for_htmx_complete as htmx_wait,
     wait_for_page_ready as page_ready,
@@ -37,8 +37,8 @@ class TestWorkingRegression:
         5. Test tab switching
         """
         # Navigate and wait for page load
-        page.set_viewport_size({"width": 1200, "height": 800})  # Ensure desktop layout
-        page.goto(test_server_url, timeout=MAX_WAIT_MS)
+        page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)  # Ensure desktop layout
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         # Take screenshot of initial state
@@ -65,13 +65,13 @@ class TestWorkingRegression:
             claudeai_feed_link.first.click()
         wait_for_htmx_complete(page)
         # Wait for feed content to load instead of arbitrary sleep
-        page.wait_for_selector("#desktop-feeds-content", state="visible", timeout=MAX_WAIT_MS)
+        page.wait_for_selector("#desktop-feeds-content", state="visible", timeout=constants.MAX_WAIT_MS)
         
         # Verify feed filtering worked - heading should change to ClaudeAI
         assert "feed_id" in page.url, "Should be viewing a specific feed"
         # Desktop h3 is in chrome container
         feed_heading = page.locator("#desktop-chrome-container h3, #desktop-chrome-content h3").filter(has_text="ClaudeAI")
-        expect(feed_heading.first).to_be_visible(timeout=MAX_WAIT_MS)
+        expect(feed_heading.first).to_be_visible(timeout=constants.MAX_WAIT_MS)
         print(f"Successfully navigated to ClaudeAI feed: {page.url}")
         
         page.screenshot(path="/tmp/regression_feed_selected.png")
@@ -94,7 +94,7 @@ class TestWorkingRegression:
         first_article.click()
         wait_for_htmx_complete(page)
         # Wait for article detail to load instead of arbitrary sleep
-        page.wait_for_selector("#desktop-item-detail", state="visible", timeout=MAX_WAIT_MS)
+        page.wait_for_selector("#desktop-item-detail", state="visible", timeout=constants.MAX_WAIT_MS)
         
         page.screenshot(path="/tmp/regression_article_clicked.png")
         
@@ -121,7 +121,7 @@ class TestWorkingRegression:
             unread_tab.click()
             wait_for_htmx_complete(page)
             # Wait for feed list to update
-            page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=MAX_WAIT_MS)
+            page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
             page.screenshot(path="/tmp/regression_unread_tab.png")
         
         # Test All Posts tab  
@@ -131,7 +131,7 @@ class TestWorkingRegression:
             all_posts_tab.click()
             wait_for_htmx_complete(page)
             # Wait for feed list to update
-            page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=MAX_WAIT_MS)
+            page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
             page.screenshot(path="/tmp/regression_all_posts_tab.png")
         
         print("=== Testing Feed Switching ===")
@@ -146,7 +146,7 @@ class TestWorkingRegression:
             hackernews_link.first.click()
         wait_for_htmx_complete(page)
         # Wait for feed content to update
-        page.wait_for_selector("#desktop-feeds-content", state="visible", timeout=MAX_WAIT_MS)
+        page.wait_for_selector("#desktop-feeds-content", state="visible", timeout=constants.MAX_WAIT_MS)
         
         # Verify feed changed to Hacker News - use .first to handle multiple matches
         hn_heading = page.locator("#desktop-chrome-container h3, #desktop-chrome-content h3").filter(has_text="Hacker News")
@@ -175,21 +175,21 @@ class TestWorkingRegression:
     def test_mobile_layout_functionality(self, page: Page, test_server_url):
         """Test mobile-specific functionality and layout."""
         # Set mobile viewport
-        page.set_viewport_size({"width": 390, "height": 844})
+        page.set_viewport_size(constants.MOBILE_VIEWPORT)
 
         # Retry page navigation in case server is slow to respond in CI
         for attempt in range(2):
             try:
-                page.goto(test_server_url, timeout=MAX_WAIT_MS)
+                page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
                 break
             except Exception as e:
                 if attempt == 1:
                     raise
                 import time
-                time.sleep(RETRY_DELAY_SECONDS)  # Wait before retry
+                time.sleep(constants.RETRY_DELAY_SECONDS)  # Wait before retry
 
         # Wait for specific mobile layout element to ensure page is loaded
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=MAX_WAIT_MS)
+        page.wait_for_selector("#mobile-layout", state="visible", timeout=constants.MAX_WAIT_MS)
         wait_for_htmx_complete(page)
         
         page.screenshot(path="/tmp/regression_mobile_initial.png")
@@ -209,7 +209,7 @@ class TestWorkingRegression:
             claudeai_link.click()
             wait_for_htmx_complete(page)
             # Wait for feed list to load
-            page.wait_for_selector("li[id^='mobile-feed-item-']", state="visible", timeout=MAX_WAIT_MS)
+            page.wait_for_selector("li[id^='mobile-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
             
             page.screenshot(path="/tmp/regression_mobile_feed_selected.png")
             
@@ -218,7 +218,7 @@ class TestWorkingRegression:
             first_article.click()
             wait_for_htmx_complete(page)
             # Wait for article detail to load (mobile shows in main-content)
-            page.wait_for_selector("#main-content", state="visible", timeout=MAX_WAIT_MS)
+            page.wait_for_selector("#main-content", state="visible", timeout=constants.MAX_WAIT_MS)
             
             page.screenshot(path="/tmp/regression_mobile_article_view.png")
             
@@ -232,16 +232,16 @@ class TestWorkingRegression:
         # Retry page navigation in case server is slow to respond in CI
         for attempt in range(2):
             try:
-                page.goto(test_server_url, timeout=MAX_WAIT_MS)
+                page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
                 break
             except Exception as e:
                 if attempt == 1:
                     raise
                 import time
-                time.sleep(RETRY_DELAY_SECONDS)  # Wait before retry
+                time.sleep(constants.RETRY_DELAY_SECONDS)  # Wait before retry
 
         # Wait for either mobile or desktop layout element to be visible
-        page.wait_for_selector("li[id^='desktop-feed-item-'], li[id^='mobile-feed-item-']", state="visible", timeout=MAX_WAIT_MS)
+        page.wait_for_selector("li[id^='desktop-feed-item-'], li[id^='mobile-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
         wait_for_htmx_complete(page)
         
         # Monitor network activity
@@ -267,14 +267,14 @@ class TestWorkingRegression:
         claudeai_link.click()
         wait_for_htmx_complete(page)
         # Wait for feed content to load
-        page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=MAX_WAIT_MS)
+        page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
         
         # Click an article
         first_article = page.locator("li[id^='desktop-feed-item-']").first
         first_article.click()
         wait_for_htmx_complete(page)
         # Wait for detail panel to load
-        page.wait_for_selector("#desktop-item-detail, #mobile-item-detail", state="visible", timeout=MAX_WAIT_MS)
+        page.wait_for_selector("#desktop-item-detail, #mobile-item-detail", state="visible", timeout=constants.MAX_WAIT_MS)
         
         # Analyze requests
         htmx_requests = [req for req in requests if 'hx-request' in req.get('headers', {})]
@@ -324,7 +324,7 @@ class TestWorkingRegression:
             except RetryError:
                 pytest.skip("Failed to start isolated test server - CI resource issue")
                 
-            page.goto(server_url, timeout=MAX_WAIT_MS)
+            page.goto(server_url, timeout=constants.MAX_WAIT_MS)
             wait_for_htmx_complete(page)
             
             # Select a feed first - handle both layouts
@@ -341,7 +341,7 @@ class TestWorkingRegression:
             claudeai_link.click()
             wait_for_htmx_complete(page)
             # Wait for feed content to load
-            page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=MAX_WAIT_MS)
+            page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
             
             # Count unread articles
             initial_unread = page.locator("li").filter(has=page.locator(".bg-blue-600")).all()
@@ -353,7 +353,7 @@ class TestWorkingRegression:
                 first_unread.click()
                 wait_for_htmx_complete(page)
                 # Wait for detail panel to load
-                page.wait_for_selector("#desktop-item-detail, #mobile-item-detail", state="visible", timeout=MAX_WAIT_MS)
+                page.wait_for_selector("#desktop-item-detail, #mobile-item-detail", state="visible", timeout=constants.MAX_WAIT_MS)
                 
                 # Check unread count decreased
                 remaining_unread = page.locator("li").filter(has=page.locator(".bg-blue-600")).all()

@@ -14,7 +14,7 @@ Rather than complex cleanup logic, simpler to run this test separately.
 import pytest
 from playwright.sync_api import Page, expect
 import time
-from test_constants import MAX_WAIT_MS
+import test_constants as constants
 from test_helpers import (
     wait_for_htmx_complete,
     wait_for_page_ready,
@@ -30,10 +30,10 @@ class TestMobileSidebarIsolated:
     
     def test_mobile_sidebar_and_navigation_flow(self, page: Page, test_server_url):
         """Test mobile-specific navigation patterns"""
-        page.set_viewport_size({"width": 390, "height": 844})
-        page.goto(test_server_url, timeout=MAX_WAIT_MS)
+        page.set_viewport_size(constants.MOBILE_VIEWPORT)
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=MAX_WAIT_MS)
+        page.wait_for_selector("#mobile-layout", state="visible", timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         # Ensure mobile layout and JavaScript are ready

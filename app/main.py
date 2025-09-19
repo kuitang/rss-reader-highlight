@@ -1,6 +1,7 @@
 """RSS Reader built with FastHTML and MonsterUI - with auto-reload enabled"""
 
 from fasthtml.common import *
+from fasthtml.common import setup_toasts, add_toast
 from monsterui.all import *
 import uuid
 from datetime import datetime, timezone
@@ -26,6 +27,9 @@ logger = logging.getLogger(__name__)
 
 # Create FastHTML app instance
 app = FastHTML()
+
+# Setup toast notifications with 5 second duration
+setup_toasts(app, duration=5)
 
 # Initialize database and setup default feeds if needed
 init_db()
@@ -137,36 +141,37 @@ class PageData:
 
 # Removed: Old HTMX routing functions - using unified layout now
 
-def three_pane_layout(data):
+def three_pane_layout(data, detail_content=None):
     """Unified three-pane layout for all viewports"""
     feed_name = data.feed_name if hasattr(data, 'feed_name') else "All Feeds"
 
-    # Mobile header bar (visible only on mobile)
-    header_bar = Div(
-        cls="lg:hidden fixed top-0 left-0 right-0 bg-background border-b p-4 z-40",
-        id="mobile-header"
+    # Create universal header for both mobile and desktop
+    universal_header = Div(
+        id="universal-header",
+        cls="bg-background border-b p-4"
     )(
-        Div(cls="flex items-center justify-between")(
-            # Hamburger menu button
-            Button(
-                UkIcon('menu'),
-                cls="p-3 rounded border hover:bg-secondary min-h-[44px] min-w-[44px]",
-                onclick="document.getElementById('app-root').setAttribute('data-drawer','open')",
-                data_testid="open-feeds"
+        Div(cls="flex items-center gap-4")(
+            # Button container with overlapping buttons
+            Div(cls="relative")(
+                # Hamburger menu button
+                Button(
+                    UkIcon('menu'),
+                    cls="hamburger-btn p-3 rounded border hover:bg-secondary min-h-[44px] min-w-[44px]",
+                    onclick="document.getElementById('app-root').setAttribute('data-drawer','open')",
+                    data_testid="hamburger-btn"
+                ),
+                # Back button (in same position as hamburger)
+                Button(
+                    UkIcon('arrow-left'),
+                    hx_get="/",
+                    hx_target="#detail-content",
+                    hx_swap="innerHTML",
+                    cls="back-btn absolute top-0 left-0 p-3 rounded border hover:bg-secondary min-h-[44px] min-w-[44px]",
+                    data_testid="back-button"
+                )
             ),
             # Feed name/title
-            H1(feed_name, cls="text-lg font-semibold"),
-            # Back button (visible only when detail has content)
-            Button(
-                UkIcon('arrow-left'),
-                hx_get="/",
-                hx_target="#detail",
-                hx_swap="innerHTML",
-                cls="lg:hidden p-3 rounded border hover:bg-secondary min-h-[44px] min-w-[44px]",
-                data_testid="back-button",
-                style="display: none;",  # Hidden by default, shown via CSS when detail has content
-                id="back-button"
-            )
+            H1(feed_name, cls="text-lg font-semibold")
         )
     )
 
@@ -181,9 +186,8 @@ def three_pane_layout(data):
     return Div(
         id="app-root",
         data_testid="app-root",
-        cls="grid min-h-dvh lg:grid-cols-[18rem_1fr_1.25fr] lg:grid-rows-1 grid-rows-[auto_1fr]"
+        cls="grid h-dvh lg:grid-cols-[18rem_1fr_1.25fr] lg:grid-rows-1"
     )(
-        header_bar,
         overlay,
         # Feeds sidebar (left)
         Aside(
@@ -197,8 +201,9 @@ def three_pane_layout(data):
         Section(
             id="summary",
             data_testid="summary",
-            cls="overflow-y-auto"
+            cls="overflow-y-auto lg:border-r"
         )(
+            universal_header,  # Header is now inside summary section
             FeedsContent(data.session_id, data.feed_id, data.unread, data.page, data=data)
         ),
         # Detail view (right)
@@ -207,8 +212,18 @@ def three_pane_layout(data):
             data_testid="detail",
             cls="hidden lg:block overflow-y-auto"
         )(
-            Div(cls="placeholder")  # Empty placeholder initially
-        )
+            # Duplicate header for mobile article view (hidden on desktop via CSS)
+            universal_header,
+            # Wrap content in container for better CSS selector targeting
+            Div(
+                cls="detail-content-container",
+                id="detail-content"
+            )(
+                detail_content if detail_content else Div(cls="placeholder")  # Use provided content or placeholder
+            )
+        ),
+        # Hidden target for surgical updates
+        Div(id="surgical-update-target", style="display:none;")
     )
 
 # Removed: mobile_chrome function - using unified layout now
@@ -220,27 +235,69 @@ def viewport_styles():
     return Style("""
     @layer utilities {
         /* Dynamic viewport units instead of forced body fixed */
+        .h-dvh {
+            height: 100dvh;
+        }
         .min-h-dvh {
             min-height: 100dvh;
         }
 
+        /* Unified header positioning - sticky for both mobile and desktop */
+        #universal-header {
+            position: sticky;
+            top: 0;
+            z-index: 40;
+        }
+
+        /* Desktop button visibility (min-width: 1024px) */
+        @media (min-width: 1024px) {
+            /* Hide all buttons on desktop (both headers) */
+            #summary .hamburger-btn, #summary .back-btn,
+            #detail .hamburger-btn, #detail .back-btn {
+                display: none !important;
+            }
+        }
+
+        /* Mobile button visibility (max-width: 1023px) */
+        @media (max-width: 1023px) {
+            /* Default state (feed list view): show hamburger in summary, hide back */
+            #summary .hamburger-btn {
+                display: block !important;
+            }
+            #summary .back-btn {
+                display: none !important;
+            }
+
+            /* Detail section: always hide hamburger, only show back when content present */
+            #detail .hamburger-btn {
+                display: none !important;
+            }
+            #detail .back-btn {
+                display: none !important; /* Hidden by default, shown only when detail has content */
+            }
+
+            /* When detail has actual content, ensure back button is visible */
+            #app-root:has(#detail-content > :not(.placeholder)) #detail .back-btn {
+                display: block !important;
+            }
+        }
+
+
         /* Mobile-specific rules (max-width: 1023px) */
         @media (max-width: 1023px) {
             /* Mobile default: show Summary, hide Detail */
+            #summary {
+                display: block !important;
+            }
             #detail {
                 display: none !important;
             }
 
-            /* When detail has content (not just placeholder), hide Summary and show Detail */
-            #app-root:has(#detail > :not(.placeholder)) #summary {
+            /* When detail has actual article content (not just placeholder), hide Summary and show Detail */
+            #app-root:has(#detail-content > :not(.placeholder)) #summary {
                 display: none !important;
             }
-            #app-root:has(#detail > :not(.placeholder)) #detail {
-                display: block !important;
-            }
-
-            /* Show back button when detail has content */
-            #app-root:has(#detail > :not(.placeholder)) #back-button {
+            #app-root:has(#detail-content > :not(.placeholder)) #detail {
                 display: block !important;
             }
 
@@ -270,13 +327,7 @@ def viewport_styles():
 
             /* Mobile layout adjustments */
             #app-root {
-                grid-template-rows: auto 1fr !important;
-                grid-template-columns: 1fr !important;
-            }
-
-            /* Mobile header spacing */
-            #summary, #detail {
-                padding-top: 5rem; /* Space for fixed header */
+                display: block !important; /* Switch from grid to block on mobile */
             }
         }
 
@@ -297,8 +348,13 @@ def viewport_styles():
                 display: block !important;
             }
 
-            /* Hide mobile-only elements */
-            #mobile-header, #sidebar-overlay, #back-button {
+            /* Hide mobile-only overlay */
+            #sidebar-overlay {
+                display: none !important;
+            }
+
+            /* Desktop: Hide header in detail column (only show in column 2/summary) */
+            #detail #universal-header {
                 display: none !important;
             }
         }
@@ -319,6 +375,39 @@ def viewport_styles():
             max-width: 100vw !important;
             overflow-x: hidden !important;
         }
+    }
+
+    /* CSS-driven styling based on data-unread attribute */
+
+    /* Feed item title styling - consistent structure, state-driven appearance */
+    li[id^='feed-item-'] .feed-title {
+        line-height: 1.25; /* Consistent line height */
+        display: inline; /* Consistent display mode */
+        font-size: inherit; /* Inherit parent font-size */
+    }
+
+    /* Title weight based on read state */
+    li[data-unread="true"] .feed-title {
+        font-weight: 600; /* font-semibold equivalent for unread items */
+    }
+    li[data-unread="false"] .feed-title {
+        font-weight: normal; /* normal weight for read items */
+    }
+
+    /* Blue dot visibility based on read state */
+    li[data-unread="true"] .blue-dot {
+        opacity: 1; /* visible for unread items */
+    }
+    li[data-unread="false"] .blue-dot {
+        opacity: 0; /* hidden for read items */
+    }
+
+    /* Blue dot space reservation: use flexbox for reliable spacing */
+    li[id^='feed-item-'] > div:first-child {
+        display: flex;
+        align-items: center;
+        min-height: 1.25rem; /* 1.25 * line-height for consistent height */
+        gap: 0.5rem; /* Space between title and blue dot */
     }
     """)
 
@@ -377,10 +466,8 @@ def before(req, sess):
         session_id = str(uuid.uuid4())
         sess['session_id'] = session_id
         SessionModel.create_session(session_id)
-        print(f"DEBUG: Created new session: {session_id}")
         should_subscribe = True
     else:
-        print(f"DEBUG: Using existing session: {session_id}")
         # Check if session has any subscriptions
         user_feeds = FeedModel.get_user_feeds(session_id)
         should_subscribe = len(user_feeds) == 0
@@ -389,167 +476,40 @@ def before(req, sess):
     if should_subscribe:
         with get_db() as conn:
             all_feeds = [dict(row) for row in conn.execute("SELECT * FROM feeds").fetchall()]
-            print(f"DEBUG: Found {len(all_feeds)} feeds to subscribe to")
             for feed in all_feeds:
                 try:
                     SessionModel.subscribe_to_feed(session_id, feed['id'])
-                    print(f"DEBUG: Subscribed to feed {feed['id']}: {feed['title']}")
                 except Exception as e:
-                    print(f"DEBUG: Subscription error for feed {feed['id']}: {str(e)}")
                     # Re-raise critical errors, only catch known duplicates
                     if "UNIQUE constraint failed" not in str(e):
                         raise
     
     # INVARIANT: Every session MUST see items (no exceptions)
     user_items = FeedItemModel.get_items_for_user(session_id, feed_id=None, unread_only=False, page=1)
-    
+
     if len(user_items) == 0:
-        import traceback
-        import json
-        
-        # Gather ALL diagnostic SQL
-        with get_db() as conn:
-            diagnostics = {}
-            
-            # 1. Basic counts
-            diagnostics['feeds_count'] = conn.execute("SELECT COUNT(*) FROM feeds").fetchone()[0]
-            diagnostics['items_count'] = conn.execute("SELECT COUNT(*) FROM feed_items").fetchone()[0]
-            diagnostics['user_feeds_count'] = conn.execute(
-                "SELECT COUNT(*) FROM user_feeds WHERE session_id = ?", (session_id,)
-            ).fetchone()[0]
-            
-            # 2. Sample feeds
-            diagnostics['sample_feeds'] = [dict(row) for row in conn.execute(
-                "SELECT id, url, title FROM feeds LIMIT 5"
-            ).fetchall()]
-            
-            # 3. Sample items
-            diagnostics['sample_items'] = [dict(row) for row in conn.execute(
-                "SELECT id, feed_id, title FROM feed_items LIMIT 5"
-            ).fetchall()]
-            
-            # 4. User's subscriptions
-            diagnostics['user_subscriptions'] = [dict(row) for row in conn.execute(
-                "SELECT * FROM user_feeds WHERE session_id = ? LIMIT 5", (session_id,)
-            ).fetchall()]
-            
-            # 5. The EXACT query that's failing
-            failing_sql = """
-                SELECT fi.*, f.title as feed_title, 
-                       COALESCE(ui.is_read, 0) as is_read,
-                       COALESCE(ui.starred, 0) as starred,
-                       fo.name as folder_name
-                FROM feed_items fi
-                JOIN feeds f ON fi.feed_id = f.id
-                JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
-                LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
-                LEFT JOIN folders fo ON ui.folder_id = fo.id
-                ORDER BY fi.published DESC LIMIT 20
-            """
-            
-            diagnostics['failing_query_result'] = [dict(row) for row in conn.execute(
-                failing_sql, (session_id, session_id)
-            ).fetchall()]
-            
-            # 6. Check each JOIN step
-            diagnostics['step1_feed_items'] = conn.execute(
-                "SELECT COUNT(*) FROM feed_items"
-            ).fetchone()[0]
-            
-            diagnostics['step2_with_feeds'] = conn.execute(
-                "SELECT COUNT(*) FROM feed_items fi JOIN feeds f ON fi.feed_id = f.id"
-            ).fetchone()[0]
-            
-            diagnostics['step3_with_user_feeds'] = conn.execute(
-                "SELECT COUNT(*) FROM feed_items fi "
-                "JOIN feeds f ON fi.feed_id = f.id "
-                "JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?",
-                (session_id,)
-            ).fetchone()[0]
-        
-        # Create HTML error page
+        # Log the error without exposing SQL details
+        logger.error(f"INVARIANT VIOLATION: Session {session_id} sees 0 items!")
+
+        # Return user-friendly error without SQL diagnostics
         error_html = Html(
             Head(
-                Title("500 - Invariant Violation"),
+                Title("500 - Server Error"),
                 Style("""
-                    body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #ff6b6b; }
-                    h1 { color: #ff0000; border-bottom: 3px solid #ff0000; padding-bottom: 10px; }
-                    h2 { color: #ff9999; margin-top: 30px; }
-                    pre { background: #2a2a2a; padding: 15px; border-left: 4px solid #ff6b6b; 
-                          overflow-x: auto; color: #e0e0e0; }
-                    details { margin: 20px 0; }
-                    summary { cursor: pointer; color: #ff9999; font-weight: bold; padding: 10px;
-                             background: #2a2a2a; }
-                    .error-box { background: #330000; border: 2px solid #ff0000; padding: 20px;
-                                margin: 20px 0; }
-                    .metric { display: inline-block; margin: 10px 20px 10px 0; }
-                    .metric-label { color: #888; }
-                    .metric-value { color: #fff; font-size: 1.2em; font-weight: bold; }
+                    body { font-family: system-ui, sans-serif; padding: 40px; text-align: center; }
+                    h1 { color: #dc2626; margin-bottom: 20px; }
+                    p { color: #666; margin: 20px 0; }
+                    a { color: #2563eb; text-decoration: none; }
+                    a:hover { text-decoration: underline; }
                 """)
             ),
             Body(
-                H1("🚨 INVARIANT VIOLATION: User MUST See Items"),
-                
-                Div(
-                    H2("Critical Failure"),
-                    Div(
-                        f"Session {session_id} sees 0 items but this should be impossible!",
-                        cls="error-box"
-                    ),
-                    
-                    H2("Database State"),
-                    Div(
-                        Div(Span("Total Feeds: ", cls="metric-label"), 
-                            Span(str(diagnostics['feeds_count']), cls="metric-value"), cls="metric"),
-                        Div(Span("Total Items: ", cls="metric-label"), 
-                            Span(str(diagnostics['items_count']), cls="metric-value"), cls="metric"),
-                        Div(Span("User Subscriptions: ", cls="metric-label"), 
-                            Span(str(diagnostics['user_feeds_count']), cls="metric-value"), cls="metric"),
-                    ),
-                    
-                    Details(
-                        Summary("Sample Feeds"),
-                        Pre(json.dumps(diagnostics['sample_feeds'], indent=2))
-                    ),
-                    
-                    Details(
-                        Summary("Sample Items"),
-                        Pre(json.dumps(diagnostics['sample_items'], indent=2))
-                    ),
-                    
-                    Details(
-                        Summary("User Subscriptions"),
-                        Pre(json.dumps(diagnostics['user_subscriptions'], indent=2))
-                    ),
-                    
-                    H2("SQL Join Breakdown"),
-                    Pre(f"""Step 1 - feed_items table: {diagnostics['step1_feed_items']} rows
-Step 2 - JOIN with feeds: {diagnostics['step2_with_feeds']} rows
-Step 3 - JOIN with user_feeds (session={session_id}): {diagnostics['step3_with_user_feeds']} rows"""),
-                    
-                    Details(
-                        Summary("Failing SQL Query"),
-                        Pre(failing_sql),
-                        Pre(f"Parameters: ('{session_id}', '{session_id}')"),
-                        Pre(f"Result: {json.dumps(diagnostics['failing_query_result'], indent=2)}")
-                    ),
-                    
-                    Details(
-                        Summary("Stack Trace"),
-                        Pre(''.join(traceback.format_stack()))
-                    )
-                )
+                H1("Something went wrong"),
+                P("We're having trouble loading your feeds. Please try refreshing the page."),
+                P(A("Return to Home", href="/"))
             )
         )
-        
-        # Log to console as well
-        logger.error(f"INVARIANT VIOLATION: Session {session_id} sees 0 items!")
-        
-        # Return proper HTML response with 500 status code
-        # NOTE: We're in middleware, not a route handler, so we must return a raw HTTP response.
-        # Route handlers can return FastHTML objects directly (FastHTML auto-converts them),
-        # but middleware runs before FastHTML's response pipeline, so we need HTMLResponse.
-        # Use to_xml() to convert FastHTML object to actual HTML string.
+
         return HTMLResponse(to_xml(error_html), status_code=500)
     
     # Store in request scope for easy access
@@ -660,10 +620,10 @@ def process_urls_in_content(content):
     """Replace plain URLs with compact emoji links and copy functionality"""
     if not content:
         return content
-    
+
     # URL regex pattern - matches http/https URLs
     url_pattern = r'(?<!href=["\'])(?<!src=["\'])(https?://[^\s<>"\']+)'
-    
+
     def replace_url(match):
         url = match.group(1)
         # Create compact inline components with emojis
@@ -687,7 +647,7 @@ def process_urls_in_content(content):
             style='line-height: inherit; height: auto;'
         )
         return str(link_component)
-    
+
     # Replace URLs that aren't already in HTML tags
     processed_content = re.sub(url_pattern, replace_url, content)
     return processed_content
@@ -839,7 +799,7 @@ def FeedsSidebar(session_id):
             DivFullySpaced(
                 H3("Feeds"),
                 Button(
-                    UkIcon('refresh-cw'),
+                    UkIcon('trash'),
                     hx_post="/api/session/reset",
                     hx_swap="none",
                     cls="p-1 hover:bg-secondary rounded",
@@ -927,23 +887,23 @@ def FeedItem(item, unread_view=False, feed_id=None, page=1):
     if page > 1:
         item_url += f"&page={page}"
 
-    # Unified targeting - always target #detail
+    # Unified targeting - target the detail content container
     attrs = {
         "cls": cls,
         "id": f"feed-item-{item['id']}",
         "data_testid": "feed-item",
         "data_unread": "true" if not is_read else "false",
         "hx_get": item_url,
-        "hx_target": "#detail",
+        "hx_target": "#detail-content",
         "hx_trigger": "click",
         "hx_push_url": "true"
     }
     
     return Li(
-        # Title row with blue dot
+        # Title row with blue dot - consistent structure, CSS-driven styling
         DivFullySpaced(
-            Strong(item['title']) if not is_read else Span(item['title']),  # Bold for unread, normal for read
-            Span(cls='flex h-2 w-2 rounded-full bg-blue-600') if not item.get('is_read', 0) else ''
+            Span(item['title'], cls='feed-title'),  # CSS handles bold via data-unread attribute
+            Span(cls='blue-dot flex h-2 w-2 rounded-full bg-blue-600')  # CSS handles opacity via data-unread attribute
         ),
         # Source and time row - source left, time right
         DivFullySpaced(
@@ -1003,12 +963,10 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, data=None)
                 count_query += "COALESCE(ui.is_read, 0) = 0"
             
             total_items = conn.execute(count_query, count_params).fetchone()[0]
-        print(f"DEBUG: FeedsContent using pre-fetched data: {len(paginated_items)} items, {total_pages} pages")
     else:
         # Fallback: fetch data directly (for routes not yet updated to use PageData)
         page_size = 20
         paginated_items = FeedItemModel.get_items_for_user(session_id, feed_id, unread_only, page, page_size)
-        print(f"DEBUG: FeedsContent got {len(paginated_items)} items for session {session_id} (page {page})")
         
         # Calculate total pages by getting total count
         with get_db() as conn:
@@ -1093,7 +1051,7 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, data=None)
         pagination_footer()
     ]
     
-    return Div(cls='p-0', id="feeds-list-container", uk_filter="target: .js-filter")(
+    return Div(cls='p-0 pt-2', id="feeds-list-container", uk_filter="target: .js-filter")(
         *content_elements
     )
 
@@ -1172,7 +1130,6 @@ def index(htmx, sess, feed_id: int = None, unread: bool = True, folder_id: int =
     if not MINIMAL_MODE and background_worker.queue_manager:
         try:
             background_worker.queue_manager.queue_user_feeds(session_id)
-            print(f"DEBUG: Queued user feeds for background update")
         except Exception as e:
             print(f"WARNING: Could not queue user feeds: {str(e)}")
 
@@ -1182,7 +1139,7 @@ def index(htmx, sess, feed_id: int = None, unread: bool = True, folder_id: int =
         if getattr(htmx, 'target', None) == 'summary':
             return FeedsContent(data.session_id, data.feed_id, data.unread, data.page, data=data)
         # Clear detail to show summary (for back button)
-        elif getattr(htmx, 'target', None) == 'detail':
+        elif getattr(htmx, 'target', None) == 'detail-content':
             return Div(cls="placeholder")
 
     # Full page with unified layout
@@ -1190,17 +1147,29 @@ def index(htmx, sess, feed_id: int = None, unread: bool = True, folder_id: int =
 
 @rt('/item/{item_id}')
 def show_item(item_id: int, htmx, sess, unread_view: bool = False, feed_id: int = None, page: int = 1, _scroll: int = None):
-    """Item detail route - returns detail fragment with list item update"""
+    """Item detail route - returns full page for direct navigation, fragment for HTMX
+
+    SEMANTIC VIOLATION: This GET route modifies server state (marks item as read).
+    Normally should be POST, but keeping as GET for simpler HTMX implementation
+    and to maintain existing URL patterns for direct navigation.
+    """
     session_id = sess.get('session_id')
 
     # Get the item before marking as read
     item = FeedItemModel.get_item_for_user(session_id, item_id)
 
     if not item:
-        return Div(
+        error_content = Div(
             P("Item not found", cls='text-center text-muted-foreground p-8'),
             cls='m-4'
         )
+        # Return full page for direct navigation, fragment for HTMX
+        if not htmx or not getattr(htmx, 'request', None):
+            # Direct navigation - return full page with empty detail
+            data = PageData(session_id, feed_id, unread_view, page)
+            # Override the detail slot with error message
+            return (three_pane_layout(data), viewport_styles())
+        return error_content
 
     # Check if item was unread before marking as read
     was_unread = not item.get('is_read', 0)
@@ -1211,41 +1180,21 @@ def show_item(item_id: int, htmx, sess, unread_view: bool = False, feed_id: int 
         # Refresh item data to get updated read status
         item = FeedItemModel.get_item_for_user(session_id, item_id)
 
-    # If item was unread, return both detail view and updated list item
-    if was_unread:
-        # Create updated list item with no blue dot
-        updated_item = Li(
-            # Title row with no blue dot (read state)
-            DivFullySpaced(
-                Span(item['title']),  # No bold for read items
-                # No blue dot for read items
-            ),
-            # Source and time row
-            DivFullySpaced(
-                Small(item.get('feed_title', 'Unknown Feed'), cls='text-sm text-gray-500'),
-                Time(human_time_diff(item.get('published')), cls='text-xs text-muted-foreground')
-            ),
-            # Summary
-            Div(
-                NotStr(
-                    smart_truncate_html(item.get('description', ''), max_length=300)
-                    if item.get('description')
-                    else 'No summary available'
-                ),
-                cls='text-sm text-muted-foreground mt-2 prose prose-sm max-w-none'
-            ),
-            cls=f"{Styling.FEED_ITEM_BASE} {Styling.FEED_ITEM_READ}",
-            id=f"feed-item-{item['id']}",
-            data_testid="feed-item",
-            data_unread="false",
-            hx_get=f"/item/{item['id']}?unread_view={unread_view}" + (f"&feed_id={feed_id}" if feed_id else ""),
-            hx_target="#detail",
-            hx_trigger="click",
-            hx_push_url="true",
-            hx_swap_oob="true"
-        )
+    # For direct navigation (not HTMX), return full page
+    if not htmx or not getattr(htmx, 'request', None):
+        # Prepare full page data
+        data = PageData(session_id, feed_id, unread_view, page)
+        # Create the layout with the item detail pre-populated
+        layout = three_pane_layout(data, ItemDetailView(item))
+        return (layout, viewport_styles())
 
-        return (ItemDetailView(item), updated_item)
+    # HTMX request - return fragment(s)
+    # If item was unread, return detail view + surgical attribute update
+    if was_unread:
+        # Surgical update: use a temporary div with script for proper execution
+        surgical_update = NotStr(f'<div hx-swap-oob="outerHTML:#surgical-update-target"><script>document.getElementById("feed-item-{item_id}").setAttribute("data-unread", "false");</script></div>')
+
+        return (ItemDetailView(item), surgical_update)
     else:
         # Item was already read, just return detail view
         return ItemDetailView(item)
@@ -1255,46 +1204,40 @@ def add_feed(htmx, sess, new_feed_url: str = ""):
     """Add new feed"""
     session_id = sess.get('session_id')
     if not session_id:
-        print(f"ERROR: add_feed called without session_id")
-        return Div("Session error", cls='text-red-500 p-4')
-    
+        add_toast(sess, "Session error", "error")
+        return FeedsSidebar(session_id)
+
     url = new_feed_url.strip()
     timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
-    print(f"[{timestamp}] DEBUG: add_feed called with URL='{url}', session_id='{session_id}' [FIXED_VERSION]")
-    
+
     # Determine if request is from mobile or desktop based on target
     hx_target = getattr(htmx, 'target', '') if htmx else ''
-    print(f"[{timestamp}] DEBUG: HX-Target header: '{hx_target}'")
-    
+
     if not url:
-        return Div("Please enter a URL", cls='text-red-500 p-4')
-    
+        add_toast(sess, "Please enter a URL", "error")
+        return FeedsSidebar(session_id)
+
     # Check if user is already subscribed to this feed
     existing_feed = FeedModel.user_has_feed_url(session_id, url)
-    
+
     if existing_feed:
-        return Div(f"Already subscribed to: {existing_feed['title']}", 
-                  cls='text-yellow-600 p-4')
+        add_toast(sess, f"Already subscribed to: {existing_feed['title']}", "warning")
+        return FeedsSidebar(session_id)
     
     try:
         # FAST: Create feed record only (follow setup_default_feeds pattern)
         if not FeedModel.feed_exists_by_url(url):
             feed_id = FeedModel.create_feed(url, "Loading...")
-            print(f"DEBUG: Created feed record {feed_id} for {url}")
         else:
             # Feed exists, get the ID
             with get_db() as conn:
                 feed_id = conn.execute("SELECT id FROM feeds WHERE url = ?", (url,)).fetchone()[0]
-            print(f"DEBUG: Feed already exists with ID {feed_id}")
         
         # Subscribe user to the feed
         try:
             SessionModel.subscribe_to_feed(session_id, feed_id)
-            print(f"SUCCESS: User subscribed to feed {feed_id}")
         except Exception as e:
-            if "UNIQUE constraint failed" in str(e):
-                print(f"DEBUG: User already subscribed to feed {feed_id}")
-            else:
+            if "UNIQUE constraint failed" not in str(e):
                 raise
         
         # Queue for immediate background processing (skip in minimal mode)
@@ -1310,24 +1253,21 @@ def add_feed(htmx, sess, new_feed_url: str = ""):
             # Use put_nowait for sync context (non-blocking)
             try:
                 background_worker.queue_manager.worker.queue.put_nowait(feed_data)
-                print(f"SUCCESS: Feed {feed_id} queued immediately for background processing")
+                # Success - show toast and return unified sidebar content
+                add_toast(sess, "Feed added successfully", "success")
             except Exception as e:
-                print(f"WARNING: Could not queue feed immediately: {str(e)}")
-                print(f"Feed {feed_id} will be picked up by background worker automatically")
-        elif MINIMAL_MODE:
-            print(f"MINIMAL_MODE: Feed {feed_id} created without background processing")
+                # Feed was added but background update failed to queue
+                add_toast(sess, "Feed added but background update failed - refresh manually", "warning")
         else:
-            print(f"WARNING: Background worker not available, feed {feed_id} created without immediate queuing")
-        
-        # Return unified sidebar content
+            # Success when not using background worker (MINIMAL_MODE or no queue manager)
+            add_toast(sess, "Feed added successfully", "success")
+
         return FeedsSidebar(session_id)
-        
+
     except Exception as e:
-        print(f"ERROR: Exception in add_feed for {url}: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        
-        # Return unified sidebar content even on error
+
+        # Error - show toast and return unified sidebar content
+        add_toast(sess, f"Failed to add feed: {str(e)}", "error")
         return FeedsSidebar(session_id)
 
 @rt('/api/item/{item_id}/star')

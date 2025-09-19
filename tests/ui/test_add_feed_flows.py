@@ -10,7 +10,7 @@ import pytest
 from playwright.sync_api import sync_playwright, expect
 import time
 from datetime import datetime
-from test_constants import MAX_WAIT_MS
+import test_constants as constants
 from test_helpers import (
     wait_for_htmx_complete,
     wait_for_page_ready,
@@ -29,19 +29,19 @@ class TestAddFeedFlows:
         """Test complete add feed flow for both mobile and desktop"""
         
         for viewport_name, viewport_size, test_url in [
-            ("mobile", {"width": 375, "height": 667}, "https://httpbin.org/xml"),
-            ("desktop", {"width": 1200, "height": 800}, "https://feeds.feedburner.com/oreilly/radar")
+            ("mobile", constants.MOBILE_VIEWPORT_ALT, "https://httpbin.org/xml"),
+            ("desktop", constants.DESKTOP_VIEWPORT_ALT, "https://feeds.feedburner.com/oreilly/radar")
         ]:
             print(f"\n{('📱' if viewport_name == 'mobile' else '🖥️')} TESTING {viewport_name.upper()} ADD FEED FLOW")
             page.set_viewport_size(viewport_size)
-            page.goto(test_server_url, timeout=MAX_WAIT_MS)
+            page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
             wait_for_page_ready(page)
             
             if viewport_name == "mobile":
                 print("=== STEP 1: Open mobile sidebar ===")
                 # Find and click hamburger menu
                 hamburger_button = page.locator('#mobile-nav-button')
-                expect(hamburger_button).to_be_visible(timeout=MAX_WAIT_MS)
+                expect(hamburger_button).to_be_visible(timeout=constants.MAX_WAIT_MS)
                 hamburger_button.click()
                 page.wait_for_selector("#mobile-sidebar", state="visible")
                 print("✓ Clicked hamburger menu")
@@ -94,7 +94,7 @@ class TestAddFeedFlows:
             print("✓ Clicked add button")
             
             # Wait for HTMX response
-            wait_for_htmx_complete(page, timeout=MAX_WAIT_MS)
+            wait_for_htmx_complete(page, timeout=constants.MAX_WAIT_MS)
             
             # Verify app stability
             expect(page.locator(layout_selector)).to_be_visible()
@@ -116,12 +116,12 @@ class TestAddFeedFlows:
         """Test that feed navigation works properly after adding feeds on both mobile and desktop"""
         
         for viewport_name, viewport_size in [
-            ("desktop", {"width": 1200, "height": 800}),
-            ("mobile", {"width": 375, "height": 667})
+            ("desktop", constants.DESKTOP_VIEWPORT_ALT),
+            ("mobile", constants.MOBILE_VIEWPORT_ALT)
         ]:
             print(f"\n{('🖥️' if viewport_name == 'desktop' else '📱')} TESTING {viewport_name.upper()} NAVIGATION AFTER FEED ADD")
             page.set_viewport_size(viewport_size)
-            page.goto(test_server_url, timeout=MAX_WAIT_MS)
+            page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
             wait_for_page_ready(page)
             
             if viewport_name == "desktop":
@@ -207,8 +207,8 @@ class TestAddFeedFlows:
     
     def test_duplicate_feed_handling(self, page):
         """Test handling of duplicate feed additions"""
-        page.set_viewport_size({"width": 1200, "height": 800})  # Desktop for simplicity
-        page.goto(test_server_url, timeout=MAX_WAIT_MS)
+        page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)  # Desktop for simplicity
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         print("🔄 TESTING DUPLICATE FEED HANDLING")
@@ -235,8 +235,8 @@ class TestAddFeedFlows:
     
     def test_invalid_url_handling(self, page):
         """Test handling of invalid URLs"""
-        page.set_viewport_size({"width": 1200, "height": 800})  # Desktop
-        page.goto(test_server_url, timeout=MAX_WAIT_MS)
+        page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)  # Desktop
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         print("❌ TESTING INVALID URL HANDLING")
@@ -276,8 +276,8 @@ class TestAddFeedFlows:
     
     def test_empty_form_submission(self, page):
         """Test submission of empty form"""
-        page.set_viewport_size({"width": 1200, "height": 800})  # Desktop
-        page.goto(test_server_url, timeout=MAX_WAIT_MS)
+        page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)  # Desktop
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         print("⭕ TESTING EMPTY FORM SUBMISSION")

@@ -4,7 +4,7 @@ import pytest
 from playwright.sync_api import Page, expect
 import time
 import re
-from test_constants import MAX_WAIT_MS
+import test_constants as constants
 from test_helpers import (
     wait_for_htmx_complete,
     wait_for_page_ready,
@@ -20,8 +20,8 @@ class TestComprehensiveRegression:
     
     def test_desktop_comprehensive_workflow(self, page: Page, test_server_url):
         """Test complete desktop workflow: feed selection, article reading, tab switching"""
-        page.goto(test_server_url, timeout=MAX_WAIT_MS)
-        page.set_viewport_size({"width": 1200, "height": 800})
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
+        page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)
         
         # Wait for page load
         wait_for_page_ready(page)
@@ -49,7 +49,7 @@ class TestComprehensiveRegression:
                 middle_panel = page.locator("#desktop-feeds-content")
                 middle_panel.scroll_into_view_if_needed()
                 page.mouse.wheel(0, 500)
-                wait_for_htmx_complete(page, timeout=MAX_WAIT_MS)
+                wait_for_htmx_complete(page, timeout=constants.MAX_WAIT_MS)
                 
                 # Click on an article
                 article_items = page.locator("#desktop-feeds-content li[id*='desktop-feed-item']").all()
@@ -77,8 +77,8 @@ class TestComprehensiveRegression:
     
     def test_mobile_comprehensive_workflow(self, page: Page, test_server_url):
         """Test complete mobile workflow: navigation, feed selection, article reading"""
-        page.goto(test_server_url, timeout=MAX_WAIT_MS)
-        page.set_viewport_size({"width": 390, "height": 844})
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
+        page.set_viewport_size(constants.MOBILE_VIEWPORT)
         
         # Wait for page load and verify mobile layout
         expect(page.locator("#mobile-layout")).to_be_visible()
@@ -103,7 +103,7 @@ class TestComprehensiveRegression:
                     feed_links[iteration % len(feed_links)].click()
                     
                     # Wait for sidebar to close and content to load
-                    page.wait_for_selector("li[id^='mobile-feed-item-']", state="visible", timeout=MAX_WAIT_MS)
+                    page.wait_for_selector("li[id^='mobile-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
                     expect(page.locator("#mobile-sidebar")).to_be_hidden()
                     
                     # Scroll down in feed list
@@ -119,7 +119,7 @@ class TestComprehensiveRegression:
                         article_items[0].click()
                         
                         # Wait for article to load (full-screen mobile view)
-                        page.wait_for_selector("#main-content", state="visible", timeout=MAX_WAIT_MS)
+                        page.wait_for_selector("#main-content", state="visible", timeout=constants.MAX_WAIT_MS)
                         
                         # Verify article content is visible
                         expect(page.locator("#main-content")).to_contain_text("From:")
@@ -149,10 +149,10 @@ class TestComprehensiveRegression:
     
     def test_responsive_layout_switching(self, page: Page, test_server_url):
         """Test layout adaptation when switching between desktop and mobile viewports"""
-        page.goto(test_server_url, timeout=MAX_WAIT_MS)
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
         
         # Start with desktop
-        page.set_viewport_size({"width": 1200, "height": 800})
+        page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)
         expect(page.locator("#desktop-layout")).to_be_visible()
         expect(page.locator("#mobile-layout")).to_be_hidden()
         
@@ -160,18 +160,18 @@ class TestComprehensiveRegression:
         article_items = page.locator("li[id*='desktop-feed-item']").all()
         if len(article_items) > 0:
             article_items[0].click()
-            page.wait_for_selector("#desktop-item-detail", state="visible", timeout=MAX_WAIT_MS)
+            page.wait_for_selector("#desktop-item-detail", state="visible", timeout=constants.MAX_WAIT_MS)
             expect(page.locator("#desktop-item-detail")).to_contain_text("From:")
         
         # Switch to mobile viewport
-        page.set_viewport_size({"width": 390, "height": 844})
+        page.set_viewport_size(constants.MOBILE_VIEWPORT)
         wait_for_htmx_complete(page)
         
         expect(page.locator("#mobile-layout")).to_be_visible()
         expect(page.locator("#desktop-layout")).to_be_hidden()
         
         # Switch back to desktop
-        page.set_viewport_size({"width": 1200, "height": 800})
+        page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)
         wait_for_htmx_complete(page)
         
         expect(page.locator("#desktop-layout")).to_be_visible()
@@ -179,8 +179,8 @@ class TestComprehensiveRegression:
     
     def test_htmx_state_management(self, page: Page, test_server_url):
         """Test HTMX state updates and out-of-band swaps"""
-        page.goto(test_server_url, timeout=MAX_WAIT_MS)
-        page.set_viewport_size({"width": 1200, "height": 800})
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
+        page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)
         
         # Wait for page load
         wait_for_htmx_complete(page)
@@ -203,8 +203,8 @@ class TestComprehensiveRegression:
     
     def test_rapid_interaction_stability(self, page: Page, test_server_url):
         """Test stability under rapid user interactions"""
-        page.goto(test_server_url, timeout=MAX_WAIT_MS)
-        page.set_viewport_size({"width": 1200, "height": 800})
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
+        page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)
         
         # Wait for initial load
         wait_for_htmx_complete(page)
@@ -239,8 +239,8 @@ class TestComprehensiveRegression:
     
     def test_feed_content_and_pagination(self, page: Page, test_server_url):
         """Test feed content loading and pagination behavior"""
-        page.goto(test_server_url, timeout=MAX_WAIT_MS)
-        page.set_viewport_size({"width": 1200, "height": 800})
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
+        page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)
         
         # Wait for content load
         wait_for_page_ready(page)
@@ -267,7 +267,7 @@ class TestComprehensiveRegression:
     
     def test_session_and_state_persistence(self, page: Page, test_server_url):
         """Test session management and state persistence across navigation"""
-        page.goto(test_server_url, timeout=MAX_WAIT_MS)
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
         
         # Wait for initial session setup
         wait_for_page_ready(page)
@@ -315,41 +315,48 @@ class TestComprehensiveRegression:
                 assert "/item/" in page.url
                 
                 # Go back to main page
-                page.goto(test_server_url, timeout=MAX_WAIT_MS)
+                page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
                 wait_for_page_ready(page)
     
     def test_error_resilience_and_recovery(self, page: Page, test_server_url):
         """Test application resilience under various error conditions"""
-        page.goto(test_server_url, timeout=MAX_WAIT_MS)
-        
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
+
         # Test invalid item URL (use very high number unlikely to exist)
         invalid_item_id = 999999
-        page.goto(f"{test_server_url}/item/{invalid_item_id}", timeout=MAX_WAIT_MS)
+        page.goto(f"{test_server_url}/item/{invalid_item_id}", timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
-        
-        # Should gracefully handle non-existent items
-        # Page loads successfully (title may be default FastHTML page now)
-        
+
+        # Should gracefully handle non-existent items WITH FULL PAGE STRUCTURE
+        # Verify full page structure is present even for error case
+        expect(page.locator("#app-root")).to_be_visible()
+        # Desktop should have feeds sidebar
+        if page.viewport_size["width"] >= 1024:
+            expect(page.locator("#feeds")).to_be_visible()
+            expect(page.locator("#summary")).to_be_visible()
+        # Should show error message in detail area
+        expect(page.locator("#detail")).to_be_visible()
+
         # Test invalid feed ID (use very high number unlikely to exist)
         invalid_feed_id = 999999
-        page.goto(f"{test_server_url}/?feed_id={invalid_feed_id}", timeout=MAX_WAIT_MS)
+        page.goto(f"{test_server_url}/?feed_id={invalid_feed_id}", timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
-        
+
         # Should gracefully handle invalid feed IDs
-        # Page loads successfully (title may be default FastHTML page now)
-        
+        expect(page.locator("#app-root")).to_be_visible()
+
         # Return to valid state
-        page.goto(test_server_url, timeout=MAX_WAIT_MS)
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
-        # Page loads successfully (title may be default FastHTML page now)
+        expect(page.locator("#app-root")).to_be_visible()
 
 class TestHTMXArchitectureValidation:
     """Validate HTMX architecture changes work correctly"""
     
     def test_mobile_handlers_routing(self, page: Page, test_server_url):
         """Test MobileHandlers routing and content swapping"""
-        page.goto(test_server_url, timeout=MAX_WAIT_MS)
-        page.set_viewport_size({"width": 390, "height": 844})
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
+        page.set_viewport_size(constants.MOBILE_VIEWPORT)
         
         # Test mobile content handler
         expect(page.locator("#main-content")).to_be_visible()
@@ -367,8 +374,8 @@ class TestHTMXArchitectureValidation:
     
     def test_desktop_handlers_routing(self, page: Page, test_server_url):
         """Test DesktopHandlers routing and column updates"""
-        page.goto(test_server_url, timeout=MAX_WAIT_MS)
-        page.set_viewport_size({"width": 1200, "height": 800})
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
+        page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)
         
         # Test desktop feeds column handler
         expect(page.locator("#desktop-feeds-content")).to_be_visible()
@@ -393,8 +400,8 @@ class TestHTMXArchitectureValidation:
     def test_unified_tab_container_behavior(self, page: Page, test_server_url):
         """Test the unified create_tab_container function for both mobile and desktop"""
         # Test desktop tab behavior
-        page.goto(test_server_url, timeout=MAX_WAIT_MS)
-        page.set_viewport_size({"width": 1200, "height": 800})
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
+        page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)
         wait_for_page_ready(page)
         
         # Desktop tabs should use regular links (no HTMX)
@@ -406,7 +413,7 @@ class TestHTMXArchitectureValidation:
             wait_for_htmx_complete(page)
         
         # Test mobile tab behavior
-        page.set_viewport_size({"width": 390, "height": 844})
+        page.set_viewport_size(constants.MOBILE_VIEWPORT)
         wait_for_page_ready(page)
         
         # Mobile tabs should use HTMX attributes

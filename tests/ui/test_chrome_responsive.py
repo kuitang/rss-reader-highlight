@@ -106,10 +106,10 @@ class TestUnifiedChromeResponsive:
 
         # Test multiple viewport changes
         viewports = [
-            {"width": 1400, "height": 900, "expect_desktop": True},
+            {**DESKTOP_VIEWPORT, "expect_desktop": True},
             {"width": 800, "height": 600, "expect_desktop": False},
-            {"width": 1200, "height": 800, "expect_desktop": True},
-            {"width": 375, "height": 667, "expect_desktop": False},
+            {**DESKTOP_VIEWPORT_ALT, "expect_desktop": True},
+            {**MOBILE_VIEWPORT_ALT, "expect_desktop": False},
         ]
 
         for viewport in viewports:

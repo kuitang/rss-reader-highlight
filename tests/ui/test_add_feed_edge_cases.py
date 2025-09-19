@@ -3,7 +3,7 @@
 import pytest
 from playwright.sync_api import Page, expect
 import time
-from test_constants import MAX_WAIT_MS
+import test_constants as constants
 from test_helpers import (
     wait_for_htmx_complete,
     wait_for_page_ready,
@@ -19,12 +19,12 @@ def test_add_feed_edge_cases(page: Page, test_server_url):
     print("🧪 TESTING ADD FEED EDGE CASES")
     
     for viewport_name, viewport_size in [
-        ("desktop", {"width": 1200, "height": 800}),
-        ("mobile", {"width": 375, "height": 667})
+        ("desktop", constants.DESKTOP_VIEWPORT_ALT),
+        ("mobile", constants.MOBILE_VIEWPORT_ALT)
     ]:
         print(f"\n--- Testing {viewport_name} add feed edge cases ---")
         page.set_viewport_size(viewport_size)
-        page.goto(test_server_url, timeout=MAX_WAIT_MS)
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         # Debug: Check if correct layout is visible
@@ -110,7 +110,7 @@ def test_add_feed_edge_cases(page: Page, test_server_url):
             add_button.click()
             
             # Wait for HTMX to complete (sidebar gets completely replaced)
-            wait_for_htmx_complete(page, timeout=MAX_WAIT_MS)
+            wait_for_htmx_complete(page, timeout=constants.MAX_WAIT_MS)
             
             # Check if form submission was processed (page remained responsive)
             page_title = page.title()
