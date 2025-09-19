@@ -610,7 +610,7 @@ app, rt = fast_app(
         // Scroll restoration for unified layout
         htmx.on('htmx:afterSwap', function(evt) {
             // Handle pagination - reset scroll to top for summary updates
-            if (evt.detail.target && evt.detail.target.id === 'summary') {
+            if (evt.detail.target && (evt.detail.target.id === 'summary' || evt.detail.target.id === 'feeds-list-container')) {
                 setTimeout(() => {
                     const summary = document.getElementById('summary');
                     if (summary) {
@@ -1203,7 +1203,7 @@ def index(htmx, sess, feed_id: int = None, unread: bool = True, folder_id: int =
     # HTMX fragment updates
     if htmx and getattr(htmx, 'request', None):
         # Return updated summary list for pagination/filtering
-        if getattr(htmx, 'target', None) == 'feeds-list-container':  # Changed from 'summary'
+        if getattr(htmx, 'target', None) in ['feeds-list-container', 'summary']:  # Handle both targets
             return FeedsContent(data.session_id, data.feed_id, data.unread, data.page, data=data)
         # Clear detail to show summary (for back button)
         elif getattr(htmx, 'target', None) == 'detail-content':
