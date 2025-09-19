@@ -26,7 +26,7 @@ wait_for_htmx_complete = htmx_wait
 def ensure_mobile_sidebar_open(page: Page):
     """Helper function to ensure mobile sidebar is open before accessing feed links"""
     # Check if mobile nav button exists and is visible
-    mobile_nav_button = page.locator("button#summary [data-testid="hamburger-btn"]")
+    mobile_nav_button = page.locator("#summary [data-testid='hamburger-btn']")
     if mobile_nav_button.is_visible():
         # We're in mobile layout, need to open sidebar first
         mobile_nav_button.click()
@@ -218,7 +218,7 @@ class TestRefactoringRegression:
                 time.sleep(constants.RETRY_DELAY_SECONDS)
             
             # 1. Click hamburger menu to open sidebar
-            hamburger_menu = page.locator("button#summary [data-testid="hamburger-btn"]")  # Mobile nav button
+            hamburger_menu = page.locator("button#summary [data-testid='hamburger-btn']")  # Mobile nav button
             expect(hamburger_menu).to_be_visible()
             
             print("Opening hamburger menu")

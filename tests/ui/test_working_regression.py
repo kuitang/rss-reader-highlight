@@ -195,7 +195,7 @@ class TestWorkingRegression:
         page.screenshot(path="/tmp/regression_mobile_initial.png")
         
         # Look for mobile nav button
-        mobile_nav = page.locator("button#summary [data-testid="hamburger-btn"]")
+        mobile_nav = page.locator("button#summary [data-testid='hamburger-btn']")
         if mobile_nav.is_visible():
             print("=== Testing Mobile Navigation ===")
             
@@ -254,7 +254,7 @@ class TestWorkingRegression:
         
         # Perform actions that should trigger HTMX
         # Handle both mobile and desktop layouts
-        mobile_nav_button = page.locator("button#summary [data-testid="hamburger-btn"]")
+        mobile_nav_button = page.locator("button#summary [data-testid='hamburger-btn']")
         if mobile_nav_button.is_visible():
             # Mobile: open sidebar and get mobile feed links
             mobile_nav_button.click()
@@ -328,7 +328,7 @@ class TestWorkingRegression:
             wait_for_htmx_complete(page)
             
             # Select a feed first - handle both layouts
-            mobile_nav_button = page.locator("button#summary [data-testid="hamburger-btn"]")
+            mobile_nav_button = page.locator("button#summary [data-testid='hamburger-btn']")
             if mobile_nav_button.is_visible():
                 # Mobile: open sidebar and get mobile feed links
                 mobile_nav_button.click()

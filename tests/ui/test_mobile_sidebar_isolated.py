@@ -44,7 +44,7 @@ class TestMobileSidebarIsolated:
         # Test sidebar open/close cycle
         for i in range(3):
             # Open sidebar with hamburger
-            hamburger = page.locator("#summary [data-testid="hamburger-btn"]")
+            hamburger = page.locator("#summary [data-testid='hamburger-btn']")
             if hamburger.is_visible():
                 hamburger.click()
                 page.wait_for_selector("#feeds", state="visible")  # Wait for sidebar to become visible
@@ -69,7 +69,7 @@ class TestMobileSidebarIsolated:
                         assert "/item/" in page.url
                         
                         # Navigate back
-                        back_button = page.locator("#summary [data-testid="hamburger-btn"]")
+                        back_button = page.locator("#summary [data-testid='hamburger-btn']")
                         if back_button.is_visible():
                             back_button.click()
                             wait_for_htmx_complete(page)
