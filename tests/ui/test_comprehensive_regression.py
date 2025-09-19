@@ -363,6 +363,62 @@ class TestComprehensiveRegression:
         wait_for_page_ready(page)
         expect(page.locator("#app-root")).to_be_visible()
 
+    def test_mobile_sidebar_overlay_dismissal(self, page: Page, test_server_url):
+        """Test that clicking anywhere on the overlay (including header area) dismisses the sidebar"""
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
+        page.set_viewport_size(constants.MOBILE_VIEWPORT)
+
+        # Wait for page load
+        wait_for_page_ready(page)
+        expect(page.locator("#app-root")).to_be_visible()
+
+        # Open sidebar via hamburger button
+        hamburger = page.locator("#summary [data-testid='hamburger-btn']")
+        expect(hamburger).to_be_visible()
+        hamburger.click()
+
+        # Verify sidebar is now visible (has data-drawer="open" attribute)
+        expect(page.locator("#app-root")).to_have_attribute("data-drawer", "open", timeout=constants.MAX_WAIT_MS)
+        expect(page.locator("#feeds")).to_be_visible()
+        expect(page.locator("#sidebar-overlay")).to_be_visible()
+
+        # Test 1: Click on header/banner area (the issue being fixed)
+        # The overlay should be covering the header, so clicking on the overlay closes the sidebar
+        # We'll click on the overlay area that's over the header
+        page.click("#sidebar-overlay", position={"x": 200, "y": 30})
+
+        # Sidebar should be closed
+        expect(page.locator("#app-root")).not_to_have_attribute("data-drawer", "open", timeout=constants.MAX_WAIT_MS)
+        expect(page.locator("#sidebar-overlay")).not_to_be_visible()
+
+        # Test 2: Re-open and test clicking on overlay area (not on sidebar)
+        hamburger.click()
+        expect(page.locator("#app-root")).to_have_attribute("data-drawer", "open", timeout=constants.MAX_WAIT_MS)
+
+        # Click on overlay area (to the right of the sidebar)
+        page.click("body", position={"x": 350, "y": 200})
+
+        # Sidebar should be closed
+        expect(page.locator("#app-root")).not_to_have_attribute("data-drawer", "open", timeout=constants.MAX_WAIT_MS)
+        expect(page.locator("#sidebar-overlay")).not_to_be_visible()
+
+        # Test 3: Re-open and verify clicking inside sidebar does NOT close it
+        hamburger.click()
+        expect(page.locator("#app-root")).to_have_attribute("data-drawer", "open", timeout=constants.MAX_WAIT_MS)
+
+        # Click inside the sidebar (on a feed link for example)
+        feeds_sidebar = page.locator("#feeds")
+        if feeds_sidebar.is_visible():
+            # Click somewhere inside the feeds sidebar
+            feeds_sidebar.click(position={"x": 100, "y": 100})
+
+            # Sidebar should still be open (clicking inside should not close it)
+            expect(page.locator("#app-root")).to_have_attribute("data-drawer", "open")
+
+            # Now close it by clicking the overlay
+            page.click("body", position={"x": 350, "y": 200})
+            expect(page.locator("#app-root")).not_to_have_attribute("data-drawer", "open", timeout=constants.MAX_WAIT_MS)
+
 class TestHTMXArchitectureValidation:
     """Validate HTMX architecture changes work correctly"""
     
