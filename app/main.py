@@ -1286,7 +1286,109 @@ def add_feed(htmx, sess, new_feed_url: str = ""):
 
     if not url:
         add_toast(sess, "Please enter a URL", "error")
-        return FeedsSidebar(session_id)
+        # For integration tests: include error message in response content
+        feeds = FeedModel.get_user_feeds(session_id)
+        folders = FolderModel.get_folders(session_id)
+
+        return Ul(
+            Li(
+                DivFullySpaced(
+                    H3("Feeds"),
+                    Button(
+                        UkIcon('trash'),
+                        hx_post="/api/session/reset",
+                        hx_swap="none",
+                        cls="p-1 hover:bg-secondary rounded",
+                        title="Reset all session data",
+                        hx_confirm="Are you sure? This will clear all your subscriptions and settings."
+                    )
+                ),
+                cls='p-3'
+            ),
+            Li(
+                Form(
+                    DivLAligned(
+                        Input(
+                            placeholder="Enter RSS URL",
+                            name="new_feed_url",
+                            cls="flex-1 mr-2 add-feed-input"
+                        ),
+                        Button(
+                            UkIcon('plus'),
+                            cls="px-2 add-feed-button",
+                            type="submit"
+                        )
+                    ),
+                    hx_post="/api/feed/add",
+                    hx_target="#feeds",
+                    hx_swap="innerHTML",
+                    cls="add-feed-form"
+                ),
+                # Display validation error message
+                Div("Please enter a URL", cls="text-red-500 text-sm mt-2"),
+                cls='p-4'
+            ),
+            Li(
+                A(
+                    DivLAligned(
+                        UkIcon('globe', cls="flex-none"),
+                        Span("All Feeds"),
+                        P("", cls="text-xs text-muted"),
+                        cls="gap-3"
+                    ),
+                    href="/",
+                    hx_get="/",
+                    hx_target="#summary",
+                    hx_push_url="true",
+                    cls="hover:bg-secondary p-4 block",
+                    onclick="if (window.innerWidth < 1024) { document.getElementById('app-root').removeAttribute('data-drawer'); }"
+                ),
+                cls=''
+            ),
+            Div(
+                *[Li(
+                    A(
+                        DivLAligned(
+                            UkIcon('rss', cls="flex-none"),
+                            Span(feed['title'] or 'Untitled Feed'),
+                            P(f"updated {human_time_diff(feed.get('last_updated')) if human_time_diff(feed.get('last_updated')) != 'Unknown' else 'never updated'}", cls="text-xs text-muted"),
+                            cls="gap-3"
+                        ),
+                        href=f"/?feed_id={feed['id']}",
+                        hx_get=f"/?feed_id={feed['id']}",
+                        hx_target="#summary",
+                        hx_push_url="true",
+                        cls="hover:bg-secondary p-4 block",
+                        onclick="if (window.innerWidth < 1024) { document.getElementById('app-root').removeAttribute('data-drawer'); }"
+                    ),
+                    cls=''
+                ) for feed in feeds],
+                cls="feeds-list"
+            ),
+            Li(Hr(), cls=''),
+            Li(H4("Folders"), cls='p-3'),
+            *[Li(
+                Button(
+                    DivLAligned(
+                        UkIcon('folder', cls="flex-none"),
+                        Span(folder['name']),
+                        cls="gap-3"
+                    ),
+                    cls="w-full text-left p-4 hover:bg-secondary"
+                ),
+                cls=''
+            ) for folder in folders],
+            Li(
+                Button(
+                    UkIcon('plus'),
+                    " Add Folder",
+                    hx_post="/api/folder/add",
+                    hx_prompt="Folder name:",
+                    cls="w-full text-left p-4 hover:bg-secondary add-folder-button"
+                ),
+                cls=''
+            )
+        )
 
     # Check if user is already subscribed to this feed
     existing_feed = FeedModel.user_has_feed_url(session_id, url)
