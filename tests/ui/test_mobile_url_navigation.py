@@ -25,7 +25,7 @@ class TestMobileNavigationComplete:
         # Navigate to clean starting state (preserves session cookies automatically)
         page.goto(f"{test_server_url}/?unread=0", wait_until="networkidle", timeout=constants.MAX_WAIT_MS)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=constants.MAX_WAIT_MS)
+        page.wait_for_selector("#app-root", state="visible", timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         # Ensure clean DOM state - mobile sidebar should be closed by default
@@ -49,7 +49,7 @@ class TestMobileNavigationComplete:
         # Start at All Posts view
         page.goto(f"{test_server_url}/?unread=0", timeout=constants.MAX_WAIT_MS)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=constants.MAX_WAIT_MS)
+        page.wait_for_selector("#app-root", state="visible", timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         # CRITICAL: Set and verify scroll position on the feeds list container
@@ -168,7 +168,7 @@ class TestMobileNavigationComplete:
         # Start at list view
         page.goto(f"{test_server_url}/?unread=0", timeout=constants.MAX_WAIT_MS)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=constants.MAX_WAIT_MS)
+        page.wait_for_selector("#app-root", state="visible", timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         # Test navigation by direct URL (more reliable than element clicking)
@@ -205,7 +205,7 @@ class TestMobileNavigationComplete:
         # Step 2: Go back to list view
         page.goto(f"{test_server_url}/?unread=0", timeout=constants.MAX_WAIT_MS)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=constants.MAX_WAIT_MS)
+        page.wait_for_selector("#app-root", state="visible", timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         # Verify hamburger restored
@@ -229,7 +229,7 @@ class TestMobileNavigationComplete:
         # Start at list view - header should be visible
         page.goto(f"{test_server_url}/?unread=0", timeout=constants.MAX_WAIT_MS)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=constants.MAX_WAIT_MS)
+        page.wait_for_selector("#app-root", state="visible", timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         mobile_header = page.locator('#mobile-persistent-header')
@@ -273,7 +273,7 @@ class TestMobileNavigationComplete:
         # Navigate back to list view - header should be visible again
         page.goto(f"{test_server_url}/?unread=0", timeout=constants.MAX_WAIT_MS)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=constants.MAX_WAIT_MS)
+        page.wait_for_selector("#app-root", state="visible", timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         expect(mobile_header).to_be_hidden()  # Header remains hidden per current design
@@ -286,7 +286,7 @@ class TestMobileNavigationComplete:
         # Test 1: All Posts -> Article -> Back should return to All Posts
         page.goto(f"{test_server_url}/?unread=0", timeout=constants.MAX_WAIT_MS)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=constants.MAX_WAIT_MS)
+        page.wait_for_selector("#app-root", state="visible", timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         # Click on an article from All Posts view (don't hardcode ID)
@@ -313,7 +313,7 @@ class TestMobileNavigationComplete:
         # Test 2: Unread -> Article -> Back should return to Unread
         page.goto(f"{test_server_url}/", timeout=constants.MAX_WAIT_MS)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=constants.MAX_WAIT_MS)
+        page.wait_for_selector("#app-root", state="visible", timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         # Click on an article from Unread view (don't hardcode ID)

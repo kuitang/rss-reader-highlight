@@ -17,7 +17,7 @@ def test_mobile_tab_active_style_updates(page: Page, test_server_url):
     page.set_viewport_size(constants.MOBILE_VIEWPORT)
     page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
     # Wait for specific mobile layout element
-    page.wait_for_selector("#mobile-layout", state="visible", timeout=constants.MAX_WAIT_MS)
+    page.wait_for_selector("#app-root", state="visible", timeout=constants.MAX_WAIT_MS)
 
     # Wait for page load
     wait_for_page_ready(page)

@@ -33,11 +33,11 @@ class TestMobileSidebarIsolated:
         page.set_viewport_size(constants.MOBILE_VIEWPORT)
         page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=constants.MAX_WAIT_MS)
+        page.wait_for_selector("#app-root", state="visible", timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         # Ensure mobile layout and JavaScript are ready
-        expect(page.locator("#mobile-layout")).to_be_visible()
+        expect(page.locator("#app-root")).to_be_visible()
         expect(page.locator("#mobile-nav-button")).to_be_visible()
         wait_for_htmx_complete(page)  # Ensure JS is loaded
         

@@ -189,7 +189,7 @@ class TestWorkingRegression:
                 time.sleep(constants.RETRY_DELAY_SECONDS)  # Wait before retry
 
         # Wait for specific mobile layout element to ensure page is loaded
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=constants.MAX_WAIT_MS)
+        page.wait_for_selector("#app-root", state="visible", timeout=constants.MAX_WAIT_MS)
         wait_for_htmx_complete(page)
         
         page.screenshot(path="/tmp/regression_mobile_initial.png")

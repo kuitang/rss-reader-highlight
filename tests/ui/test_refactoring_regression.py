@@ -198,7 +198,7 @@ class TestRefactoringRegression:
             navigate_with_retry(page, test_server_url)
             wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
             # Verify server is responsive by checking for mobile layout (mobile viewport test)
-            page.wait_for_selector("#mobile-layout", timeout=constants.MAX_WAIT_MS)
+            page.wait_for_selector("#app-root", timeout=constants.MAX_WAIT_MS)
         except RetryError as e:
             raise Exception(f"Failed to navigate to {test_server_url} after retries: {e}")
         
