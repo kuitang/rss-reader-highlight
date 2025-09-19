@@ -40,21 +40,21 @@ class TestAddFeedFlows:
             if viewport_name == "mobile":
                 print("=== STEP 1: Open mobile sidebar ===")
                 # Find and click hamburger menu
-                hamburger_button = page.locator('#mobile-nav-button')
+                hamburger_button = page.locator('#summary [data-testid="hamburger-btn"]')
                 expect(hamburger_button).to_be_visible(timeout=constants.MAX_WAIT_MS)
                 hamburger_button.click()
-                page.wait_for_selector("#mobile-sidebar", state="visible")
+                page.wait_for_selector("#feeds", state="visible")
                 print("✓ Clicked hamburger menu")
                     
                 # Verify sidebar opened  
-                sidebar = page.locator("#mobile-sidebar")
+                sidebar = page.locator("#feeds")
                 expect(sidebar).to_be_visible()
                 print("✓ Sidebar opened successfully")
                 
                 print("=== STEP 2: Find add feed form ===")
                 # Mobile form elements
-                feed_input = page.locator('#mobile-sidebar input[placeholder="Enter RSS URL"]')
-                add_button = page.locator('#mobile-sidebar button.uk-btn.add-feed-button')
+                feed_input = page.locator('#feeds input[placeholder="Enter RSS URL"]')
+                add_button = page.locator('#feeds button.uk-btn.add-feed-button')
                 layout_selector = "#main-content"
                 
                 expect(feed_input).to_be_visible()
@@ -67,14 +67,14 @@ class TestAddFeedFlows:
                 print(f"✓ Input attributes correct: name='{input_name}'")
             else:
                 # Verify desktop layout
-                desktop_layout = page.locator("#desktop-layout")
+                desktop_layout = page.locator("#app-root")
                 expect(desktop_layout).to_be_visible()
                 print("✓ Desktop layout confirmed")
                 
                 # Desktop form elements
                 feed_input = page.locator('#sidebar input.add-feed-input')
                 add_button = page.locator('#sidebar button.uk-btn.add-feed-button')
-                layout_selector = "#desktop-layout"
+                layout_selector = "#app-root"
                 
                 expect(feed_input).to_be_visible()
                 expect(add_button).to_be_visible()
@@ -99,10 +99,10 @@ class TestAddFeedFlows:
             # Verify app stability
             expect(page.locator(layout_selector)).to_be_visible()
             if viewport_name == "mobile":
-                expect(page.locator("#mobile-sidebar")).to_be_visible()
+                expect(page.locator("#feeds")).to_be_visible()
                 print("✓ Mobile sidebar remained stable after add")
                 # Check feed links in mobile sidebar
-                feed_links = page.locator('#mobile-sidebar a[href*="feed_id"]')
+                feed_links = page.locator('#feeds a[href*="feed_id"]')
                 feed_count = feed_links.count()
                 print(f"✓ Feed links found: {feed_count}")
                 assert feed_count >= 0, "Should have some feed links (at least default feeds)"
@@ -126,7 +126,7 @@ class TestAddFeedFlows:
             
             if viewport_name == "desktop":
                 # Verify desktop layout
-                desktop_layout = page.locator("#desktop-layout")
+                desktop_layout = page.locator("#app-root")
                 expect(desktop_layout).to_be_visible()
                 print("✓ Desktop layout confirmed")
                 
@@ -157,13 +157,13 @@ class TestAddFeedFlows:
                 print("✓ Mobile layout confirmed")
                 
                 # Open sidebar and add feed
-                hamburger_button = page.locator('#mobile-nav-button')
+                hamburger_button = page.locator('#summary [data-testid="hamburger-btn"]')
                 hamburger_button.click()
-                page.wait_for_selector("#mobile-sidebar", state="visible")
+                page.wait_for_selector("#feeds", state="visible")
                 
                 # Add feed if form available
-                feed_input = page.locator('#mobile-sidebar input[placeholder="Enter RSS URL"]')
-                add_button = page.locator('#mobile-sidebar button.uk-btn.add-feed-button')
+                feed_input = page.locator('#feeds input[placeholder="Enter RSS URL"]')
+                add_button = page.locator('#feeds button.uk-btn.add-feed-button')
                 
                 if feed_input.is_visible() and add_button.is_visible():
                     test_url = "https://httpbin.org/xml"
@@ -173,7 +173,7 @@ class TestAddFeedFlows:
                     print("✓ Added test feed to mobile")
                 
                 # Test navigation
-                feed_links = page.locator('#mobile-sidebar a[href*="feed_id="]')
+                feed_links = page.locator('#feeds a[href*="feed_id="]')
                 content_selector = "#main-content"
             
             # Navigate to first feed
@@ -197,7 +197,7 @@ class TestAddFeedFlows:
                     print("✓ Content area remains visible after navigation")
                 else:
                     # Mobile: verify sidebar closed and content updated
-                    sidebar = page.locator("#mobile-sidebar")
+                    sidebar = page.locator("#feeds")
                     expect(sidebar).to_have_attribute("hidden", "true")
                     print("✓ Sidebar closed after feed selection")
                     expect(page.locator(content_selector)).to_be_visible()
@@ -229,7 +229,7 @@ class TestAddFeedFlows:
         
         # Should handle gracefully - either show "already subscribed" message
         # or silently ignore, but shouldn't crash
-        expect(page.locator("#desktop-layout")).to_be_visible()
+        expect(page.locator("#app-root")).to_be_visible()
         expect(page).to_have_title("RSS Reader")  # App should remain stable
         print("✓ Duplicate feed handled gracefully")
     
@@ -270,7 +270,7 @@ class TestAddFeedFlows:
             wait_for_htmx_complete(page)
             
             # Should handle gracefully - app shouldn't crash
-            expect(page.locator("#desktop-layout")).to_be_visible()
+            expect(page.locator("#app-root")).to_be_visible()
             expect(page).to_have_title("RSS Reader")
             print(f"✓ Invalid URL handled gracefully: {invalid_url}")
     
@@ -296,7 +296,7 @@ class TestAddFeedFlows:
         wait_for_htmx_complete(page)
         
         # Should handle gracefully - possibly show validation message
-        expect(page.locator("#desktop-layout")).to_be_visible()
+        expect(page.locator("#app-root")).to_be_visible()
         expect(page).to_have_title("RSS Reader")  # App should remain stable
         print("✓ Empty form submission handled gracefully")
 

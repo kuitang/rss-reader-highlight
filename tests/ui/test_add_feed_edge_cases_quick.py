@@ -29,7 +29,7 @@ def test_add_feed_empty_url_both_viewports(page, test_server_url):
         # Set up viewport-specific selectors
         if viewport_name == "mobile":
             # Open mobile sidebar using correct hamburger button
-            hamburger = page.locator('[data-testid="hamburger-btn"]').first
+            hamburger = page.locator('#summary [data-testid="hamburger-btn"]').first
             if hamburger.is_visible():
                 hamburger.click()
                 page.wait_for_selector("#feeds", state="visible", timeout=constants.MAX_WAIT_MS)

@@ -32,10 +32,10 @@ class TestUnifiedChromeResponsive:
         desktop_feed_name = desktop_chrome.locator("h3")
         expect(desktop_feed_name).to_be_visible()
         expect(desktop_feed_name).to_contain_text("All Feeds")
-        expect(page.locator("#desktop-icon-bar")).to_be_visible()
+        expect(page.locator("#icon-bar")).to_be_visible()
 
         # Verify desktop chrome has the three action buttons
-        desktop_buttons = page.locator("#desktop-icon-bar button")
+        desktop_buttons = page.locator("#icon-bar button")
         expect(desktop_buttons).to_have_count(3)
 
         # Test scrolling in desktop - chrome should stay fixed
@@ -64,7 +64,7 @@ class TestUnifiedChromeResponsive:
         expect(mobile_header).to_be_visible()
 
         # Check mobile header has hamburger button AND feed name
-        mobile_nav_button = page.locator("#mobile-nav-button")
+        mobile_nav_button = page.locator("#summary [data-testid="hamburger-btn"]")
         expect(mobile_nav_button).to_be_visible()
 
         # Verify hamburger icon is present
@@ -76,8 +76,8 @@ class TestUnifiedChromeResponsive:
         expect(mobile_feed_name).to_contain_text("All Feeds")
 
         # Check mobile has the same action buttons
-        expect(page.locator("#mobile-icon-bar")).to_be_visible()
-        mobile_buttons = page.locator("#mobile-icon-bar button")
+        expect(page.locator("#icon-bar")).to_be_visible()
+        mobile_buttons = page.locator("#icon-bar button")
         expect(mobile_buttons).to_have_count(3)
 
         # Test scrolling in mobile - header should stay fixed
@@ -124,13 +124,13 @@ class TestUnifiedChromeResponsive:
                 expect(mobile_header).to_be_hidden()
                 # Verify desktop chrome content
                 expect(desktop_chrome.locator("h3")).to_be_visible()
-                expect(page.locator("#desktop-icon-bar")).to_be_visible()
+                expect(page.locator("#icon-bar")).to_be_visible()
             else:
                 expect(desktop_chrome).to_be_hidden()
                 expect(mobile_header).to_be_visible()
                 # Verify mobile chrome content
-                expect(page.locator("#mobile-nav-button")).to_be_visible()
-                expect(page.locator("#mobile-icon-bar")).to_be_visible()
+                expect(page.locator("#summary [data-testid="hamburger-btn"]")).to_be_visible()
+                expect(page.locator("#icon-bar")).to_be_visible()
 
     def test_chrome_action_buttons_consistent(self, page: Page, test_server_url: str):
         """Test that action buttons work consistently in both views"""
@@ -142,12 +142,12 @@ class TestUnifiedChromeResponsive:
         page.set_viewport_size(DESKTOP_VIEWPORT)
 
         # Click "All Posts" in desktop
-        page.locator("#desktop-icon-bar button[title='All Posts']").click()
+        page.locator("#icon-bar button[title='All Posts']").click()
         page.wait_for_load_state("networkidle")
         expect(page).to_have_url(f"{test_server_url}/?unread=0")
 
         # Go back to unread
-        page.locator("#desktop-icon-bar button[title='Unread']").click()
+        page.locator("#icon-bar button[title='Unread']").click()
         page.wait_for_load_state("networkidle")
         expect(page).to_have_url(f"{test_server_url}/")
 
@@ -156,12 +156,12 @@ class TestUnifiedChromeResponsive:
         wait_for_viewport_transition(page)
 
         # Click "All Posts" in mobile
-        page.locator("#mobile-icon-bar button[title='All Posts']").click()
+        page.locator("#icon-bar button[title='All Posts']").click()
         page.wait_for_load_state("networkidle")
         expect(page).to_have_url(f"{test_server_url}/?unread=0")
 
         # Go back to unread
-        page.locator("#mobile-icon-bar button[title='Unread']").click()
+        page.locator("#icon-bar button[title='Unread']").click()
         page.wait_for_load_state("networkidle")
         expect(page).to_have_url(f"{test_server_url}/")
 
@@ -209,13 +209,13 @@ class TestUnifiedChromeResponsive:
         page.set_viewport_size(DESKTOP_VIEWPORT)
 
         # Click search button
-        page.locator("#desktop-icon-bar button[title='Search']").click()
+        page.locator("#icon-bar button[title='Search']").click()
         # Wait for search bar transition
-        wait_for_element_transition(page, "#desktop-search-bar")
+        wait_for_element_transition(page, "#search-bar")
 
         # Search bar should appear, icon bar should hide
-        expect(page.locator("#desktop-search-bar")).to_be_visible()
-        expect(page.locator("#desktop-icon-bar")).to_be_hidden()
+        expect(page.locator("#search-bar")).to_be_visible()
+        expect(page.locator("#icon-bar")).to_be_hidden()
 
         # Type in search
         search_input = page.locator("#desktop-search-input")
@@ -223,29 +223,29 @@ class TestUnifiedChromeResponsive:
         search_input.fill("Claude")
 
         # Close search
-        page.locator("#desktop-search-bar button[title='Close search']").click()
-        expect(page.locator("#desktop-search-bar")).to_be_hidden()
-        expect(page.locator("#desktop-icon-bar")).to_be_visible()
+        page.locator("#search-bar button[title='Close search']").click()
+        expect(page.locator("#search-bar")).to_be_hidden()
+        expect(page.locator("#icon-bar")).to_be_visible()
 
         # Mobile search test
         page.set_viewport_size(MOBILE_VIEWPORT_ALT)
         wait_for_viewport_transition(page)
 
         # Click search button
-        page.locator("#mobile-icon-bar button[title='Search']").click()
+        page.locator("#icon-bar button[title='Search']").click()
         # Wait for search bar transition
-        wait_for_element_transition(page, "#mobile-search-bar")
+        wait_for_element_transition(page, "#search-bar")
 
         # Search bar should appear, icon bar should hide
-        expect(page.locator("#mobile-search-bar")).to_be_visible()
-        expect(page.locator("#mobile-icon-bar")).to_be_hidden()
+        expect(page.locator("#search-bar")).to_be_visible()
+        expect(page.locator("#icon-bar")).to_be_hidden()
 
         # Type in search
-        mobile_search_input = page.locator("#mobile-search-input")
+        mobile_search_input = page.locator("#search-input")
         expect(mobile_search_input).to_be_visible()
         mobile_search_input.fill("Hacker")
 
         # Close search
-        page.locator("#mobile-search-bar button[title='Close search']").click()
-        expect(page.locator("#mobile-search-bar")).to_be_hidden()
-        expect(page.locator("#mobile-icon-bar")).to_be_visible()
+        page.locator("#search-bar button[title='Close search']").click()
+        expect(page.locator("#search-bar")).to_be_hidden()
+        expect(page.locator("#icon-bar")).to_be_visible()

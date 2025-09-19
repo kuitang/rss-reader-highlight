@@ -155,7 +155,7 @@ class TestSpacingValidation:
                 feed_items = page.locator('.cursor-pointer.rounded-lg').filter(is_visible=True)
                 if feed_items.count() > 0:
                     # Close any blocking sidebar
-                    page.evaluate("document.querySelector('#mobile-sidebar')?.setAttribute('hidden', 'true')")
+                    page.evaluate("document.querySelector('#feeds')?.setAttribute('hidden', 'true')")
                     wait_for_htmx_complete(page)
                     
                     first_item = feed_items.first

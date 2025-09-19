@@ -26,7 +26,7 @@ wait_for_htmx_complete = htmx_wait
 def ensure_mobile_sidebar_open(page: Page):
     """Helper function to ensure mobile sidebar is open before accessing feed links"""
     # Check if mobile nav button exists and is visible
-    mobile_nav_button = page.locator("button#mobile-nav-button")
+    mobile_nav_button = page.locator("button#summary [data-testid="hamburger-btn"]")
     if mobile_nav_button.is_visible():
         # We're in mobile layout, need to open sidebar first
         mobile_nav_button.click()
@@ -37,9 +37,9 @@ def ensure_mobile_sidebar_open(page: Page):
 def get_feed_links(page: Page):
     """Get feed links that are currently visible, handling mobile vs desktop"""
     # Try mobile sidebar links first (after ensuring sidebar is open)
-    mobile_sidebar = page.locator("#mobile-sidebar")
+    mobile_sidebar = page.locator("#feeds")
     if mobile_sidebar.is_visible():
-        return page.locator("#mobile-sidebar a[href*='feed_id']")
+        return page.locator("#feeds a[href*='feed_id']")
     
     # Fall back to desktop sidebar links
     return page.locator("#sidebar a[href*='feed_id']")
@@ -59,7 +59,7 @@ class TestRefactoringRegression:
             navigate_with_retry(page, test_server_url)
             wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
             # Verify server is responsive by checking for desktop layout (desktop viewport test)
-            page.wait_for_selector("#desktop-layout", timeout=constants.MAX_WAIT_MS)
+            page.wait_for_selector("#app-root", timeout=constants.MAX_WAIT_MS)
         except RetryError as e:
             raise Exception(f"Failed to navigate to {test_server_url} after retries: {e}")
         
@@ -67,7 +67,7 @@ class TestRefactoringRegression:
         page.screenshot(path="/tmp/desktop_initial.png")
         
         # Wait for feeds to load - look for the feed list structure
-        page.wait_for_selector("#desktop-layout, #main-content", timeout=constants.MAX_WAIT_MS)
+        page.wait_for_selector("#app-root, #main-content", timeout=constants.MAX_WAIT_MS)
         
         # Check console for any initial errors
         console_messages = []
@@ -154,7 +154,7 @@ class TestRefactoringRegression:
                 unread_tab.click()
                 wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Wait for feed list to update
-                page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+                page.wait_for_selector("li[data-testid='feed-item'], li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
                 
                 # Take screenshot of unread view
                 page.screenshot(path=f"/tmp/desktop_cycle_{cycle}_unread_tab.png")
@@ -164,7 +164,7 @@ class TestRefactoringRegression:
                 all_posts_tab.click()
                 wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Wait for feed list to update
-                page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+                page.wait_for_selector("li[data-testid='feed-item'], li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
                 
                 # Take screenshot of all posts view
                 page.screenshot(path=f"/tmp/desktop_cycle_{cycle}_all_posts_tab.png")
@@ -218,7 +218,7 @@ class TestRefactoringRegression:
                 time.sleep(constants.RETRY_DELAY_SECONDS)
             
             # 1. Click hamburger menu to open sidebar
-            hamburger_menu = page.locator("button#mobile-nav-button")  # Mobile nav button
+            hamburger_menu = page.locator("button#summary [data-testid="hamburger-btn"]")  # Mobile nav button
             expect(hamburger_menu).to_be_visible()
             
             print("Opening hamburger menu")
@@ -226,7 +226,7 @@ class TestRefactoringRegression:
             wait_for_htmx_complete(page)  # Allow animation
             
             # Verify sidebar is visible (first column on mobile)
-            sidebar = page.locator("#mobile-sidebar")
+            sidebar = page.locator("#feeds")
             expect(sidebar).to_be_visible()
             
             # Take screenshot of open sidebar
@@ -250,7 +250,7 @@ class TestRefactoringRegression:
                 print(f"Feed link not visible, skipping")
                 continue
             # Wait for feed content to load
-            page.wait_for_selector("li[id^='mobile-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+            page.wait_for_selector("li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
             
             # Verify sidebar closed automatically (mobile behavior)
             # Take screenshot after feed selection
@@ -267,7 +267,7 @@ class TestRefactoringRegression:
                 wait_for_htmx_complete(page)  # Short wait for scroll animation
             
             # 4. Click on an article (should navigate to full-screen view)
-            article_links = feed_container.locator("li[id^='mobile-feed-item-']").all()
+            article_links = feed_container.locator("li[data-testid='feed-item']").all()
             if article_links:
                 article_index = cycle % len(article_links)
                 article_item = article_links[article_index]
@@ -291,14 +291,14 @@ class TestRefactoringRegression:
                     back_buttons[0].click()
                     wait_for_htmx_complete(page)
                     # Wait for feed list to update
-                    page.wait_for_selector("li[id^='mobile-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+                    page.wait_for_selector("li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
                 else:
                     # If no back button, use browser back
                     print("Using browser back navigation")
                     page.go_back()
                     wait_for_htmx_complete(page)
                     # Wait for feed list to update
-                    page.wait_for_selector("li[id^='mobile-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+                    page.wait_for_selector("li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
                 
                 # Verify we're back at feed list
                 expect(feed_container).to_be_visible()
@@ -315,7 +315,7 @@ class TestRefactoringRegression:
                 unread_tab.click()
                 wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Wait for feed list to update
-                page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+                page.wait_for_selector("li[data-testid='feed-item'], li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
                 
                 # Take screenshot of mobile unread view
                 page.screenshot(path=f"/tmp/mobile_cycle_{cycle}_unread_tab.png")
@@ -325,7 +325,7 @@ class TestRefactoringRegression:
                 all_posts_tab.click()
                 wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Wait for feed list to update
-                page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+                page.wait_for_selector("li[data-testid='feed-item'], li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
                 
                 # Take screenshot of mobile all posts view
                 page.screenshot(path=f"/tmp/mobile_cycle_{cycle}_all_posts_tab.png")
@@ -355,7 +355,7 @@ class TestRefactoringRegression:
         try:
             navigate_with_retry(page, test_server_url)
             page.wait_for_load_state("networkidle", timeout=constants.MAX_WAIT_MS)
-            page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+            page.wait_for_selector("li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
         except RetryError as e:
             raise Exception(f"Failed to navigate to {test_server_url} after retries: {e}")
         
@@ -385,7 +385,7 @@ class TestRefactoringRegression:
             feed_links[0].click()
             wait_for_htmx_complete(page)
             # Wait for feed content to load (could be mobile or desktop)
-            page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+            page.wait_for_selector("li[data-testid='feed-item'], li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
         
         # 2. Click on an article (should trigger HTMX update)
         article_items = page.locator("main > div:nth-child(2) li").all()
@@ -397,13 +397,13 @@ class TestRefactoringRegression:
             page.wait_for_selector("#main-content", state="visible", timeout=constants.MAX_WAIT_MS)
         
         # 3. Toggle between tabs (should trigger HTMX update) - desktop viewport
-        unread_tab = page.locator("#desktop-icon-bar button[title='Unread']")
+        unread_tab = page.locator("#icon-bar button[title='Unread']")
         if unread_tab.is_visible():
             print("Toggling to Unread tab")
             unread_tab.click()
             wait_for_htmx_complete(page)
             # Wait for feed content to load (could be mobile or desktop)
-            page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+            page.wait_for_selector("li[data-testid='feed-item'], li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
         
         # Analyze requests for HTMX patterns
         htmx_requests = [req for req in requests if 'hx-request' in req.get('headers', {})]
@@ -431,7 +431,7 @@ class TestRefactoringRegression:
         try:
             navigate_with_retry(page, test_server_url)
             page.wait_for_load_state("networkidle", timeout=constants.MAX_WAIT_MS)
-            page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+            page.wait_for_selector("li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
         except RetryError as e:
             raise Exception(f"Failed to navigate to {test_server_url} after retries: {e}")
         
@@ -442,7 +442,7 @@ class TestRefactoringRegression:
             feed_links[0].click()
             wait_for_htmx_complete(page)
             # Wait for feed content to load (could be mobile or desktop)
-            page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+            page.wait_for_selector("li[data-testid='feed-item'], li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
         
         # Find articles with blue dots (unread indicators)
         unread_articles = page.locator("li").filter(has=page.locator(".w-2.h-2.bg-blue-500")).all()
@@ -481,7 +481,7 @@ class TestRefactoringRegression:
             unread_tab.click()
             page.wait_for_load_state("networkidle")
             # Wait for feed content to load
-            page.wait_for_selector("li[id^='mobile-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+            page.wait_for_selector("li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
             
             # Take screenshot of unread view
             page.screenshot(path="/tmp/unread_view.png")
@@ -492,13 +492,13 @@ class TestRefactoringRegression:
                 unread_articles_in_view[0].click()
                 wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Wait for feed list to update
-                page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+                page.wait_for_selector("li[data-testid='feed-item'], li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
                 
                 # Go back to unread view
                 unread_tab.click()
                 wait_for_htmx_complete(page)  # Use HTMX wait instead of networkidle
                 # Wait for feed list to update
-                page.wait_for_selector("li[id^='mobile-feed-item-'], li[id^='desktop-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+                page.wait_for_selector("li[data-testid='feed-item'], li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
                 
                 # Take screenshot after article removal
                 page.screenshot(path="/tmp/unread_view_after_click.png")

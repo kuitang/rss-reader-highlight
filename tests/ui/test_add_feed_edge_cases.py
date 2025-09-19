@@ -46,7 +46,7 @@ def test_add_feed_edge_cases(page: Page, test_server_url):
         # Set up viewport-specific selectors
         if viewport_name == "mobile":
             # Open mobile sidebar using the correct hamburger button
-            hamburger = page.locator('[data-testid="hamburger-btn"]').first
+            hamburger = page.locator('#summary [data-testid="hamburger-btn"]').first
             if hamburger.is_visible():
                 hamburger.click()
                 # Wait for drawer to open - sidebar should become visible
@@ -84,7 +84,7 @@ def test_add_feed_edge_cases(page: Page, test_server_url):
             if viewport_name == "mobile":
                 # Ensure mobile sidebar is open
                 if not page.locator("#feeds").is_visible():
-                    hamburger = page.locator('[data-testid="hamburger-btn"]').first
+                    hamburger = page.locator('#summary [data-testid="hamburger-btn"]').first
                     if hamburger.is_visible():
                         hamburger.click()
                         page.wait_for_selector("#feeds", state="visible", timeout=constants.MAX_WAIT_MS)

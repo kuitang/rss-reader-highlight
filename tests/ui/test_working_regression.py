@@ -84,7 +84,7 @@ class TestWorkingRegression:
         print(f"Initial unread articles: {initial_unread_count}")
         
         # Click on first available article
-        first_article = page.locator("li[id^='desktop-feed-item-']").first
+        first_article = page.locator("li[data-testid='feed-item']").first
         expect(first_article).to_be_visible()
         
         article_title_element = first_article.locator("strong").first
@@ -116,22 +116,22 @@ class TestWorkingRegression:
         
         # Test Unread tab
         # Desktop viewport test - use desktop elements
-        unread_tab = page.locator("#desktop-icon-bar button[title='Unread']")
+        unread_tab = page.locator("#icon-bar button[title='Unread']")
         if unread_tab.is_visible():
             unread_tab.click()
             wait_for_htmx_complete(page)
             # Wait for feed list to update
-            page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+            page.wait_for_selector("li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
             page.screenshot(path="/tmp/regression_unread_tab.png")
         
         # Test All Posts tab  
         # Desktop viewport test - use desktop elements
-        all_posts_tab = page.locator("#desktop-icon-bar button[title='All Posts']")
+        all_posts_tab = page.locator("#icon-bar button[title='All Posts']")
         if all_posts_tab.is_visible():
             all_posts_tab.click()
             wait_for_htmx_complete(page)
             # Wait for feed list to update
-            page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+            page.wait_for_selector("li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
             page.screenshot(path="/tmp/regression_all_posts_tab.png")
         
         print("=== Testing Feed Switching ===")
@@ -195,7 +195,7 @@ class TestWorkingRegression:
         page.screenshot(path="/tmp/regression_mobile_initial.png")
         
         # Look for mobile nav button
-        mobile_nav = page.locator("button#mobile-nav-button")
+        mobile_nav = page.locator("button#summary [data-testid="hamburger-btn"]")
         if mobile_nav.is_visible():
             print("=== Testing Mobile Navigation ===")
             
@@ -205,16 +205,16 @@ class TestWorkingRegression:
             page.screenshot(path="/tmp/regression_mobile_nav_open.png")
             
             # Click on a feed - use dynamic selector
-            claudeai_link = page.locator("#mobile-sidebar a[href*='feed_id']:has-text('ClaudeAI')").first
+            claudeai_link = page.locator("#feeds a[href*='feed_id']:has-text('ClaudeAI')").first
             claudeai_link.click()
             wait_for_htmx_complete(page)
             # Wait for feed list to load
-            page.wait_for_selector("li[id^='mobile-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+            page.wait_for_selector("li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
             
             page.screenshot(path="/tmp/regression_mobile_feed_selected.png")
             
             # Click on an article (mobile layout)
-            first_article = page.locator("li[id^='mobile-feed-item-']").first
+            first_article = page.locator("li[data-testid='feed-item']").first
             first_article.click()
             wait_for_htmx_complete(page)
             # Wait for article detail to load (mobile shows in main-content)
@@ -241,7 +241,7 @@ class TestWorkingRegression:
                 time.sleep(constants.RETRY_DELAY_SECONDS)  # Wait before retry
 
         # Wait for either mobile or desktop layout element to be visible
-        page.wait_for_selector("li[id^='desktop-feed-item-'], li[id^='mobile-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+        page.wait_for_selector("li[data-testid='feed-item'], li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
         wait_for_htmx_complete(page)
         
         # Monitor network activity
@@ -254,12 +254,12 @@ class TestWorkingRegression:
         
         # Perform actions that should trigger HTMX
         # Handle both mobile and desktop layouts
-        mobile_nav_button = page.locator("button#mobile-nav-button")
+        mobile_nav_button = page.locator("button#summary [data-testid="hamburger-btn"]")
         if mobile_nav_button.is_visible():
             # Mobile: open sidebar and get mobile feed links
             mobile_nav_button.click()
             wait_for_htmx_complete(page)
-            claudeai_link = page.locator("#mobile-sidebar a[href*='feed_id']:has-text('ClaudeAI')").first
+            claudeai_link = page.locator("#feeds a[href*='feed_id']:has-text('ClaudeAI')").first
         else:
             # Desktop: get sidebar feed links directly
             claudeai_link = page.locator("#sidebar a[href*='feed_id']:has-text('ClaudeAI')").first
@@ -267,10 +267,10 @@ class TestWorkingRegression:
         claudeai_link.click()
         wait_for_htmx_complete(page)
         # Wait for feed content to load
-        page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+        page.wait_for_selector("li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
         
         # Click an article
-        first_article = page.locator("li[id^='desktop-feed-item-']").first
+        first_article = page.locator("li[data-testid='feed-item']").first
         first_article.click()
         wait_for_htmx_complete(page)
         # Wait for detail panel to load
@@ -328,12 +328,12 @@ class TestWorkingRegression:
             wait_for_htmx_complete(page)
             
             # Select a feed first - handle both layouts
-            mobile_nav_button = page.locator("button#mobile-nav-button")
+            mobile_nav_button = page.locator("button#summary [data-testid="hamburger-btn"]")
             if mobile_nav_button.is_visible():
                 # Mobile: open sidebar and get mobile feed links
                 mobile_nav_button.click()
                 wait_for_htmx_complete(page)
-                claudeai_link = page.locator("#mobile-sidebar a[href*='feed_id']:has-text('ClaudeAI')").first
+                claudeai_link = page.locator("#feeds a[href*='feed_id']:has-text('ClaudeAI')").first
             else:
                 # Desktop: get sidebar feed links directly
                 claudeai_link = page.locator("#sidebar a[href*='feed_id']:has-text('ClaudeAI')").first
@@ -341,7 +341,7 @@ class TestWorkingRegression:
             claudeai_link.click()
             wait_for_htmx_complete(page)
             # Wait for feed content to load
-            page.wait_for_selector("li[id^='desktop-feed-item-']", state="visible", timeout=constants.MAX_WAIT_MS)
+            page.wait_for_selector("li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
             
             # Count unread articles
             initial_unread = page.locator("li").filter(has=page.locator(".bg-blue-600")).all()
@@ -368,7 +368,7 @@ class TestWorkingRegression:
                 
                 # The article we just read should not appear in unread view
                 # (This tests the filtering logic)
-                unread_view_items = page.locator("li[id^='desktop-feed-item-']").all()
+                unread_view_items = page.locator("li[data-testid='feed-item']").all()
                 print(f"Items in unread view: {len(unread_view_items)}")
                 
                 print("✓ Read/unread state management working correctly")

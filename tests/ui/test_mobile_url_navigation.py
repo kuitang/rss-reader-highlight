@@ -78,7 +78,7 @@ class TestMobileNavigationComplete:
         # Navigate to article by clicking (to trigger HTMX, not direct navigation)
         # Get the first available article ID dynamically to avoid hardcoding
         first_article_id = page.evaluate("""() => {
-            const articles = document.querySelectorAll("li[id^='mobile-feed-item-']");
+            const articles = document.querySelectorAll("li[data-testid='feed-item']");
             return articles.length > 0 ? articles[0].id : null;
         }""")
         
@@ -177,7 +177,7 @@ class TestMobileNavigationComplete:
         # Step 1: Navigate to article by finding and clicking any available article
         # Get the first available article ID dynamically
         first_article_id = page.evaluate("""() => {
-            const articles = document.querySelectorAll("li[id^='mobile-feed-item-']");
+            const articles = document.querySelectorAll("li[data-testid='feed-item']");
             return articles.length > 0 ? articles[0].id : null;
         }""")
         
@@ -238,7 +238,7 @@ class TestMobileNavigationComplete:
         # Navigate to article view by clicking an article - header should be hidden
         # Get the first available article ID dynamically
         first_article_id = page.evaluate("""() => {
-            const articles = document.querySelectorAll("li[id^='mobile-feed-item-']");
+            const articles = document.querySelectorAll("li[data-testid='feed-item']");
             return articles.length > 0 ? articles[0].id : null;
         }""")
         
@@ -292,7 +292,7 @@ class TestMobileNavigationComplete:
         # Click on an article from All Posts view (don't hardcode ID)
         # Get the first available article ID dynamically
         first_article_id = page.evaluate("""() => {
-            const articles = document.querySelectorAll("li[id^='mobile-feed-item-']");
+            const articles = document.querySelectorAll("li[data-testid='feed-item']");
             return articles.length > 0 ? articles[0].id : null;
         }""")
         
@@ -319,7 +319,7 @@ class TestMobileNavigationComplete:
         # Click on an article from Unread view (don't hardcode ID)
         # Get the first available article ID dynamically
         first_article_id = page.evaluate("""() => {
-            const articles = document.querySelectorAll("li[id^='mobile-feed-item-']");
+            const articles = document.querySelectorAll("li[data-testid='feed-item']");
             return articles.length > 0 ? articles[0].id : null;
         }""")
         

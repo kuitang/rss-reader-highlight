@@ -38,25 +38,25 @@ class TestMobileSidebarIsolated:
         
         # Ensure mobile layout and JavaScript are ready
         expect(page.locator("#app-root")).to_be_visible()
-        expect(page.locator("#mobile-nav-button")).to_be_visible()
+        expect(page.locator("#summary [data-testid='hamburger-btn']")).to_be_visible()
         wait_for_htmx_complete(page)  # Ensure JS is loaded
         
         # Test sidebar open/close cycle
         for i in range(3):
             # Open sidebar with hamburger
-            hamburger = page.locator("#mobile-nav-button")
+            hamburger = page.locator("#summary [data-testid="hamburger-btn"]")
             if hamburger.is_visible():
                 hamburger.click()
-                page.wait_for_selector("#mobile-sidebar", state="visible")  # Wait for sidebar to become visible
+                page.wait_for_selector("#feeds", state="visible")  # Wait for sidebar to become visible
                 
                 # Select different feed each iteration
-                feed_links = page.locator("#mobile-sidebar a[href*='feed_id']").all()
+                feed_links = page.locator("#feeds a[href*='feed_id']").all()
                 if len(feed_links) > i % len(feed_links):
                     feed_links[i % len(feed_links)].click()
                     
                     # Verify sidebar closes and content updates
                     wait_for_htmx_complete(page)
-                    expect(page.locator("#mobile-sidebar")).to_be_hidden()
+                    expect(page.locator("#feeds")).to_be_hidden()
                     
                     # Test article navigation
                     article_items = page.locator("li[id*='mobile-feed-item']").all()
@@ -69,7 +69,7 @@ class TestMobileSidebarIsolated:
                         assert "/item/" in page.url
                         
                         # Navigate back
-                        back_button = page.locator("#mobile-nav-button")
+                        back_button = page.locator("#summary [data-testid="hamburger-btn"]")
                         if back_button.is_visible():
                             back_button.click()
                             wait_for_htmx_complete(page)

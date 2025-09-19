@@ -88,7 +88,7 @@ class TestFormParameterBugFlow:
         
         # 1. Open mobile sidebar - off-canvas drawer
         # Use the hamburger button in the summary section (visible on mobile by default)
-        mobile_menu_button = page.locator('[data-testid="hamburger-btn"]')
+        mobile_menu_button = page.locator('#summary [data-testid="hamburger-btn"]')
         expect(mobile_menu_button).to_be_visible()
         mobile_menu_button.click()
         # Wait for drawer to open (check data-drawer attribute)
@@ -429,7 +429,7 @@ class TestSessionAndSubscriptionFlow:
                 articles_selector = "li[id^='feed-item-']"
             else:
                 # Mobile: feeds are in off-canvas drawer
-                menu_button = page.locator('[data-testid="summary"] [data-testid="hamburger-btn"]')
+                menu_button = page.locator('[data-testid="summary"] #summary [data-testid="hamburger-btn"]')
                 menu_button.click()
                 # Wait for drawer to open
                 page.wait_for_function("() => document.getElementById('app-root').getAttribute('data-drawer') === 'open'")
@@ -547,7 +547,7 @@ class TestFullViewportHeightFlow:
                         'matrix(1, 0, 0, 1, -288' in transform), f"Feeds should be off-canvas, got transform: {transform}"
 
                 # Should be able to interact with mobile elements
-                menu_button = page.locator('[data-testid="summary"] [data-testid="hamburger-btn"]')
+                menu_button = page.locator('[data-testid="summary"] #summary [data-testid="hamburger-btn"]')
                 expect(menu_button).to_be_visible()
             
             print(f"  ✓ {viewport_name} layout test passed")
@@ -745,7 +745,7 @@ class TestTabSizeAndAlignment:
                         expect(icon_bar).to_be_visible(timeout=5000)
 
                         # Check for hamburger menu button (should be visible in summary section on mobile)
-                        hamburger_btn = page.locator('[data-testid="summary"] [data-testid="hamburger-btn"]')
+                        hamburger_btn = page.locator('[data-testid="summary"] #summary [data-testid="hamburger-btn"]')
                         expect(hamburger_btn).to_be_visible()
 
                         # Check for feed name display

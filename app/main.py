@@ -249,9 +249,10 @@ def three_pane_layout(data, detail_content=None):
         Aside(
             id="feeds",
             data_testid="feeds",
-            cls="hidden lg:block lg:overflow-y-auto border-r"
+            cls="hidden lg:block lg:overflow-y-auto lg:overflow-x-hidden border-r",
+            style="scrollbar-gutter: stable;"
         )(
-            FeedsSidebar(data.session_id)
+            FeedsSidebar(data.session_id, data.unread)
         ),
         # Summary list (middle)
         Section(
@@ -380,6 +381,7 @@ def viewport_styles():
                 transform: translateX(-100%);
                 transition: transform 0.3s ease;
                 background: var(--background);
+                opacity: 1; /* Force full opacity */
                 z-index: 50;
                 display: block !important; /* Override the lg:hidden class */
             }
@@ -821,12 +823,16 @@ def human_time_diff(dt):
     else:
         return "Just now"
 
-def FeedSidebarItem(feed, count=""):
+def FeedSidebarItem(feed, unread=True, count=""):
     """Create sidebar item for feed"""
     last_updated = human_time_diff(feed.get('last_updated'))
 
     # Handle Unknown timestamp gracefully
     update_text = last_updated if last_updated != "Unknown" else "never updated"
+
+    # Build URL with current unread state
+    unread_param = "1" if unread else "0"
+    url = f"/?feed_id={feed['id']}&unread={unread_param}"
 
     return Li(
         A(
@@ -836,16 +842,16 @@ def FeedSidebarItem(feed, count=""):
                 P(f"updated {update_text}", cls="text-xs text-muted"),
                 cls="gap-3"
             ),
-            href=f"/?feed_id={feed['id']}",
-            hx_get=f"/?feed_id={feed['id']}",
-            hx_target="#summary",
+            href=url,
+            hx_get=url,
+            hx_target="#feeds-list-container",  # Changed from #summary
             hx_push_url="true",
             cls=Styling.SIDEBAR_ITEM,
             onclick="if (window.innerWidth < 1024) { document.getElementById('app-root').removeAttribute('data-drawer'); }"
         )
     )
 
-def FeedsSidebar(session_id):
+def FeedsSidebar(session_id, unread=True):
     """Create feeds sidebar for unified layout"""
     feeds = FeedModel.get_user_feeds(session_id)
     folders = FolderModel.get_folders(session_id)
@@ -902,7 +908,7 @@ def FeedsSidebar(session_id):
                 onclick="if (window.innerWidth < 1024) { document.getElementById('app-root').removeAttribute('data-drawer'); }"
             )
         ),
-        Div(cls="feeds-list")(*[FeedSidebarItem(feed) for feed in feeds]),
+        Div(cls="feeds-list")(*[FeedSidebarItem(feed, unread) for feed in feeds]),
         Li(Hr()),
         Li(H4("Folders"), cls='p-3'),
         *[Li(
@@ -1197,7 +1203,7 @@ def index(htmx, sess, feed_id: int = None, unread: bool = True, folder_id: int =
     # HTMX fragment updates
     if htmx and getattr(htmx, 'request', None):
         # Return updated summary list for pagination/filtering
-        if getattr(htmx, 'target', None) in ['summary', 'feeds-list-container']:
+        if getattr(htmx, 'target', None) == 'feeds-list-container':  # Changed from 'summary'
             return FeedsContent(data.session_id, data.feed_id, data.unread, data.page, data=data)
         # Clear detail to show summary (for back button)
         elif getattr(htmx, 'target', None) == 'detail-content':

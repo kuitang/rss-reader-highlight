@@ -182,8 +182,8 @@ def wait_for_viewport_transition(page: Page, timeout: int = MAX_WAIT_MS):
     # Also ensure layout elements are in expected state
     page.wait_for_function(
         """() => {
-            const desktop = document.querySelector('#desktop-layout');
-            const mobile = document.querySelector('#mobile-layout');
+            const desktop = document.querySelector('#app-root');
+            const mobile = document.querySelector('#app-root');
 
             // At least one layout should be visible
             const desktopVisible = desktop && window.getComputedStyle(desktop).display !== 'none';

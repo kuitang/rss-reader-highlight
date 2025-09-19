@@ -35,23 +35,23 @@ MOBILE_VIEWPORT_ALT = {"width": 375, "height": 667}
 # =============================================================================
 
 # Feed item selectors
-DESKTOP_FEED_ITEMS = "li[id^='desktop-feed-item-']"
-MOBILE_FEED_ITEMS = "li[id^='mobile-feed-item-']"
-ANY_FEED_ITEMS = "li[id^='desktop-feed-item-'], li[id^='mobile-feed-item-']"
+DESKTOP_FEED_ITEMS = "li[data-testid='feed-item']"
+MOBILE_FEED_ITEMS = "li[data-testid='feed-item']"
+ANY_FEED_ITEMS = "li[data-testid='feed-item'], li[data-testid='feed-item']"
 
 # Layout selectors
-DESKTOP_LAYOUT = "#desktop-layout"
-MOBILE_LAYOUT = "#mobile-layout"
-ANY_LAYOUT = "#desktop-layout, #mobile-layout"
+DESKTOP_LAYOUT = "#app-root"
+MOBILE_LAYOUT = "#app-root"
+ANY_LAYOUT = "#app-root, #app-root"
 
 # Navigation selectors
-DESKTOP_ICON_BAR = "#desktop-icon-bar"
-MOBILE_ICON_BAR = "#mobile-icon-bar"
-ANY_ICON_BAR = "#desktop-icon-bar, #mobile-icon-bar"
+DESKTOP_ICON_BAR = "#icon-bar"
+MOBILE_ICON_BAR = "#icon-bar"
+ANY_ICON_BAR = "#icon-bar, #icon-bar"
 
 # Content areas
 DESKTOP_FEEDS_CONTENT = "#desktop-feeds-content"
-MOBILE_SIDEBAR = "#mobile-sidebar"
+MOBILE_SIDEBAR = "#feeds"
 MAIN_CONTENT = "#main-content"
 APP_ROOT = '[data-testid="app-root"]'
 
