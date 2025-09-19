@@ -10,18 +10,16 @@ Combines functionality from:
 import pytest
 from playwright.sync_api import Page, expect
 import time
+from test_constants import MAX_WAIT_MS
+from test_helpers import (
+    wait_for_htmx_complete,
+    wait_for_page_ready,
+    wait_for_htmx_settle
+)
 
 pytestmark = pytest.mark.needs_server
 
 # HTMX Helper Functions for Fast Testing
-def wait_for_htmx_complete(page, timeout=5000):
-    """Wait for all HTMX requests to complete - much faster than fixed timeouts"""
-    page.wait_for_function("() => !document.body.classList.contains('htmx-request')", timeout=timeout)
-
-def wait_for_page_ready(page):
-    """Fast page ready check - waits for network idle instead of fixed timeout"""
-    page.wait_for_load_state("networkidle")
-
 
 class TestMobileFlows:
     """Test mobile-specific UI flows and behaviors"""
@@ -30,9 +28,9 @@ class TestMobileFlows:
     def setup(self, page: Page, test_server_url):
         """Set mobile viewport for all tests"""
         page.set_viewport_size({"width": 375, "height": 667})
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=MAX_WAIT_MS)
         # Wait for mobile layout to be visible
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+        page.wait_for_selector("#mobile-layout", state="visible", timeout=MAX_WAIT_MS)
         wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
     
     # Navigation Tests (from test_mobile_navigation.py)
@@ -47,7 +45,7 @@ class TestMobileFlows:
         
         # Find first post - updated selector to match app.py (mobile-feed-item prefix)
         first_post = page.locator("li[id^='mobile-feed-item-']").first
-        expect(first_post).to_be_visible(timeout=10000)
+        expect(first_post).to_be_visible(timeout=MAX_WAIT_MS)
         
         # Store initial HTML to detect full reload
         initial_header_html = page.locator("#mobile-header").inner_html()
@@ -61,7 +59,7 @@ class TestMobileFlows:
         assert request.headers.get("hx-request") == "true", "Post click didn't use HTMX"
         
         # Wait for article to load in main content
-        page.wait_for_selector("#main-content #item-detail", timeout=10000)
+        page.wait_for_selector("#main-content #item-detail", timeout=MAX_WAIT_MS)
         
         # Verify URL changed (for shareability) 
         assert "/item/" in page.url, "URL didn't update for article"
@@ -79,7 +77,7 @@ class TestMobileFlows:
         wait_for_htmx_complete(page)  # OPTIMIZED: Wait for any HTMX operation to complete
         
         # Wait for feed list to return
-        page.wait_for_selector("li[id^='mobile-feed-item-']", timeout=10000)
+        page.wait_for_selector("li[id^='mobile-feed-item-']", timeout=MAX_WAIT_MS)
         
         # Verify we're back at the list by checking for feed items (more reliable than container visibility)
         expect(page.locator("li[id^='mobile-feed-item-']").first).to_be_visible()
@@ -321,7 +319,7 @@ class TestMobileFlows:
         
         # Navigate to an article
         first_post = page.locator("li[id^='mobile-feed-item-']").first
-        expect(first_post).to_be_visible(timeout=10000)
+        expect(first_post).to_be_visible(timeout=MAX_WAIT_MS)
         
         first_post.click()
         wait_for_htmx_complete(page)
@@ -335,15 +333,15 @@ class TestMobileFlows:
         article_title = page.locator("#item-detail strong").first.text_content()
         
         # Navigate away and then back to test direct URL access
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=MAX_WAIT_MS)
         # Wait for mobile layout to be visible
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+        page.wait_for_selector("#mobile-layout", state="visible", timeout=MAX_WAIT_MS)
         wait_for_page_ready(page)  # FIXED: Don't expect sidebar visible on main page
         
         # Now navigate directly to the article URL
-        page.goto(article_url, timeout=10000)
+        page.goto(article_url, timeout=MAX_WAIT_MS)
         # Wait for article detail to be visible
-        page.wait_for_selector("#item-detail", state="visible", timeout=5000)
+        page.wait_for_selector("#item-detail", state="visible", timeout=MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         # Should show the same article
@@ -382,15 +380,15 @@ class TestMobileFlows:
             assert "feed_id=" in current_url, "Should be on filtered feed view"
             
             # Navigate away and back to test sharing
-            page.goto(test_server_url, timeout=10000)
+            page.goto(test_server_url, timeout=MAX_WAIT_MS)
             # Wait for mobile layout to be visible
-            page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+            page.wait_for_selector("#mobile-layout", state="visible", timeout=MAX_WAIT_MS)
             wait_for_page_ready(page)  # OPTIMIZED: Wait for page to load, sidebar is hidden by default
             
             # Navigate directly to the feed URL
-            page.goto(current_url, timeout=10000)
+            page.goto(current_url, timeout=MAX_WAIT_MS)
             # Wait for mobile layout to be visible
-            page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+            page.wait_for_selector("#mobile-layout", state="visible", timeout=MAX_WAIT_MS)
             wait_for_page_ready(page)
             
             # Should be back on the filtered view
@@ -419,13 +417,13 @@ class TestMobileFlows:
             if feed_link.is_visible():
                 feed_link.click()
             else:
-                page.goto(test_server_url + "/", timeout=10000)  # Go to home as fallback
+                page.goto(test_server_url + "/", timeout=MAX_WAIT_MS)  # Go to home as fallback
             page.wait_for_selector("#mobile-sidebar", state="visible")
             
             # Navigate back to unread view
-            page.goto(current_url, timeout=10000)
+            page.goto(current_url, timeout=MAX_WAIT_MS)
             # Wait for mobile layout to be visible
-            page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+            page.wait_for_selector("#mobile-layout", state="visible", timeout=MAX_WAIT_MS)
             wait_for_htmx_complete(page)
             
             # Should be back in unread view
@@ -477,8 +475,6 @@ class TestMobileFlows:
         expect(page.locator("li[id^='mobile-feed-item-']").first).to_be_visible()
         feed_title_after_back = page.locator("#mobile-top-bar h3, #mobile-header h3").first
         expect(feed_title_after_back).to_contain_text("ClaudeAI")  # Should NOT be "BizToc"
-
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

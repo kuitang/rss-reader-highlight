@@ -8,7 +8,6 @@ from unittest.mock import Mock
 
 # Import the functions we need to test
 from app.models import init_db, get_db, FeedModel, SessionModel, FeedItemModel, UserItemModel
-from app.main import prepare_item_data
 
 
 class TestItemNotFoundDiagnostics:
@@ -46,9 +45,9 @@ class TestItemNotFoundDiagnostics:
         session_id = 'test-session-id'
         item_id = 999999  # Non-existent item
         
-        # Test prepare_item_data returns None for non-existent item
-        item_data = prepare_item_data(session_id, item_id, None, False)
-        assert item_data.item is None
+        # Test FeedItemModel.get_item_for_user returns None for non-existent item
+        item = FeedItemModel.get_item_for_user(session_id, item_id)
+        assert item is None
         
         # Test that we can execute the diagnostic query from the route
         diagnostic_result = None

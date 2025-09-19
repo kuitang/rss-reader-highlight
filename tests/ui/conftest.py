@@ -11,6 +11,8 @@ Server Dependency Management:
 
 import pytest
 import httpx
+from test_helpers import wait_for_server_ready
+from tenacity import RetryError
 import os
 from playwright.sync_api import sync_playwright
 
@@ -103,15 +105,10 @@ def test_server_url():
     
     atexit.register(cleanup_server)
     
-    # Wait for server to start
-    for _ in range(10):  # 30 seconds timeout
-        try:
-            response = httpx.get(server_url, timeout=2)
-            if response.status_code == 200:
-                break
-        except httpx.RequestError:
-            time.sleep(1)
-    else:
+    # Wait for server to start using tenacity with exponential backoff
+    try:
+        wait_for_server_ready(server_url)
+    except RetryError:
         cleanup_server()
         pytest.skip(f"Failed to start test server on {server_url}")
     

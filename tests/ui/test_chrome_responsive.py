@@ -2,6 +2,11 @@
 
 import pytest
 from playwright.sync_api import Page, expect
+from test_constants import MINIMAL_WAIT_MS, DESKTOP_VIEWPORT, MOBILE_VIEWPORT_ALT, MAX_WAIT_MS
+from test_helpers import (
+    wait_for_viewport_transition,
+    wait_for_element_transition
+)
 
 
 class TestUnifiedChromeResponsive:
@@ -11,7 +16,7 @@ class TestUnifiedChromeResponsive:
         """Test that chrome appears correctly and doesn't scroll in both views"""
 
         # Start with desktop viewport
-        page.set_viewport_size({"width": 1400, "height": 900})
+        page.set_viewport_size(DESKTOP_VIEWPORT)
         page.goto(test_server_url)
         page.wait_for_load_state("networkidle")
 
@@ -39,15 +44,20 @@ class TestUnifiedChromeResponsive:
 
         # Scroll the feeds content
         feeds_content.evaluate("el => el.scrollTop = 200")
-        page.wait_for_timeout(100)  # Small wait for scroll
+        # Wait for scroll to complete
+        page.wait_for_function(
+            "(selector) => document.querySelector(selector).scrollTop === 200",
+            arg="#desktop-feeds-content",
+            timeout=MAX_WAIT_MS
+        )
 
         # Chrome should remain in same position (not scroll)
         scrolled_chrome_position = desktop_chrome.bounding_box()["y"]
         assert initial_chrome_position == scrolled_chrome_position, "Desktop chrome should not scroll"
 
         # Switch to mobile viewport
-        page.set_viewport_size({"width": 375, "height": 667})
-        page.wait_for_timeout(500)  # Wait for responsive transition
+        page.set_viewport_size(MOBILE_VIEWPORT_ALT)
+        wait_for_viewport_transition(page)
 
         # Mobile view assertions
         expect(desktop_chrome).to_be_hidden()
@@ -76,7 +86,12 @@ class TestUnifiedChromeResponsive:
 
         # Scroll the main content
         main_content.evaluate("el => el.scrollTop = 200")
-        page.wait_for_timeout(100)  # Small wait for scroll
+        # Wait for scroll to complete
+        page.wait_for_function(
+            "(selector) => document.querySelector(selector).scrollTop === 200",
+            arg="#main-content",
+            timeout=MAX_WAIT_MS
+        )
 
         # Mobile header should remain fixed at top
         scrolled_header_position = mobile_header.bounding_box()["y"]
@@ -99,7 +114,7 @@ class TestUnifiedChromeResponsive:
 
         for viewport in viewports:
             page.set_viewport_size({"width": viewport["width"], "height": viewport["height"]})
-            page.wait_for_timeout(300)  # Wait for transition
+            wait_for_viewport_transition(page)
 
             desktop_chrome = page.locator("#desktop-chrome-container")
             mobile_header = page.locator("#mobile-top-bar")
@@ -124,7 +139,7 @@ class TestUnifiedChromeResponsive:
         page.wait_for_load_state("networkidle")
 
         # Test in desktop view first
-        page.set_viewport_size({"width": 1400, "height": 900})
+        page.set_viewport_size(DESKTOP_VIEWPORT)
 
         # Click "All Posts" in desktop
         page.locator("#desktop-icon-bar button[title='All Posts']").click()
@@ -137,8 +152,8 @@ class TestUnifiedChromeResponsive:
         expect(page).to_have_url(f"{test_server_url}/")
 
         # Switch to mobile and test same functionality
-        page.set_viewport_size({"width": 375, "height": 667})
-        page.wait_for_timeout(300)
+        page.set_viewport_size(MOBILE_VIEWPORT_ALT)
+        wait_for_viewport_transition(page)
 
         # Click "All Posts" in mobile
         page.locator("#mobile-icon-bar button[title='All Posts']").click()
@@ -157,7 +172,7 @@ class TestUnifiedChromeResponsive:
         page.wait_for_load_state("networkidle")
 
         # Desktop view - verify initial feed name
-        page.set_viewport_size({"width": 1400, "height": 900})
+        page.set_viewport_size(DESKTOP_VIEWPORT)
         desktop_feed_name = page.locator("#desktop-chrome-container h3")
         expect(desktop_feed_name).to_contain_text("All Feeds")
 
@@ -172,8 +187,8 @@ class TestUnifiedChromeResponsive:
             expect(desktop_feed_name).not_to_contain_text("All Feeds")
 
         # Mobile view - verify feed name is also shown
-        page.set_viewport_size({"width": 375, "height": 667})
-        page.wait_for_timeout(300)
+        page.set_viewport_size(MOBILE_VIEWPORT_ALT)
+        wait_for_viewport_transition(page)
 
         mobile_feed_name = page.locator("#mobile-top-bar h3")
         expect(mobile_feed_name).to_be_visible()
@@ -191,11 +206,12 @@ class TestUnifiedChromeResponsive:
         page.wait_for_load_state("networkidle")
 
         # Desktop search test
-        page.set_viewport_size({"width": 1400, "height": 900})
+        page.set_viewport_size(DESKTOP_VIEWPORT)
 
         # Click search button
         page.locator("#desktop-icon-bar button[title='Search']").click()
-        page.wait_for_timeout(100)
+        # Wait for search bar transition
+        wait_for_element_transition(page, "#desktop-search-bar")
 
         # Search bar should appear, icon bar should hide
         expect(page.locator("#desktop-search-bar")).to_be_visible()
@@ -212,12 +228,13 @@ class TestUnifiedChromeResponsive:
         expect(page.locator("#desktop-icon-bar")).to_be_visible()
 
         # Mobile search test
-        page.set_viewport_size({"width": 375, "height": 667})
-        page.wait_for_timeout(300)
+        page.set_viewport_size(MOBILE_VIEWPORT_ALT)
+        wait_for_viewport_transition(page)
 
         # Click search button
         page.locator("#mobile-icon-bar button[title='Search']").click()
-        page.wait_for_timeout(100)
+        # Wait for search bar transition
+        wait_for_element_transition(page, "#mobile-search-bar")
 
         # Search bar should appear, icon bar should hide
         expect(page.locator("#mobile-search-bar")).to_be_visible()

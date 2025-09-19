@@ -3,23 +3,21 @@
 import pytest
 import re
 from playwright.sync_api import Page, expect
+from test_constants import MAX_WAIT_MS
+from test_helpers import (
+    wait_for_htmx_complete,
+    wait_for_page_ready,
+    wait_for_htmx_settle
+)
 
 # HTMX Helper Functions for Fast Testing
-def wait_for_htmx_complete(page, timeout=5000):
-    """Wait for all HTMX requests to complete - much faster than fixed timeouts"""
-    page.wait_for_function("() => !document.body.classList.contains('htmx-request')", timeout=timeout)
-
-def wait_for_page_ready(page):
-    """Fast page ready check - waits for network idle instead of fixed timeout"""
-    page.wait_for_load_state("networkidle")
-
 
 def test_mobile_tab_active_style_updates(page: Page, test_server_url):
     """Test mobile navigation buttons work correctly (icon-based navigation)"""
     page.set_viewport_size({"width": 390, "height": 844})
-    page.goto(test_server_url, timeout=10000)
+    page.goto(test_server_url, timeout=MAX_WAIT_MS)
     # Wait for specific mobile layout element
-    page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+    page.wait_for_selector("#mobile-layout", state="visible", timeout=MAX_WAIT_MS)
 
     # Wait for page load
     wait_for_page_ready(page)
@@ -58,7 +56,6 @@ def test_mobile_tab_active_style_updates(page: Page, test_server_url):
     expect(all_posts_btn).to_be_visible()
     expect(unread_btn).to_be_visible() 
     print("✅ Navigation buttons remain visible and functional")
-
 
 if __name__ == "__main__":
     import re

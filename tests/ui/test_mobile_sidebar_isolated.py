@@ -14,18 +14,16 @@ Rather than complex cleanup logic, simpler to run this test separately.
 import pytest
 from playwright.sync_api import Page, expect
 import time
+from test_constants import MAX_WAIT_MS
+from test_helpers import (
+    wait_for_htmx_complete,
+    wait_for_page_ready,
+    wait_for_htmx_settle
+)
 
 pytestmark = pytest.mark.needs_server
 
 # HTMX Helper Functions
-def wait_for_htmx_complete(page, timeout=5000):
-    """Wait for all HTMX requests to complete"""
-    page.wait_for_function("() => !document.body.classList.contains('htmx-request')", timeout=timeout)
-
-def wait_for_page_ready(page):
-    """Wait for page ready state"""
-    page.wait_for_load_state("networkidle")
-
 
 class TestMobileSidebarIsolated:
     """Mobile sidebar tests that need isolation from parallel execution"""
@@ -33,9 +31,9 @@ class TestMobileSidebarIsolated:
     def test_mobile_sidebar_and_navigation_flow(self, page: Page, test_server_url):
         """Test mobile-specific navigation patterns"""
         page.set_viewport_size({"width": 390, "height": 844})
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=MAX_WAIT_MS)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+        page.wait_for_selector("#mobile-layout", state="visible", timeout=MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         # Ensure mobile layout and JavaScript are ready
@@ -75,7 +73,6 @@ class TestMobileSidebarIsolated:
                         if back_button.is_visible():
                             back_button.click()
                             wait_for_htmx_complete(page)
-
 
 if __name__ == "__main__":
     # Can run this file directly for testing

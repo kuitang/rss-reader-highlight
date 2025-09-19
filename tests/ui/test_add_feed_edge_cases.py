@@ -3,15 +3,14 @@
 import pytest
 from playwright.sync_api import Page, expect
 import time
+from test_constants import MAX_WAIT_MS
+from test_helpers import (
+    wait_for_htmx_complete,
+    wait_for_page_ready,
+    wait_for_htmx_settle
+)
 
 # HTMX Helper Functions for Fast Testing
-def wait_for_htmx_complete(page, timeout=5000):
-    """Wait for all HTMX requests to complete - much faster than fixed timeouts"""
-    page.wait_for_function("() => !document.body.classList.contains('htmx-request')", timeout=timeout)
-
-def wait_for_page_ready(page):
-    """Fast page ready check - waits for network idle instead of fixed timeout"""
-    page.wait_for_load_state("networkidle")
 
 @pytest.mark.skip(reason="TODO: Fix external network requests causing timeouts")
 def test_add_feed_edge_cases(page: Page, test_server_url):
@@ -25,7 +24,7 @@ def test_add_feed_edge_cases(page: Page, test_server_url):
     ]:
         print(f"\n--- Testing {viewport_name} add feed edge cases ---")
         page.set_viewport_size(viewport_size)
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         # Debug: Check if correct layout is visible
@@ -111,7 +110,7 @@ def test_add_feed_edge_cases(page: Page, test_server_url):
             add_button.click()
             
             # Wait for HTMX to complete (sidebar gets completely replaced)
-            wait_for_htmx_complete(page, timeout=3000)
+            wait_for_htmx_complete(page, timeout=MAX_WAIT_MS)
             
             # Check if form submission was processed (page remained responsive)
             page_title = page.title()

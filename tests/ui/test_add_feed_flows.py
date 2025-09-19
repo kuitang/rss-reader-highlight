@@ -10,18 +10,16 @@ import pytest
 from playwright.sync_api import sync_playwright, expect
 import time
 from datetime import datetime
+from test_constants import MAX_WAIT_MS
+from test_helpers import (
+    wait_for_htmx_complete,
+    wait_for_page_ready,
+    wait_for_htmx_settle
+)
 
 pytestmark = pytest.mark.needs_server
 
 # HTMX Helper Functions for Fast Testing
-def wait_for_htmx_complete(page, timeout=5000):
-    """Wait for all HTMX requests to complete - much faster than fixed timeouts"""
-    page.wait_for_function("() => !document.body.classList.contains('htmx-request')", timeout=timeout)
-
-def wait_for_page_ready(page):
-    """Fast page ready check - waits for network idle instead of fixed timeout"""
-    page.wait_for_load_state("networkidle")
-
 
 @pytest.mark.skip(reason="All feed submission tests - skipping per user request")
 class TestAddFeedFlows:
@@ -36,14 +34,14 @@ class TestAddFeedFlows:
         ]:
             print(f"\n{('📱' if viewport_name == 'mobile' else '🖥️')} TESTING {viewport_name.upper()} ADD FEED FLOW")
             page.set_viewport_size(viewport_size)
-            page.goto(test_server_url, timeout=10000)
+            page.goto(test_server_url, timeout=MAX_WAIT_MS)
             wait_for_page_ready(page)
             
             if viewport_name == "mobile":
                 print("=== STEP 1: Open mobile sidebar ===")
                 # Find and click hamburger menu
                 hamburger_button = page.locator('#mobile-nav-button')
-                expect(hamburger_button).to_be_visible(timeout=10000)
+                expect(hamburger_button).to_be_visible(timeout=MAX_WAIT_MS)
                 hamburger_button.click()
                 page.wait_for_selector("#mobile-sidebar", state="visible")
                 print("✓ Clicked hamburger menu")
@@ -96,7 +94,7 @@ class TestAddFeedFlows:
             print("✓ Clicked add button")
             
             # Wait for HTMX response
-            wait_for_htmx_complete(page, timeout=8000)
+            wait_for_htmx_complete(page, timeout=MAX_WAIT_MS)
             
             # Verify app stability
             expect(page.locator(layout_selector)).to_be_visible()
@@ -123,7 +121,7 @@ class TestAddFeedFlows:
         ]:
             print(f"\n{('🖥️' if viewport_name == 'desktop' else '📱')} TESTING {viewport_name.upper()} NAVIGATION AFTER FEED ADD")
             page.set_viewport_size(viewport_size)
-            page.goto(test_server_url, timeout=10000)
+            page.goto(test_server_url, timeout=MAX_WAIT_MS)
             wait_for_page_ready(page)
             
             if viewport_name == "desktop":
@@ -210,7 +208,7 @@ class TestAddFeedFlows:
     def test_duplicate_feed_handling(self, page):
         """Test handling of duplicate feed additions"""
         page.set_viewport_size({"width": 1200, "height": 800})  # Desktop for simplicity
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         print("🔄 TESTING DUPLICATE FEED HANDLING")
@@ -238,7 +236,7 @@ class TestAddFeedFlows:
     def test_invalid_url_handling(self, page):
         """Test handling of invalid URLs"""
         page.set_viewport_size({"width": 1200, "height": 800})  # Desktop
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         print("❌ TESTING INVALID URL HANDLING")
@@ -279,7 +277,7 @@ class TestAddFeedFlows:
     def test_empty_form_submission(self, page):
         """Test submission of empty form"""
         page.set_viewport_size({"width": 1200, "height": 800})  # Desktop
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         print("⭕ TESTING EMPTY FORM SUBMISSION")
@@ -301,7 +299,6 @@ class TestAddFeedFlows:
         expect(page.locator("#desktop-layout")).to_be_visible()
         expect(page).to_have_title("RSS Reader")  # App should remain stable
         print("✓ Empty form submission handled gracefully")
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
