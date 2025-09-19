@@ -12,7 +12,6 @@ from test_helpers import (
 
 # HTMX Helper Functions for Fast Testing
 
-@pytest.mark.skip(reason="TODO: Fix external network requests causing timeouts")
 def test_add_feed_edge_cases(page: Page, test_server_url):
     """Test various add feed scenarios to find issues on both mobile and desktop"""
     
@@ -27,16 +26,16 @@ def test_add_feed_edge_cases(page: Page, test_server_url):
         page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
         
-        # Debug: Check if correct layout is visible
-        desktop_layout_visible = page.locator("#desktop-layout").is_visible()
-        mobile_layout_visible = page.locator("#mobile-layout").is_visible()
-        print(f"  Debug: Desktop layout visible: {desktop_layout_visible}, Mobile layout visible: {mobile_layout_visible}")
+        # Debug: Check if correct layout elements are visible
+        app_root_visible = page.locator("#app-root").is_visible()
+        feeds_sidebar_visible = page.locator("#feeds").is_visible()
+        print(f"  Debug: App root visible: {app_root_visible}, Feeds sidebar visible: {feeds_sidebar_visible}")
         
         # Debug: Check what elements are available
         if viewport_name == "desktop":
-            sidebar_exists = page.locator("#sidebar").count() > 0
-            print(f"  Debug: #sidebar exists: {sidebar_exists}")
-            if not sidebar_exists:
+            feeds_exists = page.locator("#feeds").count() > 0
+            print(f"  Debug: #feeds exists: {feeds_exists}")
+            if not feeds_exists:
                 # Look for form elements directly
                 input_exists = page.locator('input[placeholder="Enter RSS URL"]').count() > 0
                 button_exists = page.locator('button').count() > 0
@@ -46,28 +45,28 @@ def test_add_feed_edge_cases(page: Page, test_server_url):
         
         # Set up viewport-specific selectors
         if viewport_name == "mobile":
-            # Open mobile sidebar
-            hamburger = page.locator('#mobile-nav-button')
+            # Open mobile sidebar using the correct hamburger button
+            hamburger = page.locator('[data-testid="hamburger-btn"]').first
             if hamburger.is_visible():
                 hamburger.click()
-                page.wait_for_selector("#mobile-sidebar", state="visible")
-                feed_input = page.locator('#mobile-sidebar input[name="new_feed_url"]')
-                add_button = page.locator('#mobile-sidebar button.add-feed-button')
+                # Wait for drawer to open - sidebar should become visible
+                page.wait_for_selector("#feeds", state="visible", timeout=constants.MAX_WAIT_MS)
+                feed_input = page.locator('#feeds input[name="new_feed_url"]')
+                add_button = page.locator('#feeds button.add-feed-button')
             else:
-                print(f"  ⚠️ Mobile navigation not available, skipping {viewport_name}")
+                print(f"  ⚠️ Mobile navigation button not available, skipping {viewport_name}")
                 continue
         else:
-            # Desktop selectors - try multiple approaches
-            # First try the specific sidebar selectors
-            feed_input = page.locator('#sidebar input[name="new_feed_url"]')
-            add_button = page.locator('#sidebar button.add-feed-button')
-            
-            # If sidebar elements aren't found, try direct selectors
+            # Desktop: sidebar is always visible, direct selectors
+            feed_input = page.locator('#feeds input[name="new_feed_url"]')
+            add_button = page.locator('#feeds button.add-feed-button')
+
+            # If sidebar elements aren't found, try fallback selectors
             if feed_input.count() == 0:
-                print(f"  Debug: Sidebar input not found, trying direct selectors")
+                print(f"  Debug: #feeds input not found, trying direct selectors")
                 feed_input = page.locator('input[placeholder="Enter RSS URL"]')
-                add_button = page.locator('button.add-feed-button')  # Use the specific class
-            
+                add_button = page.locator('button.add-feed-button')
+
             # Debug what we found
             print(f"  Debug: Found {feed_input.count()} input(s), {add_button.count()} button(s)")
     
@@ -84,18 +83,23 @@ def test_add_feed_edge_cases(page: Page, test_server_url):
             # Locate fresh elements after potential HTMX updates
             if viewport_name == "mobile":
                 # Ensure mobile sidebar is open
-                if not page.locator("#mobile-sidebar").is_visible():
-                    hamburger = page.locator('#mobile-nav-button')
+                if not page.locator("#feeds").is_visible():
+                    hamburger = page.locator('[data-testid="hamburger-btn"]').first
                     if hamburger.is_visible():
                         hamburger.click()
-                        page.wait_for_selector("#mobile-sidebar", state="visible")
-                
-                feed_input = page.locator('#mobile-sidebar input[name="new_feed_url"]')
-                add_button = page.locator('#mobile-sidebar button.add-feed-button')
+                        page.wait_for_selector("#feeds", state="visible", timeout=constants.MAX_WAIT_MS)
+
+                feed_input = page.locator('#feeds input[name="new_feed_url"]')
+                add_button = page.locator('#feeds button.add-feed-button')
             else:
-                # Desktop: locate current form elements
-                feed_input = page.locator('input[placeholder="Enter RSS URL"]')
-                add_button = page.locator('button.add-feed-button')
+                # Desktop: locate current form elements in feeds sidebar
+                feed_input = page.locator('#feeds input[name="new_feed_url"]')
+                add_button = page.locator('#feeds button.add-feed-button')
+
+                # Fallback if not found
+                if feed_input.count() == 0:
+                    feed_input = page.locator('input[placeholder="Enter RSS URL"]')
+                    add_button = page.locator('button.add-feed-button')
             
             # Clear and enter URL (with error handling)
             try:

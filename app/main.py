@@ -152,7 +152,7 @@ def three_pane_layout(data, detail_content=None):
     )(
         Div(cls="flex items-center gap-4")(
             # Button container with overlapping buttons
-            Div(cls="relative")(
+            Div(cls="relative min-h-[44px] min-w-[44px]")(
                 # Hamburger menu button
                 Button(
                     UkIcon('menu'),
@@ -166,12 +166,68 @@ def three_pane_layout(data, detail_content=None):
                     hx_get="/",
                     hx_target="#detail-content",
                     hx_swap="innerHTML",
-                    cls="back-btn absolute top-0 left-0 p-3 rounded border hover:bg-secondary min-h-[44px] min-w-[44px]",
+                    cls="back-btn absolute top-0 left-0 p-3 rounded border hover:bg-secondary min-h-[44px] min-w-[44px] z-10",
                     data_testid="back-button"
                 )
             ),
-            # Feed name/title
-            H1(feed_name, cls="text-lg font-semibold")
+            # Feed name/title with flex-1 to push buttons to the right
+            H1(feed_name, cls="text-lg font-semibold flex-1"),
+
+            # Action buttons container
+            Div(
+                cls="flex items-center space-x-2",
+                id="icon-bar"
+            )(
+                Button(
+                    UkIcon('list'),
+                    hx_get=f"/?feed_id={data.feed_id}&unread=0" if hasattr(data, 'feed_id') and data.feed_id else "/?unread=0",
+                    hx_target="#feeds-list-container",
+                    hx_swap="outerHTML",
+                    hx_push_url="true",
+                    cls=f"p-2 rounded hover:bg-secondary {'bg-secondary' if not data.unread else ''}",
+                    title="All Posts",
+                    data_testid="all-posts-btn"
+                ),
+                Button(
+                    UkIcon('mail'),
+                    hx_get=f"/?feed_id={data.feed_id}" if hasattr(data, 'feed_id') and data.feed_id else "/",
+                    hx_target="#feeds-list-container",
+                    hx_swap="outerHTML",
+                    hx_push_url="true",
+                    cls=f"p-2 rounded hover:bg-secondary {'bg-secondary' if data.unread else ''}",
+                    title="Unread",
+                    data_testid="unread-btn"
+                ),
+                Button(
+                    UkIcon('search'),
+                    onclick="var bar = document.getElementById('icon-bar'); var search = document.getElementById('search-bar'); bar.style.display='none'; search.style.display='flex'; search.querySelector('input').focus();",
+                    cls="p-2 rounded hover:bg-secondary",
+                    title="Search",
+                    data_testid="search-btn"
+                )
+            ),
+
+            # Expandable search bar (hidden by default)
+            Div(
+                cls="items-center flex-1 ml-4",
+                id="search-bar",
+                style="display: none;"
+            )(
+                Div(cls="uk-inline w-full")(
+                    Input(
+                        placeholder="Search posts",
+                        cls="w-full pr-8",
+                        id="search-input",
+                        uk_filter_control=""
+                    ),
+                    Button(
+                        UkIcon('x', cls="w-4 h-4"),
+                        onclick="var bar = document.getElementById('icon-bar'); var search = document.getElementById('search-bar'); search.style.display='none'; bar.style.display='flex';",
+                        cls="uk-form-icon uk-form-icon-flip p-1 hover:text-red-500 cursor-pointer absolute right-1 top-1/2 -translate-y-1/2",
+                        title="Close search"
+                    )
+                )
+            )
         )
     )
 
@@ -221,9 +277,7 @@ def three_pane_layout(data, detail_content=None):
             )(
                 detail_content if detail_content else Div(cls="placeholder")  # Use provided content or placeholder
             )
-        ),
-        # Hidden target for surgical updates
-        Div(id="surgical-update-target", style="display:none;")
+        )
     )
 
 # Removed: mobile_chrome function - using unified layout now
@@ -249,18 +303,18 @@ def viewport_styles():
             z-index: 40;
         }
 
-        /* Desktop button visibility (min-width: 1024px) */
+        /* Simplified button visibility - each header has only one button */
+
+        /* Desktop (min-width: 1024px): Hide both buttons */
         @media (min-width: 1024px) {
-            /* Hide all buttons on desktop (both headers) */
-            #summary .hamburger-btn, #summary .back-btn,
-            #detail .hamburger-btn, #detail .back-btn {
+            .hamburger-btn, .back-btn {
                 display: none !important;
             }
         }
 
-        /* Mobile button visibility (max-width: 1023px) */
+        /* Mobile (max-width: 1023px): Show appropriate button per section */
         @media (max-width: 1023px) {
-            /* Default state (feed list view): show hamburger in summary, hide back */
+            /* Summary header: Only show hamburger, never back */
             #summary .hamburger-btn {
                 display: block !important;
             }
@@ -268,17 +322,32 @@ def viewport_styles():
                 display: none !important;
             }
 
-            /* Detail section: always hide hamburger, only show back when content present */
+            /* Detail header: Only show back, never hamburger */
             #detail .hamburger-btn {
                 display: none !important;
             }
             #detail .back-btn {
-                display: none !important; /* Hidden by default, shown only when detail has content */
+                display: block !important;
             }
 
-            /* When detail has actual content, ensure back button is visible */
-            #app-root:has(#detail-content > :not(.placeholder)) #detail .back-btn {
-                display: block !important;
+            /* On very small screens, hide action buttons to save space */
+            @media (max-width: 480px) {
+                #icon-bar, #search-bar {
+                    display: none !important;
+                }
+                /* Also hide individual buttons to prevent inline-flex override */
+                #icon-bar button, #search-bar button {
+                    display: none !important;
+                }
+            }
+
+            /* On medium mobile screens, show action buttons but constrain them */
+            @media (min-width: 481px) {
+                #icon-bar {
+                    flex-shrink: 1;
+                    min-width: 0;
+                    overflow: hidden;
+                }
             }
         }
 
@@ -377,38 +446,25 @@ def viewport_styles():
         }
     }
 
-    /* CSS-driven styling based on data-unread attribute */
+    /* Note: Title styling and blue dot styling now handled via inline styles in surgical updates */
+    """), Script("""
+    document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('click', function(event) {
+            const searchBar = document.getElementById('search-bar');
+            const iconBar = document.getElementById('icon-bar');
 
-    /* Feed item title styling - consistent structure, state-driven appearance */
-    li[id^='feed-item-'] .feed-title {
-        line-height: 1.25; /* Consistent line height */
-        display: inline; /* Consistent display mode */
-        font-size: inherit; /* Inherit parent font-size */
-    }
+            if (searchBar && iconBar) {
+                const isSearchVisible = searchBar.style.display !== 'none';
+                const clickedInsideSearch = searchBar.contains(event.target);
+                const clickedSearchButton = event.target.closest('button[title="Search"]');
 
-    /* Title weight based on read state */
-    li[data-unread="true"] .feed-title {
-        font-weight: 600; /* font-semibold equivalent for unread items */
-    }
-    li[data-unread="false"] .feed-title {
-        font-weight: normal; /* normal weight for read items */
-    }
-
-    /* Blue dot visibility based on read state */
-    li[data-unread="true"] .blue-dot {
-        opacity: 1; /* visible for unread items */
-    }
-    li[data-unread="false"] .blue-dot {
-        opacity: 0; /* hidden for read items */
-    }
-
-    /* Blue dot space reservation: use flexbox for reliable spacing */
-    li[id^='feed-item-'] > div:first-child {
-        display: flex;
-        align-items: center;
-        min-height: 1.25rem; /* 1.25 * line-height for consistent height */
-        gap: 0.5rem; /* Space between title and blue dot */
-    }
+                if (isSearchVisible && !clickedInsideSearch && !clickedSearchButton) {
+                    searchBar.style.display = 'none';
+                    iconBar.style.display = 'flex';
+                }
+            }
+        });
+    });
     """)
 
 def create_tab_container(feed_name, feed_id, unread_only):
@@ -892,7 +948,6 @@ def FeedItem(item, unread_view=False, feed_id=None, page=1):
         "cls": cls,
         "id": f"feed-item-{item['id']}",
         "data_testid": "feed-item",
-        "data_unread": "true" if not is_read else "false",
         "hx_get": item_url,
         "hx_target": "#detail-content",
         "hx_trigger": "click",
@@ -900,10 +955,16 @@ def FeedItem(item, unread_view=False, feed_id=None, page=1):
     }
     
     return Li(
-        # Title row with blue dot - consistent structure, CSS-driven styling
-        DivFullySpaced(
-            Span(item['title'], cls='feed-title'),  # CSS handles bold via data-unread attribute
-            Span(cls='blue-dot flex h-2 w-2 rounded-full bg-blue-600')  # CSS handles opacity via data-unread attribute
+        # Title row with blue dot - wrapped in container for surgical updates
+        Div(
+            DivFullySpaced(
+                Span(item['title'],
+                     style=f"font-weight: {'600' if not is_read else 'normal'}; line-height: 1.25; display: inline; font-size: inherit;"),
+                Span(cls='flex h-2 w-2 rounded-full bg-blue-600',
+                     style=f"opacity: {'1' if not is_read else '0'};")
+            ),
+            id=f"title-container-{item['id']}",
+            style="display: flex; align-items: center; min-height: 1.25rem; gap: 0.5rem;"
         ),
         # Source and time row - source left, time right
         DivFullySpaced(
@@ -1136,7 +1197,7 @@ def index(htmx, sess, feed_id: int = None, unread: bool = True, folder_id: int =
     # HTMX fragment updates
     if htmx and getattr(htmx, 'request', None):
         # Return updated summary list for pagination/filtering
-        if getattr(htmx, 'target', None) == 'summary':
+        if getattr(htmx, 'target', None) in ['summary', 'feeds-list-container']:
             return FeedsContent(data.session_id, data.feed_id, data.unread, data.page, data=data)
         # Clear detail to show summary (for back button)
         elif getattr(htmx, 'target', None) == 'detail-content':
@@ -1189,12 +1250,22 @@ def show_item(item_id: int, htmx, sess, unread_view: bool = False, feed_id: int 
         return (layout, viewport_styles())
 
     # HTMX request - return fragment(s)
-    # If item was unread, return detail view + surgical attribute update
+    # If item was unread, return detail view + surgical container update
     if was_unread:
-        # Surgical update: use a temporary div with script for proper execution
-        surgical_update = NotStr(f'<div hx-swap-oob="outerHTML:#surgical-update-target"><script>document.getElementById("feed-item-{item_id}").setAttribute("data-unread", "false");</script></div>')
+        # Surgical update: return updated title container with read state styling
+        updated_title_container = Div(
+            DivFullySpaced(
+                Span(item['title'],
+                     style="font-weight: normal; line-height: 1.25; display: inline; font-size: inherit;"),
+                Span(cls='flex h-2 w-2 rounded-full bg-blue-600',
+                     style="opacity: 0;")
+            ),
+            id=f"title-container-{item_id}",
+            style="display: flex; align-items: center; min-height: 1.25rem; gap: 0.5rem;",
+            hx_swap_oob="true"
+        )
 
-        return (ItemDetailView(item), surgical_update)
+        return (ItemDetailView(item), updated_title_container)
     else:
         # Item was already read, just return detail view
         return ItemDetailView(item)

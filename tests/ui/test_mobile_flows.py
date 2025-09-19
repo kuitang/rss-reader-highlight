@@ -10,6 +10,7 @@ Combines functionality from:
 import pytest
 from playwright.sync_api import Page, expect
 import time
+import re
 import test_constants as constants
 from test_helpers import (
     wait_for_htmx_complete,
@@ -37,18 +38,20 @@ class TestMobileFlows:
     def test_mobile_post_navigation_htmx(self, page: Page, test_server_url):
         """Test that mobile post navigation uses HTMX without full page reloads"""
         
-        # Check that we have the mobile layout
-        expect(page.locator("#mobile-layout")).to_be_visible()
+        # Check that we have the mobile viewport (unified responsive layout)
+        expect(page.locator("#app-root")).to_be_visible()
+        # In mobile viewport, feeds sidebar should be hidden
+        expect(page.locator("#feeds")).to_have_class(re.compile(r"hidden"))
         
         # Get initial page state
         initial_url = page.url
         
-        # Find first post - updated selector to match app.py (mobile-feed-item prefix)
-        first_post = page.locator("li[id^='mobile-feed-item-']").first
+        # Find first post - updated selector to match unified layout
+        first_post = page.locator("li[data-testid='feed-item']").first
         expect(first_post).to_be_visible(timeout=constants.MAX_WAIT_MS)
         
-        # Store initial HTML to detect full reload
-        initial_header_html = page.locator("#mobile-header").inner_html()
+        # Store initial HTML to detect full reload (use summary for mobile)
+        initial_header_html = page.locator("#summary").inner_html()
         
         # Click on first post - should use HTMX
         with page.expect_request(lambda req: "/item/" in req.url) as request_info:
@@ -58,14 +61,14 @@ class TestMobileFlows:
         request = request_info.value
         assert request.headers.get("hx-request") == "true", "Post click didn't use HTMX"
         
-        # Wait for article to load in main content
-        page.wait_for_selector("#main-content #item-detail", timeout=constants.MAX_WAIT_MS)
+        # Wait for article to load in detail view
+        page.wait_for_selector("#detail", timeout=constants.MAX_WAIT_MS)
         
         # Verify URL changed (for shareability) 
         assert "/item/" in page.url, "URL didn't update for article"
         
-        # Verify back button is shown - updated selector to match app.py CSS classes
-        back_button = page.locator("#mobile-nav-button")  # Back button is first button
+        # Verify back button is shown - updated selector for unified layout
+        back_button = page.locator("#summary [data-testid='back-button']")  # Back button in summary view
         expect(back_button).to_be_visible()
         
         # Verify it's actually a back button by checking for arrow-left icon
@@ -77,26 +80,26 @@ class TestMobileFlows:
         wait_for_htmx_complete(page)  # OPTIMIZED: Wait for any HTMX operation to complete
         
         # Wait for feed list to return
-        page.wait_for_selector("li[id^='mobile-feed-item-']", timeout=constants.MAX_WAIT_MS)
+        page.wait_for_selector("li[data-testid='feed-item']", timeout=constants.MAX_WAIT_MS)
         
         # Verify we're back at the list by checking for feed items (more reliable than container visibility)
-        expect(page.locator("li[id^='mobile-feed-item-']").first).to_be_visible()
+        expect(page.locator("li[data-testid='feed-item']").first).to_be_visible()
     
     def test_mobile_feed_filter_preserved(self, page: Page, test_server_url):
         """Test that feed filter state is preserved during navigation"""
         
         # Open mobile sidebar - updated selector
-        menu_button = page.locator('#mobile-nav-button')
+        menu_button = page.locator('#summary [data-testid="hamburger-btn"]')
         menu_button.click()
         
         # Wait for sidebar - check for hidden attribute
-        page.wait_for_selector("#mobile-sidebar", state="visible")
-        sidebar = page.locator("#mobile-sidebar")
+        page.wait_for_selector("#feeds", state="visible")
+        sidebar = page.locator("#feeds")
         # Sidebar should be visible (no hidden attribute or hidden=false)
         expect(sidebar).to_be_visible()
         
         # Click on a specific feed (not "All Feeds")
-        feed_links = page.locator("#mobile-sidebar a[href*='feed_id=']")
+        feed_links = page.locator("#feeds a[href*='feed_id=']")
         if feed_links.count() > 0:
             first_feed = feed_links.first
             feed_url = first_feed.get_attribute("href")
@@ -115,7 +118,7 @@ class TestMobileFlows:
             expect(sidebar).to_have_attribute("hidden", "true")
             
             # Click on a post - should preserve feed context
-            posts = page.locator("li[id^='mobile-feed-item-']")
+            posts = page.locator("li[data-testid='feed-item']")
             if posts.count() > 0:
                 first_post = posts.first
                 first_post.click()
@@ -125,7 +128,7 @@ class TestMobileFlows:
                 assert f"feed_id={feed_id}" in page.url or "/item/" in page.url
                 
                 # Go back - should return to filtered feed view
-                back_button = page.locator("#mobile-nav-button")
+                back_button = page.locator("#summary [data-testid='back-button']")
                 back_button.click()
                 wait_for_htmx_complete(page)  # FIXED: Don't expect sidebar visible after back navigation
                 
@@ -136,25 +139,24 @@ class TestMobileFlows:
     def test_mobile_persistent_header_visibility(self, page: Page, test_server_url):
         """Test mobile header search functionality (moved from persistent header to main header)"""
         
-        # Verify we're in mobile mode
-        desktop_layout = page.locator("#desktop-layout")
-        mobile_content = page.locator("#main-content")
+        # Verify we're in mobile mode (unified responsive layout)
+        expect(page.locator("#app-root")).to_be_visible()
+        # In mobile viewport, feeds sidebar should be hidden
+        expect(page.locator("#feeds")).to_have_class(re.compile(r"hidden"))
+        expect(page.locator("#summary")).to_be_visible()
         
-        expect(desktop_layout).to_be_hidden()
-        expect(mobile_content).to_be_visible()
-        
-        # Check for main header with icon bar (new structure)
-        mobile_top_bar = page.locator("#mobile-top-bar")
-        expect(mobile_top_bar).to_be_visible()
+        # Check for unified header and navigation (new structure)
+        expect(page.locator("#summary")).to_be_visible()
+        expect(page.locator("[data-testid='hamburger-btn']")).to_be_visible()
         
         # Click search button to expand search
-        # Mobile viewport test - use mobile search button
-        search_button = page.locator('#mobile-icon-bar button[title="Search"]')
+        # Mobile viewport test - use unified search button
+        search_button = page.locator('[data-testid="search-btn"]')
         expect(search_button).to_be_visible()
         search_button.click()
-        
+
         # Find search input in expanded search bar
-        search_input = page.locator('#mobile-search-input')
+        search_input = page.locator('#search-input')
         expect(search_input).to_be_visible()
         
         # Enter some search text to create state

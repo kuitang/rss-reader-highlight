@@ -1,0 +1,38 @@
+# Surgical OOB Update Attempt Summary
+
+## Problem
+The current OOB (out-of-band) update mechanism for marking items as read fails after the first item because it replaces the `#surgical-update-target` element entirely with `outerHTML`, removing it from the DOM.
+
+## Current Implementation
+- Uses `hx-swap-oob="outerHTML:#surgical-update-target"` to inject a script
+- Script updates `data-unread` attribute on the feed item
+- CSS reacts to attribute change (hides blue dot, unbolds title)
+- **Bug**: Target element is destroyed after first use
+
+## Solutions Explored
+
+### 1. Minimal Script Injection (90 bytes)
+- Use `hx-swap-oob="beforeend:body"` to append script
+- No persistent target needed
+- Smallest data transfer
+
+### 2. Return Updated FeedItem Component (~500 bytes)
+- Return complete Li element with `hx-swap-oob="true"`
+- Includes title, description, timestamps
+- Too much redundant data
+
+### 3. Container Div for Changed Elements (~150 bytes)
+- Wrap only title/blue dot in container
+- Swap just the container via OOB
+- Still sends redundant title text
+
+### 4. Attribute-Only Swap Extension (60 bytes ideal)
+- Searched for `oob-attribute-swap` extension
+- No official HTMX extension exists for this
+- Would need custom extension code
+
+## Recommendation
+Fix the current implementation by ensuring the target element persists:
+- Change to `hx-swap-oob="innerHTML:#surgical-update-target"`
+- Or recreate the target element with each update
+- Or use `beforeend:body` to avoid needing a persistent target
