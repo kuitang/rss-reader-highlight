@@ -629,31 +629,21 @@ def initialize_worker_system():
     global feed_worker, queue_manager
     
     timestamp = datetime.now().strftime('%H:%M:%S.%f')[:-3]
-    print(f"[{timestamp}] DEBUG: initialize_worker_system() called")
-    print(f"[{timestamp}] DEBUG: Before init - feed_worker: {feed_worker}, queue_manager: {queue_manager}")
-    
+
     if feed_worker is None:
-        print(f"[{timestamp}] DEBUG: Creating new worker and queue manager...")
         feed_worker = FeedUpdateWorker()
-        print(f"[{timestamp}] DEBUG: Created feed_worker: {feed_worker}")
-        
+
         queue_manager = FeedQueueManager(feed_worker)
-        print(f"[{timestamp}] DEBUG: Created queue_manager: {queue_manager}")
-        
+
         feed_worker.start()
-        print(f"[{timestamp}] DEBUG: Worker started")
-        
+
         # Queue all feeds initially for first startup
         all_feeds = FeedModel.get_feeds_to_update(max_age_minutes=60)  # Feeds older than 1 hour
-        print(f"[{timestamp}] DEBUG: Found {len(all_feeds)} feeds to queue")
-        
+
         for feed in all_feeds:
             feed_worker.queue.put(feed)
-        
-        print(f"[{timestamp}] DEBUG: After init - feed_worker: {feed_worker}, queue_manager: {queue_manager}")
+
         logger.info(f"[{timestamp}] Worker system initialized, queued {len(all_feeds)} feeds (PIDs: main={os.getpid()})")
-    else:
-        print(f"[{timestamp}] DEBUG: Worker system already initialized")
 
 
 def shutdown_worker_system():

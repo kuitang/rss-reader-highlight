@@ -237,10 +237,12 @@ Tests focus on **complex workflows that broke during development**, not trivial 
 **By default, tests should verify functionality in BOTH desktop and mobile viewports** unless the test explicitly targets one viewport:
 
 ```python
-# Test both viewports
+import test_constants as constants
+
+# Test both viewports - use constants instead of hardcoded values
 viewports = [
-    {"width": 1400, "height": 900},  # Desktop
-    {"width": 390, "height": 844}    # Mobile
+    constants.DESKTOP_VIEWPORT,  # Desktop: {"width": 1400, "height": 900}
+    constants.MOBILE_VIEWPORT     # Mobile: {"width": 390, "height": 844}
 ]
 for viewport in viewports:
     page.set_viewport_size(viewport)
@@ -264,6 +266,25 @@ Use `.first` when both mobile and desktop elements exist but only one is needed:
 element = page.locator('#mobile-icon-bar, #desktop-icon-bar').first
 ```
 
+#### Test Constants and Configuration
+**ALWAYS use test_constants.py for viewport sizes and timeouts**:
+```python
+import test_constants as constants
+
+# ✅ GOOD - Use predefined constants
+page.set_viewport_size(constants.DESKTOP_VIEWPORT)     # {"width": 1400, "height": 900}
+page.set_viewport_size(constants.MOBILE_VIEWPORT)      # {"width": 390, "height": 844}
+page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT) # {"width": 1200, "height": 800}
+page.set_viewport_size(constants.MOBILE_VIEWPORT_ALT)  # {"width": 375, "height": 667}
+
+# Use consistent timeouts
+page.wait_for_selector("#element", timeout=constants.MAX_WAIT_MS)
+
+# ❌ BAD - Hardcoded values
+page.set_viewport_size({"width": 1200, "height": 800})
+page.wait_for_selector("#element", timeout=5000)
+```
+
 #### ⚠️ MANDATORY Rules for Writing Playwright Tests
 
 1. **Selector Strategy - Use Semantic, Not Styling**
@@ -285,18 +306,19 @@ element = page.locator('#mobile-icon-bar, #desktop-icon-bar').first
    time.sleep(3)
 
    # ✅ GOOD - Wait for specific selector/condition
-   page.wait_for_selector("#content", state="visible", timeout=10000)
+   page.wait_for_selector("#content", state="visible", timeout=constants.MAX_WAIT_MS)
    wait_for_htmx_complete(page)  # Waits for HTMX requests to complete
    page.wait_for_function("() => !document.body.classList.contains('htmx-request')")
    ```
 
-3. **Maximum Timeout: 10 Seconds**
+3. **Use Constants for Timeouts**
    ```python
-   # ❌ BAD - Long timeout masks real issues
+   # ❌ BAD - Hardcoded timeout values
    page.wait_for_selector("#slow-element", timeout=30000)
-
-   # ✅ GOOD - Max 10s, fail fast if something is wrong
    page.wait_for_selector("#element", timeout=10000)
+
+   # ✅ GOOD - Use predefined constants
+   page.wait_for_selector("#element", timeout=constants.MAX_WAIT_MS)
    ```
 
 4. **Handle Layout Variations**
@@ -321,7 +343,9 @@ element = page.locator('#mobile-icon-bar, #desktop-icon-bar').first
 #### Essential Helper Functions
 
 ```python
-def wait_for_htmx_complete(page, timeout=5000):
+import test_constants as constants
+
+def wait_for_htmx_complete(page, timeout=constants.MAX_WAIT_MS):
     """Wait for all HTMX requests to complete"""
     page.wait_for_function(
         "() => !document.body.classList.contains('htmx-request')",

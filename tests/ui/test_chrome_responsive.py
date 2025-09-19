@@ -2,6 +2,11 @@
 
 import pytest
 from playwright.sync_api import Page, expect
+from test_constants import MINIMAL_WAIT_MS, DESKTOP_VIEWPORT, MOBILE_VIEWPORT_ALT, MAX_WAIT_MS, DESKTOP_VIEWPORT_ALT
+from test_helpers import (
+    wait_for_viewport_transition,
+    wait_for_element_transition
+)
 
 
 class TestUnifiedChromeResponsive:
@@ -11,12 +16,12 @@ class TestUnifiedChromeResponsive:
         """Test that chrome appears correctly and doesn't scroll in both views"""
 
         # Start with desktop viewport
-        page.set_viewport_size({"width": 1400, "height": 900})
+        page.set_viewport_size(DESKTOP_VIEWPORT)
         page.goto(test_server_url)
         page.wait_for_load_state("networkidle")
 
         # Desktop view assertions
-        desktop_chrome = page.locator("#desktop-chrome-container")
+        desktop_chrome = page.locator("#universal-header")
         mobile_header = page.locator("#mobile-top-bar")
 
         # Desktop chrome should be visible
@@ -27,34 +32,39 @@ class TestUnifiedChromeResponsive:
         desktop_feed_name = desktop_chrome.locator("h3")
         expect(desktop_feed_name).to_be_visible()
         expect(desktop_feed_name).to_contain_text("All Feeds")
-        expect(page.locator("#desktop-icon-bar")).to_be_visible()
+        expect(page.locator("#icon-bar")).to_be_visible()
 
         # Verify desktop chrome has the three action buttons
-        desktop_buttons = page.locator("#desktop-icon-bar button")
+        desktop_buttons = page.locator("#icon-bar button")
         expect(desktop_buttons).to_have_count(3)
 
         # Test scrolling in desktop - chrome should stay fixed
-        feeds_content = page.locator("#desktop-feeds-content")
+        feeds_content = page.locator("#summary")
         initial_chrome_position = desktop_chrome.bounding_box()["y"]
 
         # Scroll the feeds content
         feeds_content.evaluate("el => el.scrollTop = 200")
-        page.wait_for_timeout(100)  # Small wait for scroll
+        # Wait for scroll to complete
+        page.wait_for_function(
+            "(selector) => document.querySelector(selector).scrollTop === 200",
+            arg="#summary",
+            timeout=MAX_WAIT_MS
+        )
 
         # Chrome should remain in same position (not scroll)
         scrolled_chrome_position = desktop_chrome.bounding_box()["y"]
         assert initial_chrome_position == scrolled_chrome_position, "Desktop chrome should not scroll"
 
         # Switch to mobile viewport
-        page.set_viewport_size({"width": 375, "height": 667})
-        page.wait_for_timeout(500)  # Wait for responsive transition
+        page.set_viewport_size(MOBILE_VIEWPORT_ALT)
+        wait_for_viewport_transition(page)
 
         # Mobile view assertions
         expect(desktop_chrome).to_be_hidden()
         expect(mobile_header).to_be_visible()
 
         # Check mobile header has hamburger button AND feed name
-        mobile_nav_button = page.locator("#mobile-nav-button")
+        mobile_nav_button = page.locator("#summary [data-testid='hamburger-btn']")
         expect(mobile_nav_button).to_be_visible()
 
         # Verify hamburger icon is present
@@ -66,17 +76,22 @@ class TestUnifiedChromeResponsive:
         expect(mobile_feed_name).to_contain_text("All Feeds")
 
         # Check mobile has the same action buttons
-        expect(page.locator("#mobile-icon-bar")).to_be_visible()
-        mobile_buttons = page.locator("#mobile-icon-bar button")
+        expect(page.locator("#icon-bar")).to_be_visible()
+        mobile_buttons = page.locator("#icon-bar button")
         expect(mobile_buttons).to_have_count(3)
 
         # Test scrolling in mobile - header should stay fixed
-        main_content = page.locator("#main-content")
+        main_content = page.locator("#summary")
         initial_header_position = mobile_header.bounding_box()["y"]
 
         # Scroll the main content
         main_content.evaluate("el => el.scrollTop = 200")
-        page.wait_for_timeout(100)  # Small wait for scroll
+        # Wait for scroll to complete
+        page.wait_for_function(
+            "(selector) => document.querySelector(selector).scrollTop === 200",
+            arg="#summary",
+            timeout=MAX_WAIT_MS
+        )
 
         # Mobile header should remain fixed at top
         scrolled_header_position = mobile_header.bounding_box()["y"]
@@ -91,17 +106,17 @@ class TestUnifiedChromeResponsive:
 
         # Test multiple viewport changes
         viewports = [
-            {"width": 1400, "height": 900, "expect_desktop": True},
+            {**DESKTOP_VIEWPORT, "expect_desktop": True},
             {"width": 800, "height": 600, "expect_desktop": False},
-            {"width": 1200, "height": 800, "expect_desktop": True},
-            {"width": 375, "height": 667, "expect_desktop": False},
+            {**DESKTOP_VIEWPORT_ALT, "expect_desktop": True},
+            {**MOBILE_VIEWPORT_ALT, "expect_desktop": False},
         ]
 
         for viewport in viewports:
             page.set_viewport_size({"width": viewport["width"], "height": viewport["height"]})
-            page.wait_for_timeout(300)  # Wait for transition
+            wait_for_viewport_transition(page)
 
-            desktop_chrome = page.locator("#desktop-chrome-container")
+            desktop_chrome = page.locator("#universal-header")
             mobile_header = page.locator("#mobile-top-bar")
 
             if viewport["expect_desktop"]:
@@ -109,13 +124,13 @@ class TestUnifiedChromeResponsive:
                 expect(mobile_header).to_be_hidden()
                 # Verify desktop chrome content
                 expect(desktop_chrome.locator("h3")).to_be_visible()
-                expect(page.locator("#desktop-icon-bar")).to_be_visible()
+                expect(page.locator("#icon-bar")).to_be_visible()
             else:
                 expect(desktop_chrome).to_be_hidden()
                 expect(mobile_header).to_be_visible()
                 # Verify mobile chrome content
-                expect(page.locator("#mobile-nav-button")).to_be_visible()
-                expect(page.locator("#mobile-icon-bar")).to_be_visible()
+                expect(page.locator("#summary [data-testid='hamburger-btn']")).to_be_visible()
+                expect(page.locator("#icon-bar")).to_be_visible()
 
     def test_chrome_action_buttons_consistent(self, page: Page, test_server_url: str):
         """Test that action buttons work consistently in both views"""
@@ -124,29 +139,29 @@ class TestUnifiedChromeResponsive:
         page.wait_for_load_state("networkidle")
 
         # Test in desktop view first
-        page.set_viewport_size({"width": 1400, "height": 900})
+        page.set_viewport_size(DESKTOP_VIEWPORT)
 
         # Click "All Posts" in desktop
-        page.locator("#desktop-icon-bar button[title='All Posts']").click()
+        page.locator("#icon-bar button[title='All Posts']").first.click()
         page.wait_for_load_state("networkidle")
         expect(page).to_have_url(f"{test_server_url}/?unread=0")
 
         # Go back to unread
-        page.locator("#desktop-icon-bar button[title='Unread']").click()
+        page.locator("#icon-bar button[title='Unread']").first.click()
         page.wait_for_load_state("networkidle")
         expect(page).to_have_url(f"{test_server_url}/")
 
         # Switch to mobile and test same functionality
-        page.set_viewport_size({"width": 375, "height": 667})
-        page.wait_for_timeout(300)
+        page.set_viewport_size(MOBILE_VIEWPORT_ALT)
+        wait_for_viewport_transition(page)
 
         # Click "All Posts" in mobile
-        page.locator("#mobile-icon-bar button[title='All Posts']").click()
+        page.locator("#icon-bar button[title='All Posts']").first.click()
         page.wait_for_load_state("networkidle")
         expect(page).to_have_url(f"{test_server_url}/?unread=0")
 
         # Go back to unread
-        page.locator("#mobile-icon-bar button[title='Unread']").click()
+        page.locator("#icon-bar button[title='Unread']").first.click()
         page.wait_for_load_state("networkidle")
         expect(page).to_have_url(f"{test_server_url}/")
 
@@ -157,8 +172,8 @@ class TestUnifiedChromeResponsive:
         page.wait_for_load_state("networkidle")
 
         # Desktop view - verify initial feed name
-        page.set_viewport_size({"width": 1400, "height": 900})
-        desktop_feed_name = page.locator("#desktop-chrome-container h3")
+        page.set_viewport_size(DESKTOP_VIEWPORT)
+        desktop_feed_name = page.locator("#universal-header h1")
         expect(desktop_feed_name).to_contain_text("All Feeds")
 
         # Click on a specific feed in desktop sidebar (if available)
@@ -172,8 +187,8 @@ class TestUnifiedChromeResponsive:
             expect(desktop_feed_name).not_to_contain_text("All Feeds")
 
         # Mobile view - verify feed name is also shown
-        page.set_viewport_size({"width": 375, "height": 667})
-        page.wait_for_timeout(300)
+        page.set_viewport_size(MOBILE_VIEWPORT_ALT)
+        wait_for_viewport_transition(page)
 
         mobile_feed_name = page.locator("#mobile-top-bar h3")
         expect(mobile_feed_name).to_be_visible()
@@ -191,15 +206,16 @@ class TestUnifiedChromeResponsive:
         page.wait_for_load_state("networkidle")
 
         # Desktop search test
-        page.set_viewport_size({"width": 1400, "height": 900})
+        page.set_viewport_size(DESKTOP_VIEWPORT)
 
         # Click search button
-        page.locator("#desktop-icon-bar button[title='Search']").click()
-        page.wait_for_timeout(100)
+        page.locator("#icon-bar button[title='Search']").first.click()
+        # Wait for search bar transition
+        wait_for_element_transition(page, "#search-bar")
 
         # Search bar should appear, icon bar should hide
-        expect(page.locator("#desktop-search-bar")).to_be_visible()
-        expect(page.locator("#desktop-icon-bar")).to_be_hidden()
+        expect(page.locator("#search-bar")).to_be_visible()
+        expect(page.locator("#icon-bar")).to_be_hidden()
 
         # Type in search
         search_input = page.locator("#desktop-search-input")
@@ -207,28 +223,29 @@ class TestUnifiedChromeResponsive:
         search_input.fill("Claude")
 
         # Close search
-        page.locator("#desktop-search-bar button[title='Close search']").click()
-        expect(page.locator("#desktop-search-bar")).to_be_hidden()
-        expect(page.locator("#desktop-icon-bar")).to_be_visible()
+        page.locator("#search-bar button[title='Close search']").click()
+        expect(page.locator("#search-bar")).to_be_hidden()
+        expect(page.locator("#icon-bar")).to_be_visible()
 
         # Mobile search test
-        page.set_viewport_size({"width": 375, "height": 667})
-        page.wait_for_timeout(300)
+        page.set_viewport_size(MOBILE_VIEWPORT_ALT)
+        wait_for_viewport_transition(page)
 
         # Click search button
-        page.locator("#mobile-icon-bar button[title='Search']").click()
-        page.wait_for_timeout(100)
+        page.locator("#icon-bar button[title='Search']").first.click()
+        # Wait for search bar transition
+        wait_for_element_transition(page, "#search-bar")
 
         # Search bar should appear, icon bar should hide
-        expect(page.locator("#mobile-search-bar")).to_be_visible()
-        expect(page.locator("#mobile-icon-bar")).to_be_hidden()
+        expect(page.locator("#search-bar")).to_be_visible()
+        expect(page.locator("#icon-bar")).to_be_hidden()
 
         # Type in search
-        mobile_search_input = page.locator("#mobile-search-input")
+        mobile_search_input = page.locator("#search-input")
         expect(mobile_search_input).to_be_visible()
         mobile_search_input.fill("Hacker")
 
         # Close search
-        page.locator("#mobile-search-bar button[title='Close search']").click()
-        expect(page.locator("#mobile-search-bar")).to_be_hidden()
-        expect(page.locator("#mobile-icon-bar")).to_be_visible()
+        page.locator("#search-bar button[title='Close search']").click()
+        expect(page.locator("#search-bar")).to_be_hidden()
+        expect(page.locator("#icon-bar")).to_be_visible()

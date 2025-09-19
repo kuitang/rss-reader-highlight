@@ -1,0 +1,939 @@
+🧪 RSS Reader Test Suite
+========================
+
+🔬 Running core tests...
+============================= test session starts ==============================
+platform linux -- Python 3.11.2, pytest-8.4.2, pluggy-1.6.0 -- /home/kuitang/git/rss-reader-highlight/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/kuitang/git/rss-reader-highlight
+configfile: pytest.ini
+plugins: anyio-4.10.0, asyncio-1.1.0, httpx-0.35.0, xdist-3.8.0
+asyncio: mode=Mode.AUTO, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+created: 8/8 workers
+8 workers [48 items]
+
+scheduling tests via LoadFileScheduling
+
+tests/core/test_image_extraction.py::TestImageExtraction::test_combined_images_and_text 
+tests/core/test_essential_mocks.py::TestNetworkErrorScenarios::test_connection_timeout_handling 
+tests/core/test_html_sanitization.py::TestHtmlSanitization::test_edge_cases 
+tests/core/test_smart_truncate_html.py::TestSmartTruncateHtml::test_markdown_image_conversion 
+tests/core/test_background_worker_integration.py::TestBackgroundWorkerIntegration::test_concurrent_feed_processing_with_deduplication 
+tests/core/test_item_not_found_diagnostics.py::TestItemNotFoundDiagnostics::test_item_not_found_diagnostic_generation 
+tests/core/test_direct_functions.py::TestDatabaseOperations::test_complete_user_workflow_database_operations 
+tests/core/test_feed_item_id_stability.py::test_item_id_stable_on_update 
+[gw0] [  2%] PASSED tests/core/test_image_extraction.py::TestImageExtraction::test_combined_images_and_text 
+tests/core/test_image_extraction.py::TestImageExtraction::test_empty_image_tag 
+[gw0] [  4%] PASSED tests/core/test_image_extraction.py::TestImageExtraction::test_empty_image_tag 
+tests/core/test_image_extraction.py::TestImageExtraction::test_extract_multiple_images_from_html 
+[gw0] [  6%] PASSED tests/core/test_image_extraction.py::TestImageExtraction::test_extract_multiple_images_from_html 
+tests/core/test_image_extraction.py::TestImageExtraction::test_extract_single_image_from_html 
+[gw2] [  8%] PASSED tests/core/test_essential_mocks.py::TestNetworkErrorScenarios::test_connection_timeout_handling 
+[gw0] [ 10%] PASSED tests/core/test_image_extraction.py::TestImageExtraction::test_extract_single_image_from_html 
+tests/core/test_essential_mocks.py::TestNetworkErrorScenarios::test_http_error_codes_handling 
+tests/core/test_image_extraction.py::TestImageExtraction::test_fallback_when_no_text_only_images 
+[gw0] [ 12%] PASSED tests/core/test_image_extraction.py::TestImageExtraction::test_fallback_when_no_text_only_images 
+tests/core/test_image_extraction.py::TestImageExtraction::test_figure_with_figcaption 
+[gw2] [ 14%] PASSED tests/core/test_essential_mocks.py::TestNetworkErrorScenarios::test_http_error_codes_handling 
+tests/core/test_essential_mocks.py::TestNetworkErrorScenarios::test_malformed_response_handling 
+[gw0] [ 16%] PASSED tests/core/test_image_extraction.py::TestImageExtraction::test_figure_with_figcaption 
+tests/core/test_image_extraction.py::TestImageExtraction::test_image_markdown_in_app_display 
+[gw2] [ 18%] PASSED tests/core/test_essential_mocks.py::TestNetworkErrorScenarios::test_malformed_response_handling 
+tests/core/test_essential_mocks.py::TestDatabaseConstraintScenarios::test_foreign_key_constraint_handling 
+[gw0] [ 20%] PASSED tests/core/test_image_extraction.py::TestImageExtraction::test_image_markdown_in_app_display 
+tests/core/test_image_extraction.py::TestImageExtraction::test_image_with_title_attribute 
+[gw0] [ 22%] PASSED tests/core/test_image_extraction.py::TestImageExtraction::test_image_with_title_attribute 
+tests/core/test_image_extraction.py::TestImageExtraction::test_image_without_alt_text 
+[gw0] [ 25%] PASSED tests/core/test_image_extraction.py::TestImageExtraction::test_image_without_alt_text 
+tests/core/test_image_extraction.py::TestImageExtraction::test_real_rss_feed_with_image 
+[gw0] [ 27%] PASSED tests/core/test_image_extraction.py::TestImageExtraction::test_real_rss_feed_with_image 
+tests/core/test_image_extraction.py::TestImageExtraction::test_reddit_style_thumbnail 
+[gw0] [ 29%] PASSED tests/core/test_image_extraction.py::TestImageExtraction::test_reddit_style_thumbnail 
+[gw2] [ 31%] PASSED tests/core/test_essential_mocks.py::TestDatabaseConstraintScenarios::test_foreign_key_constraint_handling 
+tests/core/test_essential_mocks.py::TestDatabaseConstraintScenarios::test_transaction_rollback_on_error 
+[gw6] [ 33%] PASSED tests/core/test_feed_item_id_stability.py::test_item_id_stable_on_update 
+[gw2] [ 35%] PASSED tests/core/test_essential_mocks.py::TestDatabaseConstraintScenarios::test_transaction_rollback_on_error 
+tests/core/test_essential_mocks.py::TestDateParsingEdgeCases::test_invalid_date_formats 
+[gw2] [ 37%] PASSED tests/core/test_essential_mocks.py::TestDateParsingEdgeCases::test_invalid_date_formats 
+tests/core/test_essential_mocks.py::TestDateParsingEdgeCases::test_timezone_handling_edge_cases 
+[gw2] [ 39%] PASSED tests/core/test_essential_mocks.py::TestDateParsingEdgeCases::test_timezone_handling_edge_cases 
+tests/core/test_essential_mocks.py::TestFeedParsingEdgeCases::test_feed_should_never_be_added_if_parsing_fails 
+[gw5] [ 41%] PASSED tests/core/test_html_sanitization.py::TestHtmlSanitization::test_edge_cases 
+tests/core/test_html_sanitization.py::TestHtmlSanitization::test_feed_parser_integration 
+[gw5] [ 43%] PASSED tests/core/test_html_sanitization.py::TestHtmlSanitization::test_feed_parser_integration 
+tests/core/test_html_sanitization.py::TestHtmlSanitization::test_item_detail_view_rendering 
+[gw5] [ 45%] PASSED tests/core/test_html_sanitization.py::TestHtmlSanitization::test_item_detail_view_rendering 
+tests/core/test_html_sanitization.py::TestHtmlSanitization::test_markdown_rendering_safety 
+[gw5] [ 47%] PASSED tests/core/test_html_sanitization.py::TestHtmlSanitization::test_markdown_rendering_safety 
+tests/core/test_html_sanitization.py::TestHtmlSanitization::test_trafilatura_sanitization 
+[gw5] [ 50%] PASSED tests/core/test_html_sanitization.py::TestHtmlSanitization::test_trafilatura_sanitization 
+[gw3] [ 52%] PASSED tests/core/test_item_not_found_diagnostics.py::TestItemNotFoundDiagnostics::test_item_not_found_diagnostic_generation 
+tests/core/test_item_not_found_diagnostics.py::TestItemNotFoundDiagnostics::test_read_toggle_diagnostic_queries 
+[gw2] [ 54%] PASSED tests/core/test_essential_mocks.py::TestFeedParsingEdgeCases::test_feed_should_never_be_added_if_parsing_fails 
+tests/core/test_essential_mocks.py::TestFeedParsingEdgeCases::test_missing_required_fields 
+[gw7] [ 56%] PASSED tests/core/test_direct_functions.py::TestDatabaseOperations::test_complete_user_workflow_database_operations 
+tests/core/test_direct_functions.py::TestUtilityFunctions::test_human_time_diff_comprehensive 
+[gw7] [ 58%] PASSED tests/core/test_direct_functions.py::TestUtilityFunctions::test_human_time_diff_comprehensive 
+tests/core/test_direct_functions.py::TestFeedManagementLogic::test_feed_update_logic 
+[gw3] [ 60%] PASSED tests/core/test_item_not_found_diagnostics.py::TestItemNotFoundDiagnostics::test_read_toggle_diagnostic_queries 
+tests/core/test_item_not_found_diagnostics.py::TestItemNotFoundDiagnostics::test_diagnostic_html_structure_components 
+[gw7] [ 62%] PASSED tests/core/test_direct_functions.py::TestFeedManagementLogic::test_feed_update_logic 
+tests/core/test_direct_functions.py::TestFeedManagementLogic::test_pagination_item_slicing 
+[gw4] [ 64%] PASSED tests/core/test_smart_truncate_html.py::TestSmartTruncateHtml::test_markdown_image_conversion 
+tests/core/test_smart_truncate_html.py::TestSmartTruncateHtml::test_image_with_text_truncation 
+[gw4] [ 66%] PASSED tests/core/test_smart_truncate_html.py::TestSmartTruncateHtml::test_image_with_text_truncation 
+tests/core/test_smart_truncate_html.py::TestSmartTruncateHtml::test_multiple_images_preservation 
+[gw4] [ 68%] PASSED tests/core/test_smart_truncate_html.py::TestSmartTruncateHtml::test_multiple_images_preservation 
+tests/core/test_smart_truncate_html.py::TestSmartTruncateHtml::test_text_only_truncation 
+[gw4] [ 70%] PASSED tests/core/test_smart_truncate_html.py::TestSmartTruncateHtml::test_text_only_truncation 
+tests/core/test_smart_truncate_html.py::TestSmartTruncateHtml::test_empty_and_none_input 
+[gw4] [ 72%] PASSED tests/core/test_smart_truncate_html.py::TestSmartTruncateHtml::test_empty_and_none_input 
+tests/core/test_smart_truncate_html.py::TestSmartTruncateHtml::test_visible_text_counting 
+[gw4] [ 75%] PASSED tests/core/test_smart_truncate_html.py::TestSmartTruncateHtml::test_visible_text_counting 
+[gw2] [ 77%] PASSED tests/core/test_essential_mocks.py::TestFeedParsingEdgeCases::test_missing_required_fields 
+[gw3] [ 79%] PASSED tests/core/test_item_not_found_diagnostics.py::TestItemNotFoundDiagnostics::test_diagnostic_html_structure_components 
+tests/core/test_item_not_found_diagnostics.py::TestItemNotFoundDiagnostics::test_toggle_read_function_behavior 
+[gw3] [ 81%] PASSED tests/core/test_item_not_found_diagnostics.py::TestItemNotFoundDiagnostics::test_toggle_read_function_behavior 
+tests/core/test_item_not_found_diagnostics.py::TestItemNotFoundDiagnostics::test_get_item_for_user_behavior 
+[gw3] [ 83%] PASSED tests/core/test_item_not_found_diagnostics.py::TestItemNotFoundDiagnostics::test_get_item_for_user_behavior 
+tests/core/test_item_not_found_diagnostics.py::TestItemNotFoundDiagnostics::test_diagnostic_queries_with_valid_session_no_item 
+[gw3] [ 85%] PASSED tests/core/test_item_not_found_diagnostics.py::TestItemNotFoundDiagnostics::test_diagnostic_queries_with_valid_session_no_item 
+[gw7] [ 87%] PASSED tests/core/test_direct_functions.py::TestFeedManagementLogic::test_pagination_item_slicing 
+[gw1] [ 89%] PASSED tests/core/test_background_worker_integration.py::TestBackgroundWorkerIntegration::test_concurrent_feed_processing_with_deduplication 
+tests/core/test_background_worker_integration.py::TestBackgroundWorkerIntegration::test_user_request_triggers_background_updates 
+[gw1] [ 91%] PASSED tests/core/test_background_worker_integration.py::TestBackgroundWorkerIntegration::test_user_request_triggers_background_updates 
+tests/core/test_background_worker_integration.py::TestBackgroundWorkerIntegration::test_domain_rate_limiting_enforcement 
+[gw1] [ 93%] PASSED tests/core/test_background_worker_integration.py::TestBackgroundWorkerIntegration::test_domain_rate_limiting_enforcement 
+tests/core/test_background_worker_integration.py::TestBackgroundWorkerIntegration::test_worker_restart_recovery 
+[gw1] [ 95%] PASSED tests/core/test_background_worker_integration.py::TestBackgroundWorkerIntegration::test_worker_restart_recovery 
+tests/core/test_background_worker_integration.py::TestBackgroundWorkerIntegration::test_database_integrity_under_concurrent_writes 
+[gw1] [ 97%] PASSED tests/core/test_background_worker_integration.py::TestBackgroundWorkerIntegration::test_database_integrity_under_concurrent_writes 
+tests/core/test_background_worker_integration.py::TestBackgroundWorkerIntegration::test_ui_status_indicator_accuracy 
+[gw1] [100%] PASSED tests/core/test_background_worker_integration.py::TestBackgroundWorkerIntegration::test_ui_status_indicator_accuracy 
+
+======================== 48 passed in 60.60s (0:01:00) =========================
+
+🔗 Running integration tests...
+============================= test session starts ==============================
+platform linux -- Python 3.11.2, pytest-8.4.2, pluggy-1.6.0 -- /home/kuitang/git/rss-reader-highlight/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/kuitang/git/rss-reader-highlight
+configfile: pytest.ini
+plugins: anyio-4.10.0, asyncio-1.1.0, httpx-0.35.0, xdist-3.8.0
+asyncio: mode=Mode.AUTO, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+created: 8/8 workers
+8 workers [15 items]
+
+scheduling tests via LoadFileScheduling
+
+tests/integration/test_application_startup.py::TestApplicationStartup::test_normal_mode_startup_and_feeds 
+tests/integration/test_optimized_integration.py::test_server 
+[gw1] [  6%] PASSED tests/integration/test_optimized_integration.py::test_server 
+tests/integration/test_optimized_integration.py::TestCriticalHTTPWorkflows::test_fresh_start_complete_flow 
+[gw1] [ 13%] PASSED tests/integration/test_optimized_integration.py::TestCriticalHTTPWorkflows::test_fresh_start_complete_flow 
+tests/integration/test_optimized_integration.py::TestCriticalHTTPWorkflows::test_session_persistence_across_requests 
+[gw0] [ 20%] PASSED tests/integration/test_application_startup.py::TestApplicationStartup::test_normal_mode_startup_and_feeds 
+tests/integration/test_application_startup.py::TestApplicationStartup::test_minimal_mode_startup_and_feeds 
+[gw0] [ 26%] PASSED tests/integration/test_application_startup.py::TestApplicationStartup::test_minimal_mode_startup_and_feeds 
+tests/integration/test_application_startup.py::TestApplicationStartup::test_both_modes_serve_different_content 
+[gw1] [ 33%] PASSED tests/integration/test_optimized_integration.py::TestCriticalHTTPWorkflows::test_session_persistence_across_requests 
+tests/integration/test_optimized_integration.py::TestCriticalHTTPWorkflows::test_form_parameter_mapping_via_http 
+[gw1] [ 40%] PASSED tests/integration/test_optimized_integration.py::TestCriticalHTTPWorkflows::test_form_parameter_mapping_via_http 
+tests/integration/test_optimized_integration.py::TestCriticalHTTPWorkflows::test_pagination_with_complex_parameters 
+[gw1] [ 46%] PASSED tests/integration/test_optimized_integration.py::TestCriticalHTTPWorkflows::test_pagination_with_complex_parameters 
+tests/integration/test_optimized_integration.py::TestCriticalHTTPWorkflows::test_article_reading_state_via_http 
+[gw1] [ 53%] PASSED tests/integration/test_optimized_integration.py::TestCriticalHTTPWorkflows::test_article_reading_state_via_http 
+tests/integration/test_optimized_integration.py::TestCriticalHTTPWorkflows::test_no_untitled_feeds_error_detection 
+[gw0] [ 60%] PASSED tests/integration/test_application_startup.py::TestApplicationStartup::test_both_modes_serve_different_content 
+tests/integration/test_application_startup.py::TestApplicationStartup::test_database_isolation 
+[gw0] [ 66%] PASSED tests/integration/test_application_startup.py::TestApplicationStartup::test_database_isolation 
+tests/integration/test_application_startup.py::TestApplicationStartup::test_fresh_start_complete_flow 
+[gw0] [ 73%] PASSED tests/integration/test_application_startup.py::TestApplicationStartup::test_fresh_start_complete_flow 
+tests/integration/test_application_startup.py::TestApplicationStartup::test_session_persistence_across_requests 
+[gw1] [ 80%] PASSED tests/integration/test_optimized_integration.py::TestCriticalHTTPWorkflows::test_no_untitled_feeds_error_detection 
+[gw0] [ 86%] PASSED tests/integration/test_application_startup.py::TestApplicationStartup::test_session_persistence_across_requests 
+tests/integration/test_application_startup.py::TestApplicationStartup::test_form_parameter_mapping_via_http 
+[gw0] [ 93%] PASSED tests/integration/test_application_startup.py::TestApplicationStartup::test_form_parameter_mapping_via_http 
+tests/integration/test_application_startup.py::TestApplicationStartup::test_minimal_vs_normal_database_behavior 
+[gw0] [100%] PASSED tests/integration/test_application_startup.py::TestApplicationStartup::test_minimal_vs_normal_database_behavior 
+
+=============================== warnings summary ===============================
+tests/integration/test_optimized_integration.py::test_server
+  /home/kuitang/git/rss-reader-highlight/venv/lib/python3.11/site-packages/_pytest/python.py:161: PytestReturnNotNoneWarning: Test functions should return None, but tests/integration/test_optimized_integration.py::test_server returned <class 'contextlib._GeneratorContextManager'>.
+  Did you mean to use `assert` instead of `return`?
+  See https://docs.pytest.org/en/stable/how-to/assert.html#return-not-none for more information.
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================== 15 passed, 1 warning in 33.79s ========================
+
+🌐 Running UI tests...
+============================= test session starts ==============================
+platform linux -- Python 3.11.2, pytest-8.4.2, pluggy-1.6.0 -- /home/kuitang/git/rss-reader-highlight/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/kuitang/git/rss-reader-highlight
+configfile: pytest.ini
+plugins: anyio-4.10.0, asyncio-1.1.0, httpx-0.35.0, xdist-3.8.0
+asyncio: mode=Mode.AUTO, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+created: 8/8 workers
+8 workers [95 items]
+
+scheduling tests via LoadFileScheduling
+
+tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_desktop_comprehensive_workflow 
+tests/ui/test_mobile_url_navigation.py::TestMobileNavigationComplete::test_scroll_position_preservation_critical 
+tests/ui/test_critical_ui_flows.py::TestFormParameterBugFlow::test_feed_url_form_submission_complete_flow 
+tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_post_navigation_htmx 
+tests/ui/test_spacing_validation.py::TestSpacingValidation::test_perfect_tab_layout_mobile 
+tests/ui/test_refactoring_regression.py::TestRefactoringRegression::test_desktop_repetitive_workflow 
+tests/ui/test_chrome_responsive.py::TestUnifiedChromeResponsive::test_chrome_responsive_behavior 
+tests/ui/test_add_feed_flows.py::TestAddFeedFlows::test_add_feed_complete_flow 
+[gw3] [  1%] SKIPPED tests/ui/test_add_feed_flows.py::TestAddFeedFlows::test_add_feed_complete_flow 
+tests/ui/test_add_feed_flows.py::TestAddFeedFlows::test_feed_navigation_after_add 
+[gw3] [  2%] SKIPPED tests/ui/test_add_feed_flows.py::TestAddFeedFlows::test_feed_navigation_after_add 
+tests/ui/test_add_feed_flows.py::TestAddFeedFlows::test_duplicate_feed_handling 
+[gw3] [  3%] SKIPPED tests/ui/test_add_feed_flows.py::TestAddFeedFlows::test_duplicate_feed_handling 
+tests/ui/test_add_feed_flows.py::TestAddFeedFlows::test_invalid_url_handling 
+[gw3] [  4%] SKIPPED tests/ui/test_add_feed_flows.py::TestAddFeedFlows::test_invalid_url_handling 
+tests/ui/test_add_feed_flows.py::TestAddFeedFlows::test_empty_form_submission 
+[gw3] [  5%] SKIPPED tests/ui/test_add_feed_flows.py::TestAddFeedFlows::test_empty_form_submission 
+tests/ui/test_regression_fixes.py::TestRegressionFixes::test_header_persistence_on_feed_click 
+[gw4] [  6%] FAILED tests/ui/test_chrome_responsive.py::TestUnifiedChromeResponsive::test_chrome_responsive_behavior 
+tests/ui/test_chrome_responsive.py::TestUnifiedChromeResponsive::test_chrome_transitions_smoothly 
+[gw6] [  7%] FAILED tests/ui/test_refactoring_regression.py::TestRefactoringRegression::test_desktop_repetitive_workflow 
+tests/ui/test_refactoring_regression.py::TestRefactoringRegression::test_mobile_repetitive_workflow 
+[gw3] [  8%] FAILED tests/ui/test_regression_fixes.py::TestRegressionFixes::test_header_persistence_on_feed_click 
+tests/ui/test_regression_fixes.py::TestRegressionFixes::test_unread_parameter_preservation 
+[gw7] [  9%] PASSED tests/ui/test_mobile_url_navigation.py::TestMobileNavigationComplete::test_scroll_position_preservation_critical 
+tests/ui/test_mobile_url_navigation.py::TestMobileNavigationComplete::test_chevron_hamburger_button_toggle 
+[gw0] [ 10%] PASSED tests/ui/test_critical_ui_flows.py::TestFormParameterBugFlow::test_feed_url_form_submission_complete_flow 
+tests/ui/test_critical_ui_flows.py::TestFormParameterBugFlow::test_feed_url_form_submission_mobile_flow 
+[gw0] [ 11%] SKIPPED tests/ui/test_critical_ui_flows.py::TestFormParameterBugFlow::test_feed_url_form_submission_mobile_flow 
+tests/ui/test_critical_ui_flows.py::TestFormParameterBugFlow::test_mobile_sidebar_auto_close_on_feed_click 
+[gw5] [ 12%] PASSED tests/ui/test_spacing_validation.py::TestSpacingValidation::test_perfect_tab_layout_mobile 
+tests/ui/test_spacing_validation.py::TestSpacingValidation::test_tab_buttons_no_grey_border 
+[gw5] [ 13%] PASSED tests/ui/test_spacing_validation.py::TestSpacingValidation::test_tab_buttons_no_grey_border 
+tests/ui/test_spacing_validation.py::TestSpacingValidation::test_first_item_top_spacing 
+[gw3] [ 14%] PASSED tests/ui/test_regression_fixes.py::TestRegressionFixes::test_unread_parameter_preservation 
+tests/ui/test_regression_fixes.py::TestRegressionFixes::test_mobile_sidebar_opacity 
+[gw5] [ 15%] PASSED tests/ui/test_spacing_validation.py::TestSpacingValidation::test_first_item_top_spacing 
+tests/ui/test_spacing_validation.py::TestSpacingValidation::test_action_buttons_horizontal_padding 
+[gw5] [ 16%] PASSED tests/ui/test_spacing_validation.py::TestSpacingValidation::test_action_buttons_horizontal_padding 
+tests/ui/test_spacing_validation.py::TestSpacingValidation::test_spacing_consistency_mobile 
+[gw5] [ 17%] PASSED tests/ui/test_spacing_validation.py::TestSpacingValidation::test_spacing_consistency_mobile 
+tests/ui/test_fresh_tab_state.py::TestFreshTabStatePreservation::test_mobile_fresh_tab_with_full_state 
+[gw1] [ 18%] FAILED tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_desktop_comprehensive_workflow 
+tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_mobile_comprehensive_workflow 
+[gw2] [ 20%] FAILED tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_post_navigation_htmx 
+tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_feed_filter_preserved 
+[gw3] [ 21%] PASSED tests/ui/test_regression_fixes.py::TestRegressionFixes::test_mobile_sidebar_opacity 
+tests/ui/test_regression_fixes.py::TestRegressionFixes::test_mobile_sidebar_opacity_dark_mode 
+[gw0] [ 22%] PASSED tests/ui/test_critical_ui_flows.py::TestFormParameterBugFlow::test_mobile_sidebar_auto_close_on_feed_click 
+tests/ui/test_critical_ui_flows.py::TestFormParameterBugFlow::test_desktop_feed_filtering_full_page_update 
+[gw7] [ 23%] FAILED tests/ui/test_mobile_url_navigation.py::TestMobileNavigationComplete::test_chevron_hamburger_button_toggle 
+tests/ui/test_mobile_url_navigation.py::TestMobileNavigationComplete::test_mobile_header_regression_fix 
+[gw4] [ 24%] FAILED tests/ui/test_chrome_responsive.py::TestUnifiedChromeResponsive::test_chrome_transitions_smoothly 
+tests/ui/test_chrome_responsive.py::TestUnifiedChromeResponsive::test_chrome_action_buttons_consistent 
+[gw6] [ 25%] FAILED tests/ui/test_refactoring_regression.py::TestRefactoringRegression::test_mobile_repetitive_workflow 
+tests/ui/test_refactoring_regression.py::TestRefactoringRegression::test_htmx_request_monitoring 
+[gw2] [ 26%] FAILED tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_feed_filter_preserved 
+tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_persistent_header_visibility 
+[gw3] [ 27%] PASSED tests/ui/test_regression_fixes.py::TestRegressionFixes::test_mobile_sidebar_opacity_dark_mode 
+tests/ui/test_working_regression.py::TestWorkingRegression::test_basic_functionality_flow 
+[gw1] [ 28%] FAILED tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_mobile_comprehensive_workflow 
+tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_responsive_layout_switching 
+[gw0] [ 29%] PASSED tests/ui/test_critical_ui_flows.py::TestFormParameterBugFlow::test_desktop_feed_filtering_full_page_update 
+tests/ui/test_critical_ui_flows.py::TestFormParameterBugFlow::test_duplicate_feed_detection_via_form 
+[gw7] [ 30%] PASSED tests/ui/test_mobile_url_navigation.py::TestMobileNavigationComplete::test_mobile_header_regression_fix 
+[gw6] [ 31%] FAILED tests/ui/test_refactoring_regression.py::TestRefactoringRegression::test_htmx_request_monitoring 
+tests/ui/test_mobile_url_navigation.py::TestMobileNavigationComplete::test_all_posts_vs_unread_state_preservation 
+[gw7] [ 32%] SKIPPED tests/ui/test_mobile_url_navigation.py::TestMobileNavigationComplete::test_all_posts_vs_unread_state_preservation 
+tests/ui/test_refactoring_regression.py::TestRefactoringRegression::test_read_unread_state_management 
+[gw5] [ 33%] PASSED tests/ui/test_fresh_tab_state.py::TestFreshTabStatePreservation::test_mobile_fresh_tab_with_full_state 
+tests/ui/test_fresh_tab_state.py::TestFreshTabStatePreservation::test_desktop_fresh_tab_with_full_state 
+tests/ui/test_header_visibility.py::TestHeaderButtonVisibilityRules::test_header_button_visibility_rules 
+[gw1] [ 34%] PASSED tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_responsive_layout_switching 
+tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_htmx_state_management 
+[gw2] [ 35%] FAILED tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_persistent_header_visibility 
+tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_search_form_functionality 
+[gw0] [ 36%] PASSED tests/ui/test_critical_ui_flows.py::TestFormParameterBugFlow::test_duplicate_feed_detection_via_form 
+tests/ui/test_critical_ui_flows.py::TestBBCRedirectHandlingFlow::test_bbc_feed_addition_with_redirects 
+[gw0] [ 37%] SKIPPED tests/ui/test_critical_ui_flows.py::TestBBCRedirectHandlingFlow::test_bbc_feed_addition_with_redirects 
+tests/ui/test_critical_ui_flows.py::TestButtonStateUpdates::test_button_state_toggles_with_oob_update 
+[gw1] [ 38%] FAILED tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_htmx_state_management 
+[gw6] [ 40%] PASSED tests/ui/test_refactoring_regression.py::TestRefactoringRegression::test_read_unread_state_management 
+tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_rapid_interaction_stability 
+tests/ui/test_text_wrapping.py::TestTextWrapping::test_comprehensive_ui_fixes 
+[gw4] [ 41%] FAILED tests/ui/test_chrome_responsive.py::TestUnifiedChromeResponsive::test_chrome_action_buttons_consistent 
+tests/ui/test_chrome_responsive.py::TestUnifiedChromeResponsive::test_feed_name_changes_both_views 
+[gw5] [ 42%] PASSED tests/ui/test_fresh_tab_state.py::TestFreshTabStatePreservation::test_desktop_fresh_tab_with_full_state 
+tests/ui/test_fresh_tab_state.py::TestFreshTabStatePreservation::test_copy_url_preserves_all_state 
+[gw6] [ 43%] PASSED tests/ui/test_text_wrapping.py::TestTextWrapping::test_comprehensive_ui_fixes 
+tests/ui/test_text_wrapping.py::TestTextWrapping::test_css_rules_applied 
+[gw6] [ 44%] FAILED tests/ui/test_text_wrapping.py::TestTextWrapping::test_css_rules_applied 
+tests/ui/test_text_wrapping.py::TestTextWrapping::test_monsterui_components_used 
+[gw6] [ 45%] PASSED tests/ui/test_text_wrapping.py::TestTextWrapping::test_monsterui_components_used 
+tests/ui/test_mobile_sidebar_isolated.py::TestMobileSidebarIsolated::test_mobile_sidebar_and_navigation_flow 
+[gw0] [ 46%] PASSED tests/ui/test_critical_ui_flows.py::TestButtonStateUpdates::test_button_state_toggles_with_oob_update 
+tests/ui/test_critical_ui_flows.py::TestBlueIndicatorHTMXFlow::test_blue_indicator_disappears_on_article_click 
+[gw4] [ 47%] FAILED tests/ui/test_chrome_responsive.py::TestUnifiedChromeResponsive::test_feed_name_changes_both_views 
+tests/ui/test_chrome_responsive.py::TestUnifiedChromeResponsive::test_search_functionality_both_views 
+[gw7] [ 48%] PASSED tests/ui/test_header_visibility.py::TestHeaderButtonVisibilityRules::test_header_button_visibility_rules 
+tests/ui/test_header_visibility.py::TestLayoutAndResponsiveness::test_header_positioning_in_summary_section 
+[gw2] [ 49%] FAILED tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_search_form_functionality 
+tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_viewport_fixed_behavior 
+[gw5] [ 50%] FAILED tests/ui/test_fresh_tab_state.py::TestFreshTabStatePreservation::test_copy_url_preserves_all_state 
+tests/ui/test_add_feed_edge_cases.py::test_add_feed_edge_cases 
+[gw7] [ 51%] PASSED tests/ui/test_header_visibility.py::TestLayoutAndResponsiveness::test_header_positioning_in_summary_section 
+tests/ui/test_header_visibility.py::TestLayoutAndResponsiveness::test_header_width_constraint_on_desktop 
+[gw2] [ 52%] FAILED tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_viewport_fixed_behavior 
+tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_content_scrolling 
+[gw6] [ 53%] FAILED tests/ui/test_mobile_sidebar_isolated.py::TestMobileSidebarIsolated::test_mobile_sidebar_and_navigation_flow 
+tests/ui/test_mobile_tab_regression.py::test_mobile_tab_active_style_updates 
+[gw1] [ 54%] PASSED tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_rapid_interaction_stability 
+tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_feed_content_and_pagination 
+[gw0] [ 55%] PASSED tests/ui/test_critical_ui_flows.py::TestBlueIndicatorHTMXFlow::test_blue_indicator_disappears_on_article_click 
+tests/ui/test_critical_ui_flows.py::TestBlueIndicatorHTMXFlow::test_unread_view_article_behavior 
+[gw2] [ 56%] PASSED tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_content_scrolling 
+tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_sidebar_scrolling 
+[gw7] [ 57%] FAILED tests/ui/test_header_visibility.py::TestLayoutAndResponsiveness::test_header_width_constraint_on_desktop 
+[gw4] [ 58%] FAILED tests/ui/test_chrome_responsive.py::TestUnifiedChromeResponsive::test_search_functionality_both_views 
+[gw0] [ 60%] PASSED tests/ui/test_critical_ui_flows.py::TestBlueIndicatorHTMXFlow::test_unread_view_article_behavior 
+tests/ui/test_critical_ui_flows.py::TestBlueIndicatorHTMXFlow::test_multiple_article_clicks_blue_management 
+[gw1] [ 61%] PASSED tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_feed_content_and_pagination 
+tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_session_and_state_persistence 
+tests/ui/test_add_feed_edge_cases_quick.py::test_add_feed_empty_url_both_viewports 
+[gw0] [ 62%] PASSED tests/ui/test_critical_ui_flows.py::TestBlueIndicatorHTMXFlow::test_multiple_article_clicks_blue_management 
+tests/ui/test_critical_ui_flows.py::TestSessionAndSubscriptionFlow::test_fresh_user_auto_subscription_flow 
+[gw5] [ 63%] PASSED tests/ui/test_add_feed_edge_cases.py::test_add_feed_edge_cases 
+tests/ui/test_height_consistency.py::TestFeedItemHeightConsistency::test_height_consistency_unread_to_read_transition 
+[gw6] [ 64%] FAILED tests/ui/test_mobile_tab_regression.py::test_mobile_tab_active_style_updates 
+[gw2] [ 65%] FAILED tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_sidebar_scrolling 
+tests/ui/test_mobile_flows.py::TestMobileFlows::test_url_sharing_article_view_both_viewports 
+tests/ui/test_surgical_updates.py::TestSurgicalUpdatesMultipleItems::test_surgical_updates_on_multiple_items 
+[gw4] [ 66%] PASSED tests/ui/test_add_feed_edge_cases_quick.py::test_add_feed_empty_url_both_viewports 
+[gw1] [ 67%] PASSED tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_session_and_state_persistence 
+tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_error_resilience_and_recovery 
+[gw5] [ 68%] SKIPPED tests/ui/test_height_consistency.py::TestFeedItemHeightConsistency::test_height_consistency_unread_to_read_transition 
+[gw0] [ 69%] PASSED tests/ui/test_critical_ui_flows.py::TestSessionAndSubscriptionFlow::test_fresh_user_auto_subscription_flow 
+tests/ui/test_critical_ui_flows.py::TestSessionAndSubscriptionFlow::test_second_browser_tab_independent_session 
+[gw6] [ 70%] SKIPPED tests/ui/test_surgical_updates.py::TestSurgicalUpdatesMultipleItems::test_surgical_updates_on_multiple_items 
+[gw1] [ 71%] PASSED tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_error_resilience_and_recovery 
+tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_mobile_sidebar_overlay_dismissal 
+[gw2] [ 72%] FAILED tests/ui/test_mobile_flows.py::TestMobileFlows::test_url_sharing_article_view_both_viewports 
+tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_url_sharing_feed_filter 
+[gw0] [ 73%] PASSED tests/ui/test_critical_ui_flows.py::TestSessionAndSubscriptionFlow::test_second_browser_tab_independent_session 
+tests/ui/test_critical_ui_flows.py::TestFullViewportHeightFlow::test_viewport_layout_adaptation 
+[gw1] [ 74%] PASSED tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_mobile_sidebar_overlay_dismissal 
+tests/ui/test_comprehensive_regression.py::TestHTMXArchitectureValidation::test_mobile_handlers_routing 
+[gw1] [ 75%] PASSED tests/ui/test_comprehensive_regression.py::TestHTMXArchitectureValidation::test_mobile_handlers_routing 
+[gw0] [ 76%] PASSED tests/ui/test_critical_ui_flows.py::TestFullViewportHeightFlow::test_viewport_layout_adaptation 
+tests/ui/test_comprehensive_regression.py::TestHTMXArchitectureValidation::test_desktop_handlers_routing 
+tests/ui/test_critical_ui_flows.py::TestErrorHandlingUIFeedback::test_network_error_handling_ui_feedback 
+[gw0] [ 77%] SKIPPED tests/ui/test_critical_ui_flows.py::TestErrorHandlingUIFeedback::test_network_error_handling_ui_feedback 
+tests/ui/test_critical_ui_flows.py::TestErrorHandlingUIFeedback::test_malformed_url_error_handling 
+[gw2] [ 78%] PASSED tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_url_sharing_feed_filter 
+tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_url_sharing_with_unread_filter 
+[gw1] [ 80%] PASSED tests/ui/test_comprehensive_regression.py::TestHTMXArchitectureValidation::test_desktop_handlers_routing 
+tests/ui/test_comprehensive_regression.py::TestHTMXArchitectureValidation::test_unified_tab_container_behavior 
+[gw2] [ 81%] PASSED tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_url_sharing_with_unread_filter 
+tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_feed_title_persistence_after_article_navigation 
+[gw3] [ 82%] FAILED tests/ui/test_working_regression.py::TestWorkingRegression::test_basic_functionality_flow 
+tests/ui/test_working_regression.py::TestWorkingRegression::test_mobile_layout_functionality 
+[gw0] [ 83%] PASSED tests/ui/test_critical_ui_flows.py::TestErrorHandlingUIFeedback::test_malformed_url_error_handling 
+tests/ui/test_critical_ui_flows.py::TestComplexNavigationFlows::test_deep_navigation_and_back_button_flow 
+[gw1] [ 84%] PASSED tests/ui/test_comprehensive_regression.py::TestHTMXArchitectureValidation::test_unified_tab_container_behavior 
+[gw3] [ 85%] PASSED tests/ui/test_working_regression.py::TestWorkingRegression::test_mobile_layout_functionality 
+tests/ui/test_working_regression.py::TestWorkingRegression::test_htmx_requests_monitoring 
+[gw2] [ 86%] FAILED tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_feed_title_persistence_after_article_navigation 
+[gw3] [ 87%] FAILED tests/ui/test_working_regression.py::TestWorkingRegression::test_htmx_requests_monitoring 
+tests/ui/test_working_regression.py::TestWorkingRegression::test_read_unread_state_persistence 
+[gw0] [ 88%] PASSED tests/ui/test_critical_ui_flows.py::TestComplexNavigationFlows::test_deep_navigation_and_back_button_flow 
+tests/ui/test_critical_ui_flows.py::TestComplexNavigationFlows::test_rapid_clicking_stability 
+[gw0] [ 89%] PASSED tests/ui/test_critical_ui_flows.py::TestComplexNavigationFlows::test_rapid_clicking_stability 
+tests/ui/test_critical_ui_flows.py::TestTabSizeAndAlignment::test_tabs_correct_size_and_alignment 
+[gw0] [ 90%] PASSED tests/ui/test_critical_ui_flows.py::TestTabSizeAndAlignment::test_tabs_correct_size_and_alignment 
+tests/ui/test_critical_ui_flows.py::TestHeaderUpdateBugFixes::test_header_updates_when_clicking_feed 
+[gw0] [ 91%] PASSED tests/ui/test_critical_ui_flows.py::TestHeaderUpdateBugFixes::test_header_updates_when_clicking_feed 
+tests/ui/test_critical_ui_flows.py::TestHeaderUpdateBugFixes::test_header_persists_when_clicking_all_feeds_multiple_times 
+[gw0] [ 92%] PASSED tests/ui/test_critical_ui_flows.py::TestHeaderUpdateBugFixes::test_header_persists_when_clicking_all_feeds_multiple_times 
+tests/ui/test_critical_ui_flows.py::TestHeaderUpdateBugFixes::test_no_header_duplication_when_clicking_all_posts_unread 
+[gw3] [ 93%] FAILED tests/ui/test_working_regression.py::TestWorkingRegression::test_read_unread_state_persistence 
+[gw0] [ 94%] PASSED tests/ui/test_critical_ui_flows.py::TestHeaderUpdateBugFixes::test_no_header_duplication_when_clicking_all_posts_unread 
+tests/ui/test_critical_ui_flows.py::TestSearchBarHeightInvariant::test_search_expansion_height_invariant 
+[gw0] [ 95%] SKIPPED tests/ui/test_critical_ui_flows.py::TestSearchBarHeightInvariant::test_search_expansion_height_invariant 
+tests/ui/test_critical_ui_flows.py::TestSearchBarHeightInvariant::test_search_click_outside_closes 
+[gw0] [ 96%] SKIPPED tests/ui/test_critical_ui_flows.py::TestSearchBarHeightInvariant::test_search_click_outside_closes 
+tests/ui/test_critical_ui_flows.py::TestPaginationButtonDuplication::test_pagination_buttons_no_duplicates 
+[gw0] [ 97%] PASSED tests/ui/test_critical_ui_flows.py::TestPaginationButtonDuplication::test_pagination_buttons_no_duplicates 
+tests/ui/test_critical_ui_flows.py::TestPaginationScroll::test_pagination_scroll_to_top[viewport0] 
+[gw0] [ 98%] PASSED tests/ui/test_critical_ui_flows.py::TestPaginationScroll::test_pagination_scroll_to_top[viewport0] 
+tests/ui/test_critical_ui_flows.py::TestPaginationScroll::test_pagination_scroll_to_top[viewport1] 
+[gw0] [100%] PASSED tests/ui/test_critical_ui_flows.py::TestPaginationScroll::test_pagination_scroll_to_top[viewport1] 
+
+=================================== FAILURES ===================================
+_________ TestUnifiedChromeResponsive.test_chrome_responsive_behavior __________
+[gw4] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_chrome_responsive.py:28: in test_chrome_responsive_behavior
+    expect(desktop_chrome).to_be_visible()
+venv/lib/python3.11/site-packages/playwright/_impl/_locator.py:726: in _expect
+    return await self._frame._expect(self._selector, expression, options, title)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.11/site-packages/playwright/_impl/_frame.py:189: in _expect
+    result = await self._channel.send_return_as_dict(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:83: in send_return_as_dict
+    return await self._connection.wrap_api_call(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:558: in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+E   playwright._impl._errors.Error: LocatorAssertions.to_be_visible: Error: strict mode violation: locator("#universal-header") resolved to 2 elements:
+E       1) <div id="universal-header" class="bg-background border-b p-4">…</div> aka get_by_test_id("summary").locator("#universal-header")
+E       2) <div id="universal-header" class="bg-background border-b p-4">…</div> aka get_by_test_id("detail").locator("#universal-header")
+E   
+E   Call log:
+E     - Expect "to_be_visible" with timeout 5000ms
+E     - waiting for locator("#universal-header")
+---------------------------- Captured stdout setup -----------------------------
+🔧 Worker gw4: Starting minimal server...
+✅ Worker gw4: Server started (PID: 23502)
+__________ TestRefactoringRegression.test_desktop_repetitive_workflow __________
+[gw6] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_refactoring_regression.py:82: in test_desktop_repetitive_workflow
+    assert feed_count >= 2, f"Expected at least 2 feeds, got {feed_count}"
+E   AssertionError: Expected at least 2 feeds, got 0
+E   assert 0 >= 2
+---------------------------- Captured stdout setup -----------------------------
+🔧 Worker gw6: Starting minimal server...
+✅ Worker gw6: Server started (PID: 23501)
+__________ TestRegressionFixes.test_header_persistence_on_feed_click ___________
+[gw3] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_regression_fixes.py:39: in test_header_persistence_on_feed_click
+    expect(header_after.text_content()).not_to_be_empty()
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.11/site-packages/playwright/sync_api/__init__.py:144: in __call__
+    raise ValueError(f"Unsupported type: {type(actual)}")
+E   ValueError: Unsupported type: <class 'str'>
+---------------------------- Captured stdout setup -----------------------------
+🔧 Worker gw3: Starting minimal server...
+✅ Worker gw3: Server started (PID: 23507)
+_______ TestComprehensiveRegression.test_desktop_comprehensive_workflow ________
+[gw1] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_comprehensive_regression.py:71: in test_desktop_comprehensive_workflow
+    if all_posts_btn.is_visible():
+       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.11/site-packages/playwright/sync_api/_generated.py:17198: in is_visible
+    self._sync(self._impl_obj.is_visible(timeout=timeout))
+venv/lib/python3.11/site-packages/playwright/_impl/_locator.py:513: in is_visible
+    return await self._frame.is_visible(
+venv/lib/python3.11/site-packages/playwright/_impl/_frame.py:408: in is_visible
+    return await self._channel.send(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:69: in send
+    return await self._connection.wrap_api_call(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:558: in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+E   playwright._impl._errors.Error: Locator.is_visible: Error: strict mode violation: locator("[data-testid='all-posts-btn']") resolved to 2 elements:
+E       1) <button type="submit" title="All Posts" hx-push-url="true" hx-swap="outerHTML" data-testid="all-posts-btn" hx-get="/?feed_id=5&unread=0" hx-target="#feeds-list-container" class="uk-btn p-2 rounded hover:bg-secondary ">…</button> aka get_by_test_id("summary").get_by_test_id("all-posts-btn")
+E       2) <button type="submit" title="All Posts" hx-push-url="true" hx-swap="outerHTML" data-testid="all-posts-btn" hx-get="/?feed_id=5&unread=0" hx-target="#feeds-list-container" class="uk-btn p-2 rounded hover:bg-secondary ">…</button> aka get_by_test_id("detail").get_by_test_id("all-posts-btn")
+E   
+E   Call log:
+E       - checking visibility of locator("[data-testid='all-posts-btn']")
+---------------------------- Captured stdout setup -----------------------------
+🔧 Worker gw1: Starting minimal server...
+✅ Worker gw1: Server started (PID: 23504)
+----------------------------- Captured stdout call -----------------------------
+Desktop iteration 1
+_______________ TestMobileFlows.test_mobile_post_navigation_htmx _______________
+[gw2] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_mobile_flows.py:72: in test_mobile_post_navigation_htmx
+    expect(back_button).to_be_visible()
+E   AssertionError: Locator expected to be visible
+E   Actual value: hidden 
+E   Call log:
+E     - Expect "to_be_visible" with timeout 5000ms
+E     - waiting for locator("#summary [data-testid='back-button']")
+E       8 × locator resolved to <button hx-get="/" type="submit" hx-swap="innerHTML" data-testid="back-button" hx-target="#detail-content" class="uk-btn back-btn absolute top-0 left-0 p-3 rounded border hover:bg-secondary min-h-[44px] min-w-[44px] z-10">…</button>
+E         - unexpected value "hidden"
+---------------------------- Captured stdout setup -----------------------------
+🔧 Worker gw2: Starting minimal server...
+✅ Worker gw2: Server started (PID: 23505)
+______ TestMobileNavigationComplete.test_chevron_hamburger_button_toggle _______
+[gw7] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_mobile_url_navigation.py:203: in test_chevron_hamburger_button_toggle
+    assert chevron_icon == 'arrow-left', f"FAILED: Expected arrow-left icon in article view, got: {chevron_icon}"
+E   AssertionError: FAILED: Expected arrow-left icon in article view, got: not-found
+E   assert 'not-found' == 'arrow-left'
+E     
+E     - arrow-left
+E     + not-found
+----------------------------- Captured stdout call -----------------------------
+🔄 CHEVRON TEST: Article view button icon: not-found
+_________ TestUnifiedChromeResponsive.test_chrome_transitions_smoothly _________
+[gw4] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_chrome_responsive.py:117: in test_chrome_transitions_smoothly
+    wait_for_viewport_transition(page)
+tests/ui/test_helpers.py:166: in wait_for_viewport_transition
+    page.wait_for_function(
+venv/lib/python3.11/site-packages/playwright/sync_api/_generated.py:11559: in wait_for_function
+    self._sync(
+venv/lib/python3.11/site-packages/playwright/_impl/_page.py:1113: in wait_for_function
+    return await self._main_frame.wait_for_function(**locals_to_params(locals()))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.11/site-packages/playwright/_impl/_frame.py:860: in wait_for_function
+    await self._channel.send("waitForFunction", self._timeout, params)
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:69: in send
+    return await self._connection.wrap_api_call(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:558: in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+E   playwright._impl._errors.TimeoutError: Page.wait_for_function: Timeout 5000ms exceeded.
+__________ TestRefactoringRegression.test_mobile_repetitive_workflow ___________
+[gw6] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_refactoring_regression.py:222: in test_mobile_repetitive_workflow
+    expect(hamburger_menu).to_be_visible()
+E   AssertionError: Locator expected to be visible
+E   Actual value: <element(s) not found> 
+E   Call log:
+E     - Expect "to_be_visible" with timeout 5000ms
+E     - waiting for locator("button#summary [data-testid='hamburger-btn']")
+----------------------------- Captured stdout call -----------------------------
+
+=== Mobile Cycle 1 ===
+______________ TestMobileFlows.test_mobile_feed_filter_preserved _______________
+[gw2] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_mobile_flows.py:115: in test_mobile_feed_filter_preserved
+    assert f"feed_id={feed_id}" in page.url
+E   AssertionError: assert 'feed_id=5' in 'http://localhost:58713/'
+E    +  where 'http://localhost:58713/' = <Page url='http://localhost:58713/'>.url
+________ TestComprehensiveRegression.test_mobile_comprehensive_workflow ________
+[gw1] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_comprehensive_regression.py:138: in test_mobile_comprehensive_workflow
+    if back_button.is_visible():
+       ^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.11/site-packages/playwright/sync_api/_generated.py:17198: in is_visible
+    self._sync(self._impl_obj.is_visible(timeout=timeout))
+venv/lib/python3.11/site-packages/playwright/_impl/_locator.py:513: in is_visible
+    return await self._frame.is_visible(
+venv/lib/python3.11/site-packages/playwright/_impl/_frame.py:408: in is_visible
+    return await self._channel.send(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:69: in send
+    return await self._connection.wrap_api_call(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:558: in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+E   playwright._impl._errors.Error: Locator.is_visible: Error: strict mode violation: locator("[data-testid='back-button']") resolved to 2 elements:
+E       1) <button hx-get="/" type="submit" hx-swap="innerHTML" data-testid="back-button" hx-target="#detail-content" class="uk-btn back-btn absolute top-0 left-0 p-3 rounded border hover:bg-secondary min-h-[44px] min-w-[44px] z-10">…</button> aka get_by_test_id("summary").get_by_test_id("back-button")
+E       2) <button hx-get="/" type="submit" hx-swap="innerHTML" data-testid="back-button" hx-target="#detail-content" class="uk-btn back-btn absolute top-0 left-0 p-3 rounded border hover:bg-secondary min-h-[44px] min-w-[44px] z-10">…</button> aka get_by_test_id("detail").get_by_test_id("back-button")
+E   
+E   Call log:
+E       - checking visibility of locator("[data-testid='back-button']")
+----------------------------- Captured stdout call -----------------------------
+Mobile iteration 1
+____________ TestRefactoringRegression.test_htmx_request_monitoring ____________
+[gw6] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_refactoring_regression.py:401: in test_htmx_request_monitoring
+    if unread_tab.is_visible():
+       ^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.11/site-packages/playwright/sync_api/_generated.py:17198: in is_visible
+    self._sync(self._impl_obj.is_visible(timeout=timeout))
+venv/lib/python3.11/site-packages/playwright/_impl/_locator.py:513: in is_visible
+    return await self._frame.is_visible(
+venv/lib/python3.11/site-packages/playwright/_impl/_frame.py:408: in is_visible
+    return await self._channel.send(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:69: in send
+    return await self._connection.wrap_api_call(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:558: in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+E   playwright._impl._errors.Error: Locator.is_visible: Error: strict mode violation: locator("#icon-bar button[title='Unread']") resolved to 2 elements:
+E       1) <button type="submit" title="Unread" hx-push-url="true" hx-swap="outerHTML" hx-get="/?feed_id=5" data-testid="unread-btn" hx-target="#feeds-list-container" class="uk-btn p-2 rounded hover:bg-secondary bg-secondary">…</button> aka get_by_test_id("summary").get_by_test_id("unread-btn")
+E       2) <button type="submit" title="Unread" hx-push-url="true" hx-swap="outerHTML" hx-get="/?feed_id=5" data-testid="unread-btn" hx-target="#feeds-list-container" class="uk-btn p-2 rounded hover:bg-secondary bg-secondary">…</button> aka get_by_test_id("detail").get_by_test_id("unread-btn")
+E   
+E   Call log:
+E       - checking visibility of locator("#icon-bar button[title='Unread']")
+----------------------------- Captured stdout call -----------------------------
+Clicking feed to trigger HTMX update
+___________ TestMobileFlows.test_mobile_persistent_header_visibility ___________
+[gw2] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_mobile_flows.py:155: in test_mobile_persistent_header_visibility
+    expect(search_button).to_be_visible()
+E   AssertionError: Locator expected to be visible
+E   Actual value: hidden 
+E   Call log:
+E     - Expect "to_be_visible" with timeout 5000ms
+E     - waiting for locator("#summary [data-testid=\"search-btn\"]")
+E       8 × locator resolved to <button type="submit" title="Search" data-testid="search-btn" class="uk-btn p-2 rounded hover:bg-secondary" onclick="var bar = document.getElementById('icon-bar'); var search = document.getElementById('search-bar'); bar.style.display='none'; search.style.display='flex'; search.querySelector('input').focus();">…</button>
+E         - unexpected value "hidden"
+____________ TestComprehensiveRegression.test_htmx_state_management ____________
+[gw1] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_comprehensive_regression.py:216: in test_htmx_state_management
+    assert final_count < initial_count, "Blue indicator should disappear after reading"
+E   AssertionError: Blue indicator should disappear after reading
+E   assert 20 < 20
+______ TestUnifiedChromeResponsive.test_chrome_action_buttons_consistent _______
+[gw4] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_chrome_responsive.py:156: in test_chrome_action_buttons_consistent
+    wait_for_viewport_transition(page)
+tests/ui/test_helpers.py:166: in wait_for_viewport_transition
+    page.wait_for_function(
+venv/lib/python3.11/site-packages/playwright/sync_api/_generated.py:11559: in wait_for_function
+    self._sync(
+venv/lib/python3.11/site-packages/playwright/_impl/_page.py:1113: in wait_for_function
+    return await self._main_frame.wait_for_function(**locals_to_params(locals()))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.11/site-packages/playwright/_impl/_frame.py:860: in wait_for_function
+    await self._channel.send("waitForFunction", self._timeout, params)
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:69: in send
+    return await self._connection.wrap_api_call(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:558: in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+E   playwright._impl._errors.TimeoutError: Page.wait_for_function: Timeout 5000ms exceeded.
+___________________ TestTextWrapping.test_css_rules_applied ____________________
+[gw6] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_text_wrapping.py:85: in test_css_rules_applied
+    html_content = page.content()
+                   ^^^^
+E   NameError: name 'page' is not defined
+________ TestUnifiedChromeResponsive.test_feed_name_changes_both_views _________
+[gw4] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_chrome_responsive.py:177: in test_feed_name_changes_both_views
+    expect(desktop_feed_name).to_contain_text("All Feeds")
+venv/lib/python3.11/site-packages/playwright/_impl/_locator.py:726: in _expect
+    return await self._frame._expect(self._selector, expression, options, title)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.11/site-packages/playwright/_impl/_frame.py:189: in _expect
+    result = await self._channel.send_return_as_dict(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:83: in send_return_as_dict
+    return await self._connection.wrap_api_call(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:558: in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+E   playwright._impl._errors.Error: LocatorAssertions.to_contain_text: Error: strict mode violation: locator("#universal-header h1") resolved to 2 elements:
+E       1) <h1 class="uk-h1 text-lg font-semibold flex-1">All Feeds</h1> aka get_by_role("heading", name="All Feeds")
+E       2) <h1 class="uk-h1 text-lg font-semibold flex-1">All Feeds</h1> aka get_by_test_id("detail").get_by_text("All Feeds")
+E   
+E   Call log:
+E     - Expect "to_contain_text" with timeout 5000ms
+E     - waiting for locator("#universal-header h1")
+____________ TestMobileFlows.test_mobile_search_form_functionality _____________
+[gw2] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_mobile_flows.py:216: in test_mobile_search_form_functionality
+    expect(search_button).to_be_visible()
+E   AssertionError: Locator expected to be visible
+E   Actual value: hidden 
+E   Call log:
+E     - Expect "to_be_visible" with timeout 5000ms
+E     - waiting for locator("#summary [data-testid=\"search-btn\"]")
+E       9 × locator resolved to <button type="submit" title="Search" data-testid="search-btn" class="uk-btn p-2 rounded hover:bg-secondary" onclick="var bar = document.getElementById('icon-bar'); var search = document.getElementById('search-bar'); bar.style.display='none'; search.style.display='flex'; search.querySelector('input').focus();">…</button>
+E         - unexpected value "hidden"
+_______ TestFreshTabStatePreservation.test_copy_url_preserves_all_state ________
+[gw5] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_fresh_tab_state.py:253: in test_copy_url_preserves_all_state
+    assert scroll_pos > 250, f"Scroll position should be approximately restored to 300px (got {scroll_pos})"
+E   AssertionError: Scroll position should be approximately restored to 300px (got 0)
+E   assert 0 > 250
+----------------------------- Captured stdout call -----------------------------
+🔍 Debug after back: URL=http://localhost:46371/?unread=0
+🔍 Scroll param: None, ScrollTop: 0
+🔍 Summary exists: True, Height: 5182/844
+_____________ TestMobileFlows.test_mobile_viewport_fixed_behavior ______________
+[gw2] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_mobile_flows.py:259: in test_mobile_viewport_fixed_behavior
+    assert body_styles["body_position"] == "fixed", f"Body should be fixed, got {body_styles['body_position']}"
+E   AssertionError: Body should be fixed, got static
+E   assert 'static' == 'fixed'
+E     
+E     - fixed
+E     + static
+______ TestMobileSidebarIsolated.test_mobile_sidebar_and_navigation_flow _______
+[gw6] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_mobile_sidebar_isolated.py:61: in test_mobile_sidebar_and_navigation_flow
+    expect(app_root).not_to_have_attribute("data-drawer")
+E   TypeError: LocatorAssertions.not_to_have_attribute() missing 1 required positional argument: 'value'
+_____ TestLayoutAndResponsiveness.test_header_width_constraint_on_desktop ______
+[gw7] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_header_visibility.py:168: in test_header_width_constraint_on_desktop
+    assert "18rem" in header_left or "288px" in header_left, \
+E   AssertionError: Desktop header should have left constraint, got: auto
+E   assert ('18rem' in 'auto' or '288px' in 'auto')
+--------------------------- Captured stdout teardown ---------------------------
+🧹 Worker gw7: Stopping server...
+_______ TestUnifiedChromeResponsive.test_search_functionality_both_views _______
+[gw4] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_chrome_responsive.py:214: in test_search_functionality_both_views
+    wait_for_element_transition(page, "#search-bar")
+tests/ui/test_helpers.py:207: in wait_for_element_transition
+    page.wait_for_function(
+venv/lib/python3.11/site-packages/playwright/sync_api/_generated.py:11559: in wait_for_function
+    self._sync(
+venv/lib/python3.11/site-packages/playwright/_impl/_page.py:1113: in wait_for_function
+    return await self._main_frame.wait_for_function(**locals_to_params(locals()))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.11/site-packages/playwright/_impl/_frame.py:860: in wait_for_function
+    await self._channel.send("waitForFunction", self._timeout, params)
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:69: in send
+    return await self._connection.wrap_api_call(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:558: in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+E   playwright._impl._errors.TimeoutError: Page.wait_for_function: Timeout 5000ms exceeded.
+_____________________ test_mobile_tab_active_style_updates _____________________
+[gw6] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_mobile_tab_regression.py:31: in test_mobile_tab_active_style_updates
+    expect(all_posts_btn).to_be_visible()
+E   AssertionError: Locator expected to be visible
+E   Actual value: hidden 
+E   Call log:
+E     - Expect "to_be_visible" with timeout 5000ms
+E     - waiting for locator("#summary [data-testid=\"all-posts-btn\"]")
+E       8 × locator resolved to <button type="submit" title="All Posts" hx-push-url="true" hx-get="/?unread=0" hx-swap="outerHTML" data-testid="all-posts-btn" hx-target="#feeds-list-container" class="uk-btn p-2 rounded hover:bg-secondary ">…</button>
+E         - unexpected value "hidden"
+________________ TestMobileFlows.test_mobile_sidebar_scrolling _________________
+[gw2] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_mobile_flows.py:301: in test_mobile_sidebar_scrolling
+    expect(sidebar_content).to_be_visible()
+E   AssertionError: Locator expected to be visible
+E   Actual value: <element(s) not found> 
+E   Call log:
+E     - Expect "to_be_visible" with timeout 5000ms
+E     - waiting for locator("#feeds").locator(".bg-background.w-80")
+_________ TestMobileFlows.test_url_sharing_article_view_both_viewports _________
+[gw2] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_mobile_flows.py:365: in test_url_sharing_article_view_both_viewports
+    expect(page.locator("#universal-header")).to_be_visible()
+venv/lib/python3.11/site-packages/playwright/_impl/_locator.py:726: in _expect
+    return await self._frame._expect(self._selector, expression, options, title)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.11/site-packages/playwright/_impl/_frame.py:189: in _expect
+    result = await self._channel.send_return_as_dict(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:83: in send_return_as_dict
+    return await self._connection.wrap_api_call(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:558: in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+E   playwright._impl._errors.Error: LocatorAssertions.to_be_visible: Error: strict mode violation: locator("#universal-header") resolved to 2 elements:
+E       1) <div id="universal-header" class="bg-background border-b p-4">…</div> aka get_by_test_id("summary").locator("#universal-header")
+E       2) <div id="universal-header" class="bg-background border-b p-4">…</div> aka get_by_test_id("detail").locator("#universal-header")
+E   
+E   Call log:
+E     - Expect "to_be_visible" with timeout 5000ms
+E     - waiting for locator("#universal-header")
+_____________ TestWorkingRegression.test_basic_functionality_flow ______________
+[gw3] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_working_regression.py:91: in test_basic_functionality_flow
+    article_title = article_title_element.text_content()
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.11/site-packages/playwright/sync_api/_generated.py:17734: in text_content
+    self._sync(self._impl_obj.text_content(timeout=timeout))
+venv/lib/python3.11/site-packages/playwright/_impl/_locator.py:629: in text_content
+    return await self._frame.text_content(
+venv/lib/python3.11/site-packages/playwright/_impl/_frame.py:688: in text_content
+    return await self._channel.send(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:69: in send
+    return await self._connection.wrap_api_call(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:558: in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+E   playwright._impl._errors.TimeoutError: Locator.text_content: Timeout 30000ms exceeded.
+E   Call log:
+E     - waiting for locator("li[data-testid='feed-item']").first.locator("strong").first
+----------------------------- Captured stdout call -----------------------------
+=== Testing Feed Selection ===
+Successfully navigated to ClaudeAI feed: http://localhost:42109/?feed_id=5&unread=1
+=== Testing Article Selection ===
+Initial unread articles: 20
+_ TestMobileFlows.test_mobile_feed_title_persistence_after_article_navigation __
+[gw2] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_mobile_flows.py:491: in test_mobile_feed_title_persistence_after_article_navigation
+    expect(back_button).to_be_visible()
+E   AssertionError: Locator expected to be visible
+E   Actual value: <element(s) not found> 
+E   Call log:
+E     - Expect "to_be_visible" with timeout 5000ms
+E     - waiting for locator("#summary [data-testid=\"hamburger-btn\"]").filter(has=locator("uk-icon[icon=\"arrow-left\"]"))
+--------------------------- Captured stdout teardown ---------------------------
+🧹 Worker gw2: Stopping server...
+_____________ TestWorkingRegression.test_htmx_requests_monitoring ______________
+[gw3] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_working_regression.py:277: in test_htmx_requests_monitoring
+    page.wait_for_selector("#desktop-item-detail, #mobile-item-detail", state="visible", timeout=constants.MAX_WAIT_MS)
+venv/lib/python3.11/site-packages/playwright/sync_api/_generated.py:8182: in wait_for_selector
+    self._sync(
+venv/lib/python3.11/site-packages/playwright/_impl/_page.py:423: in wait_for_selector
+    return await self._main_frame.wait_for_selector(**locals_to_params(locals()))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.11/site-packages/playwright/_impl/_frame.py:369: in wait_for_selector
+    await self._channel.send(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:69: in send
+    return await self._connection.wrap_api_call(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:558: in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+E   playwright._impl._errors.TimeoutError: Page.wait_for_selector: Timeout 5000ms exceeded.
+E   Call log:
+E     - waiting for locator("#desktop-item-detail, #mobile-item-detail") to be visible
+___________ TestWorkingRegression.test_read_unread_state_persistence ___________
+[gw3] linux -- Python 3.11.2 /home/kuitang/git/rss-reader-highlight/venv/bin/python
+tests/ui/test_working_regression.py:356: in test_read_unread_state_persistence
+    page.wait_for_selector("#desktop-item-detail, #mobile-item-detail", state="visible", timeout=constants.MAX_WAIT_MS)
+venv/lib/python3.11/site-packages/playwright/sync_api/_generated.py:8182: in wait_for_selector
+    self._sync(
+venv/lib/python3.11/site-packages/playwright/_impl/_page.py:423: in wait_for_selector
+    return await self._main_frame.wait_for_selector(**locals_to_params(locals()))
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+venv/lib/python3.11/site-packages/playwright/_impl/_frame.py:369: in wait_for_selector
+    await self._channel.send(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:69: in send
+    return await self._connection.wrap_api_call(
+venv/lib/python3.11/site-packages/playwright/_impl/_connection.py:558: in wrap_api_call
+    raise rewrite_error(error, f"{parsed_st['apiName']}: {error}") from None
+E   playwright._impl._errors.TimeoutError: Page.wait_for_selector: Timeout 5000ms exceeded.
+E   Call log:
+E     - waiting for locator("#desktop-item-detail, #mobile-item-detail") to be visible
+--------------------------- Captured stdout teardown ---------------------------
+🧹 Worker gw3: Stopping server...
+=========================== short test summary info ============================
+FAILED tests/ui/test_chrome_responsive.py::TestUnifiedChromeResponsive::test_chrome_responsive_behavior - playwright._impl._errors.Error: LocatorAssertions.to_be_visible: Error: strict mode violation: locator("#universal-header") resolved to 2 elements:
+    1) <div id="universal-header" class="bg-background border-b p-4">…</div> aka get_by_test_id("summary").locator("#universal-header")
+    2) <div id="universal-header" class="bg-background border-b p-4">…</div> aka get_by_test_id("detail").locator("#universal-header")
+
+Call log:
+  - Expect "to_be_visible" with timeout 5000ms
+  - waiting for locator("#universal-header")
+FAILED tests/ui/test_refactoring_regression.py::TestRefactoringRegression::test_desktop_repetitive_workflow - AssertionError: Expected at least 2 feeds, got 0
+assert 0 >= 2
+FAILED tests/ui/test_regression_fixes.py::TestRegressionFixes::test_header_persistence_on_feed_click - ValueError: Unsupported type: <class 'str'>
+FAILED tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_desktop_comprehensive_workflow - playwright._impl._errors.Error: Locator.is_visible: Error: strict mode violation: locator("[data-testid='all-posts-btn']") resolved to 2 elements:
+    1) <button type="submit" title="All Posts" hx-push-url="true" hx-swap="outerHTML" data-testid="all-posts-btn" hx-get="/?feed_id=5&unread=0" hx-target="#feeds-list-container" class="uk-btn p-2 rounded hover:bg-secondary ">…</button> aka get_by_test_id("summary").get_by_test_id("all-posts-btn")
+    2) <button type="submit" title="All Posts" hx-push-url="true" hx-swap="outerHTML" data-testid="all-posts-btn" hx-get="/?feed_id=5&unread=0" hx-target="#feeds-list-container" class="uk-btn p-2 rounded hover:bg-secondary ">…</button> aka get_by_test_id("detail").get_by_test_id("all-posts-btn")
+
+Call log:
+    - checking visibility of locator("[data-testid='all-posts-btn']")
+FAILED tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_post_navigation_htmx - AssertionError: Locator expected to be visible
+Actual value: hidden 
+Call log:
+  - Expect "to_be_visible" with timeout 5000ms
+  - waiting for locator("#summary [data-testid='back-button']")
+    8 × locator resolved to <button hx-get="/" type="submit" hx-swap="innerHTML" data-testid="back-button" hx-target="#detail-content" class="uk-btn back-btn absolute top-0 left-0 p-3 rounded border hover:bg-secondary min-h-[44px] min-w-[44px] z-10">…</button>
+      - unexpected value "hidden"
+FAILED tests/ui/test_mobile_url_navigation.py::TestMobileNavigationComplete::test_chevron_hamburger_button_toggle - AssertionError: FAILED: Expected arrow-left icon in article view, got: not-found
+assert 'not-found' == 'arrow-left'
+  
+  - arrow-left
+  + not-found
+FAILED tests/ui/test_chrome_responsive.py::TestUnifiedChromeResponsive::test_chrome_transitions_smoothly - playwright._impl._errors.TimeoutError: Page.wait_for_function: Timeout 5000ms exceeded.
+FAILED tests/ui/test_refactoring_regression.py::TestRefactoringRegression::test_mobile_repetitive_workflow - AssertionError: Locator expected to be visible
+Actual value: <element(s) not found> 
+Call log:
+  - Expect "to_be_visible" with timeout 5000ms
+  - waiting for locator("button#summary [data-testid='hamburger-btn']")
+FAILED tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_feed_filter_preserved - AssertionError: assert 'feed_id=5' in 'http://localhost:58713/'
+ +  where 'http://localhost:58713/' = <Page url='http://localhost:58713/'>.url
+FAILED tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_mobile_comprehensive_workflow - playwright._impl._errors.Error: Locator.is_visible: Error: strict mode violation: locator("[data-testid='back-button']") resolved to 2 elements:
+    1) <button hx-get="/" type="submit" hx-swap="innerHTML" data-testid="back-button" hx-target="#detail-content" class="uk-btn back-btn absolute top-0 left-0 p-3 rounded border hover:bg-secondary min-h-[44px] min-w-[44px] z-10">…</button> aka get_by_test_id("summary").get_by_test_id("back-button")
+    2) <button hx-get="/" type="submit" hx-swap="innerHTML" data-testid="back-button" hx-target="#detail-content" class="uk-btn back-btn absolute top-0 left-0 p-3 rounded border hover:bg-secondary min-h-[44px] min-w-[44px] z-10">…</button> aka get_by_test_id("detail").get_by_test_id("back-button")
+
+Call log:
+    - checking visibility of locator("[data-testid='back-button']")
+FAILED tests/ui/test_refactoring_regression.py::TestRefactoringRegression::test_htmx_request_monitoring - playwright._impl._errors.Error: Locator.is_visible: Error: strict mode violation: locator("#icon-bar button[title='Unread']") resolved to 2 elements:
+    1) <button type="submit" title="Unread" hx-push-url="true" hx-swap="outerHTML" hx-get="/?feed_id=5" data-testid="unread-btn" hx-target="#feeds-list-container" class="uk-btn p-2 rounded hover:bg-secondary bg-secondary">…</button> aka get_by_test_id("summary").get_by_test_id("unread-btn")
+    2) <button type="submit" title="Unread" hx-push-url="true" hx-swap="outerHTML" hx-get="/?feed_id=5" data-testid="unread-btn" hx-target="#feeds-list-container" class="uk-btn p-2 rounded hover:bg-secondary bg-secondary">…</button> aka get_by_test_id("detail").get_by_test_id("unread-btn")
+
+Call log:
+    - checking visibility of locator("#icon-bar button[title='Unread']")
+FAILED tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_persistent_header_visibility - AssertionError: Locator expected to be visible
+Actual value: hidden 
+Call log:
+  - Expect "to_be_visible" with timeout 5000ms
+  - waiting for locator("#summary [data-testid=\"search-btn\"]")
+    8 × locator resolved to <button type="submit" title="Search" data-testid="search-btn" class="uk-btn p-2 rounded hover:bg-secondary" onclick="var bar = document.getElementById('icon-bar'); var search = document.getElementById('search-bar'); bar.style.display='none'; search.style.display='flex'; search.querySelector('input').focus();">…</button>
+      - unexpected value "hidden"
+FAILED tests/ui/test_comprehensive_regression.py::TestComprehensiveRegression::test_htmx_state_management - AssertionError: Blue indicator should disappear after reading
+assert 20 < 20
+FAILED tests/ui/test_chrome_responsive.py::TestUnifiedChromeResponsive::test_chrome_action_buttons_consistent - playwright._impl._errors.TimeoutError: Page.wait_for_function: Timeout 5000ms exceeded.
+FAILED tests/ui/test_text_wrapping.py::TestTextWrapping::test_css_rules_applied - NameError: name 'page' is not defined
+FAILED tests/ui/test_chrome_responsive.py::TestUnifiedChromeResponsive::test_feed_name_changes_both_views - playwright._impl._errors.Error: LocatorAssertions.to_contain_text: Error: strict mode violation: locator("#universal-header h1") resolved to 2 elements:
+    1) <h1 class="uk-h1 text-lg font-semibold flex-1">All Feeds</h1> aka get_by_role("heading", name="All Feeds")
+    2) <h1 class="uk-h1 text-lg font-semibold flex-1">All Feeds</h1> aka get_by_test_id("detail").get_by_text("All Feeds")
+
+Call log:
+  - Expect "to_contain_text" with timeout 5000ms
+  - waiting for locator("#universal-header h1")
+FAILED tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_search_form_functionality - AssertionError: Locator expected to be visible
+Actual value: hidden 
+Call log:
+  - Expect "to_be_visible" with timeout 5000ms
+  - waiting for locator("#summary [data-testid=\"search-btn\"]")
+    9 × locator resolved to <button type="submit" title="Search" data-testid="search-btn" class="uk-btn p-2 rounded hover:bg-secondary" onclick="var bar = document.getElementById('icon-bar'); var search = document.getElementById('search-bar'); bar.style.display='none'; search.style.display='flex'; search.querySelector('input').focus();">…</button>
+      - unexpected value "hidden"
+FAILED tests/ui/test_fresh_tab_state.py::TestFreshTabStatePreservation::test_copy_url_preserves_all_state - AssertionError: Scroll position should be approximately restored to 300px (got 0)
+assert 0 > 250
+FAILED tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_viewport_fixed_behavior - AssertionError: Body should be fixed, got static
+assert 'static' == 'fixed'
+  
+  - fixed
+  + static
+FAILED tests/ui/test_mobile_sidebar_isolated.py::TestMobileSidebarIsolated::test_mobile_sidebar_and_navigation_flow - TypeError: LocatorAssertions.not_to_have_attribute() missing 1 required positional argument: 'value'
+FAILED tests/ui/test_header_visibility.py::TestLayoutAndResponsiveness::test_header_width_constraint_on_desktop - AssertionError: Desktop header should have left constraint, got: auto
+assert ('18rem' in 'auto' or '288px' in 'auto')
+FAILED tests/ui/test_chrome_responsive.py::TestUnifiedChromeResponsive::test_search_functionality_both_views - playwright._impl._errors.TimeoutError: Page.wait_for_function: Timeout 5000ms exceeded.
+FAILED tests/ui/test_mobile_tab_regression.py::test_mobile_tab_active_style_updates - AssertionError: Locator expected to be visible
+Actual value: hidden 
+Call log:
+  - Expect "to_be_visible" with timeout 5000ms
+  - waiting for locator("#summary [data-testid=\"all-posts-btn\"]")
+    8 × locator resolved to <button type="submit" title="All Posts" hx-push-url="true" hx-get="/?unread=0" hx-swap="outerHTML" data-testid="all-posts-btn" hx-target="#feeds-list-container" class="uk-btn p-2 rounded hover:bg-secondary ">…</button>
+      - unexpected value "hidden"
+FAILED tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_sidebar_scrolling - AssertionError: Locator expected to be visible
+Actual value: <element(s) not found> 
+Call log:
+  - Expect "to_be_visible" with timeout 5000ms
+  - waiting for locator("#feeds").locator(".bg-background.w-80")
+FAILED tests/ui/test_mobile_flows.py::TestMobileFlows::test_url_sharing_article_view_both_viewports - playwright._impl._errors.Error: LocatorAssertions.to_be_visible: Error: strict mode violation: locator("#universal-header") resolved to 2 elements:
+    1) <div id="universal-header" class="bg-background border-b p-4">…</div> aka get_by_test_id("summary").locator("#universal-header")
+    2) <div id="universal-header" class="bg-background border-b p-4">…</div> aka get_by_test_id("detail").locator("#universal-header")
+
+Call log:
+  - Expect "to_be_visible" with timeout 5000ms
+  - waiting for locator("#universal-header")
+FAILED tests/ui/test_working_regression.py::TestWorkingRegression::test_basic_functionality_flow - playwright._impl._errors.TimeoutError: Locator.text_content: Timeout 30000ms exceeded.
+Call log:
+  - waiting for locator("li[data-testid='feed-item']").first.locator("strong").first
+FAILED tests/ui/test_mobile_flows.py::TestMobileFlows::test_mobile_feed_title_persistence_after_article_navigation - AssertionError: Locator expected to be visible
+Actual value: <element(s) not found> 
+Call log:
+  - Expect "to_be_visible" with timeout 5000ms
+  - waiting for locator("#summary [data-testid=\"hamburger-btn\"]").filter(has=locator("uk-icon[icon=\"arrow-left\"]"))
+FAILED tests/ui/test_working_regression.py::TestWorkingRegression::test_htmx_requests_monitoring - playwright._impl._errors.TimeoutError: Page.wait_for_selector: Timeout 5000ms exceeded.
+Call log:
+  - waiting for locator("#desktop-item-detail, #mobile-item-detail") to be visible
+FAILED tests/ui/test_working_regression.py::TestWorkingRegression::test_read_unread_state_persistence - playwright._impl._errors.TimeoutError: Page.wait_for_selector: Timeout 5000ms exceeded.
+Call log:
+  - waiting for locator("#desktop-item-detail, #mobile-item-detail") to be visible
+============ 29 failed, 53 passed, 13 skipped in 107.00s (0:01:47) =============
+
+⚙️  Running specialized tests...
+============================= test session starts ==============================
+platform linux -- Python 3.11.2, pytest-8.4.2, pluggy-1.6.0 -- /home/kuitang/git/rss-reader-highlight/venv/bin/python
+cachedir: .pytest_cache
+rootdir: /home/kuitang/git/rss-reader-highlight
+configfile: pytest.ini
+plugins: anyio-4.10.0, asyncio-1.1.0, httpx-0.35.0, xdist-3.8.0
+asyncio: mode=Mode.AUTO, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+created: 8/8 workers
+8 workers [9 items]
+
+scheduling tests via LoadFileScheduling
+
+tests/specialized/test_feed_ingestion.py::TestFeedIngestion::test_reddit_rss_suffix_detection 
+tests/specialized/test_docker_integration.py::test_docker_integration 
+[gw0] [ 11%] PASSED tests/specialized/test_feed_ingestion.py::TestFeedIngestion::test_reddit_rss_suffix_detection 
+tests/specialized/test_feed_ingestion.py::TestFeedIngestion::test_rss_autodiscovery_success_cases 
+[gw0] [ 22%] PASSED tests/specialized/test_feed_ingestion.py::TestFeedIngestion::test_rss_autodiscovery_success_cases 
+tests/specialized/test_feed_ingestion.py::TestFeedIngestion::test_rss_autodiscovery_failure_cases 
+[gw0] [ 33%] PASSED tests/specialized/test_feed_ingestion.py::TestFeedIngestion::test_rss_autodiscovery_failure_cases 
+tests/specialized/test_feed_ingestion.py::TestFeedIngestion::test_fetch_feed_success 
+[gw0] [ 44%] PASSED tests/specialized/test_feed_ingestion.py::TestFeedIngestion::test_fetch_feed_success 
+tests/specialized/test_feed_ingestion.py::TestFeedIngestion::test_fetch_atom_feed_success 
+[gw0] [ 55%] PASSED tests/specialized/test_feed_ingestion.py::TestFeedIngestion::test_fetch_atom_feed_success 
+tests/specialized/test_feed_ingestion.py::TestFeedIngestion::test_http_redirect_handling 
+[gw0] [ 66%] PASSED tests/specialized/test_feed_ingestion.py::TestFeedIngestion::test_http_redirect_handling 
+tests/specialized/test_feed_ingestion.py::TestFeedIngestion::test_fetch_feed_with_network_error 
+[gw0] [ 77%] PASSED tests/specialized/test_feed_ingestion.py::TestFeedIngestion::test_fetch_feed_with_network_error 
+tests/specialized/test_feed_ingestion.py::TestFeedIngestion::test_fetch_feed_with_http_error 
+[gw0] [ 88%] PASSED tests/specialized/test_feed_ingestion.py::TestFeedIngestion::test_fetch_feed_with_http_error 
+[gw1] [100%] PASSED tests/specialized/test_docker_integration.py::test_docker_integration 
+
+============================== 9 passed in 24.12s ==============================
+
+❌ Some tests failed

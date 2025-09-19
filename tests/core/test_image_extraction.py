@@ -164,7 +164,7 @@ class TestImageExtraction(unittest.TestCase):
     def test_image_markdown_in_app_display(self):
         """Test that markdown images are properly converted for display"""
         import mistletoe
-        
+
         # Simulate what happens in app.py
         markdown_with_image = '![Test Image](https://example.com/image.jpg)\n\nSome article text here.'
         html_output = mistletoe.markdown(markdown_with_image)
