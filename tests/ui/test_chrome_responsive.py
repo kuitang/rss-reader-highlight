@@ -2,7 +2,7 @@
 
 import pytest
 from playwright.sync_api import Page, expect
-from test_constants import MINIMAL_WAIT_MS, DESKTOP_VIEWPORT, MOBILE_VIEWPORT_ALT, MAX_WAIT_MS
+from test_constants import MINIMAL_WAIT_MS, DESKTOP_VIEWPORT, MOBILE_VIEWPORT_ALT, MAX_WAIT_MS, DESKTOP_VIEWPORT_ALT
 from test_helpers import (
     wait_for_viewport_transition,
     wait_for_element_transition
@@ -142,12 +142,12 @@ class TestUnifiedChromeResponsive:
         page.set_viewport_size(DESKTOP_VIEWPORT)
 
         # Click "All Posts" in desktop
-        page.locator("#icon-bar button[title='All Posts']").click()
+        page.locator("#icon-bar button[title='All Posts']").first.click()
         page.wait_for_load_state("networkidle")
         expect(page).to_have_url(f"{test_server_url}/?unread=0")
 
         # Go back to unread
-        page.locator("#icon-bar button[title='Unread']").click()
+        page.locator("#icon-bar button[title='Unread']").first.click()
         page.wait_for_load_state("networkidle")
         expect(page).to_have_url(f"{test_server_url}/")
 
@@ -156,12 +156,12 @@ class TestUnifiedChromeResponsive:
         wait_for_viewport_transition(page)
 
         # Click "All Posts" in mobile
-        page.locator("#icon-bar button[title='All Posts']").click()
+        page.locator("#icon-bar button[title='All Posts']").first.click()
         page.wait_for_load_state("networkidle")
         expect(page).to_have_url(f"{test_server_url}/?unread=0")
 
         # Go back to unread
-        page.locator("#icon-bar button[title='Unread']").click()
+        page.locator("#icon-bar button[title='Unread']").first.click()
         page.wait_for_load_state("networkidle")
         expect(page).to_have_url(f"{test_server_url}/")
 
@@ -209,7 +209,7 @@ class TestUnifiedChromeResponsive:
         page.set_viewport_size(DESKTOP_VIEWPORT)
 
         # Click search button
-        page.locator("#icon-bar button[title='Search']").click()
+        page.locator("#icon-bar button[title='Search']").first.click()
         # Wait for search bar transition
         wait_for_element_transition(page, "#search-bar")
 
@@ -232,7 +232,7 @@ class TestUnifiedChromeResponsive:
         wait_for_viewport_transition(page)
 
         # Click search button
-        page.locator("#icon-bar button[title='Search']").click()
+        page.locator("#icon-bar button[title='Search']").first.click()
         # Wait for search bar transition
         wait_for_element_transition(page, "#search-bar")
 

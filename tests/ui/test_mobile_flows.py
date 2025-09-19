@@ -147,11 +147,11 @@ class TestMobileFlows:
         
         # Check for unified header and navigation (new structure)
         expect(page.locator("#summary")).to_be_visible()
-        expect(page.locator("[data-testid=\"hamburger-btn\"]")).to_be_visible()
+        expect(page.locator("#summary [data-testid=\"hamburger-btn\"]")).to_be_visible()
         
         # Click search button to expand search
         # Mobile viewport test - use unified search button
-        search_button = page.locator('[data-testid="search-btn"]')
+        search_button = page.locator('#summary [data-testid="search-btn"]')
         expect(search_button).to_be_visible()
         search_button.click()
 
@@ -204,7 +204,7 @@ class TestMobileFlows:
             
             # Search functionality should be accessible again
             # Mobile viewport test - use mobile search button
-            search_button = page.locator('[data-testid="search-btn"]')
+            search_button = page.locator('#summary [data-testid="search-btn"]')
             expect(search_button).to_be_visible()
     
     def test_mobile_search_form_functionality(self, page: Page, test_server_url):
@@ -212,7 +212,7 @@ class TestMobileFlows:
         
         # Click search button to expand search
         # Mobile viewport test - use mobile search button
-        search_button = page.locator('[data-testid="search-btn"]')
+        search_button = page.locator('#summary [data-testid="search-btn"]')
         expect(search_button).to_be_visible()
         search_button.click()
         
