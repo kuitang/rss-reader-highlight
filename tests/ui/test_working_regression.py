@@ -65,12 +65,12 @@ class TestWorkingRegression:
             claudeai_feed_link.first.click()
         wait_for_htmx_complete(page)
         # Wait for feed content to load instead of arbitrary sleep
-        page.wait_for_selector("#desktop-feeds-content", state="visible", timeout=constants.MAX_WAIT_MS)
+        page.wait_for_selector("#summary", state="visible", timeout=constants.MAX_WAIT_MS)
         
         # Verify feed filtering worked - heading should change to ClaudeAI
         assert "feed_id" in page.url, "Should be viewing a specific feed"
         # Desktop h3 is in chrome container
-        feed_heading = page.locator("#desktop-chrome-container h3, #desktop-chrome-content h3").filter(has_text="ClaudeAI")
+        feed_heading = page.locator("#universal-header h1").filter(has_text="ClaudeAI")
         expect(feed_heading.first).to_be_visible(timeout=constants.MAX_WAIT_MS)
         print(f"Successfully navigated to ClaudeAI feed: {page.url}")
         
@@ -146,10 +146,10 @@ class TestWorkingRegression:
             hackernews_link.first.click()
         wait_for_htmx_complete(page)
         # Wait for feed content to update
-        page.wait_for_selector("#desktop-feeds-content", state="visible", timeout=constants.MAX_WAIT_MS)
+        page.wait_for_selector("#summary", state="visible", timeout=constants.MAX_WAIT_MS)
         
         # Verify feed changed to Hacker News - use .first to handle multiple matches
-        hn_heading = page.locator("#desktop-chrome-container h3, #desktop-chrome-content h3").filter(has_text="Hacker News")
+        hn_heading = page.locator("#universal-header h1").filter(has_text="Hacker News")
         expect(hn_heading.first).to_be_visible()
         
         page.screenshot(path="/tmp/regression_hackernews_selected.png")
@@ -218,7 +218,7 @@ class TestWorkingRegression:
             first_article.click()
             wait_for_htmx_complete(page)
             # Wait for article detail to load (mobile shows in main-content)
-            page.wait_for_selector("#main-content", state="visible", timeout=constants.MAX_WAIT_MS)
+            page.wait_for_selector("#detail", state="visible", timeout=constants.MAX_WAIT_MS)
             
             page.screenshot(path="/tmp/regression_mobile_article_view.png")
             
@@ -262,7 +262,7 @@ class TestWorkingRegression:
             claudeai_link = page.locator("#feeds a[href*='feed_id']:has-text('ClaudeAI')").first
         else:
             # Desktop: get sidebar feed links directly
-            claudeai_link = page.locator("#sidebar a[href*='feed_id']:has-text('ClaudeAI')").first
+            claudeai_link = page.locator("#feeds a[href*='feed_id']:has-text('ClaudeAI')").first
         
         claudeai_link.click()
         wait_for_htmx_complete(page)
@@ -336,7 +336,7 @@ class TestWorkingRegression:
                 claudeai_link = page.locator("#feeds a[href*='feed_id']:has-text('ClaudeAI')").first
             else:
                 # Desktop: get sidebar feed links directly
-                claudeai_link = page.locator("#sidebar a[href*='feed_id']:has-text('ClaudeAI')").first
+                claudeai_link = page.locator("#feeds a[href*='feed_id']:has-text('ClaudeAI')").first
             
             claudeai_link.click()
             wait_for_htmx_complete(page)

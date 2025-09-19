@@ -49,16 +49,16 @@ DESKTOP_ICON_BAR = "#icon-bar"
 MOBILE_ICON_BAR = "#icon-bar"
 ANY_ICON_BAR = "#icon-bar, #icon-bar"
 
-# Content areas
-DESKTOP_FEEDS_CONTENT = "#desktop-feeds-content"
+# Content areas (updated for unified layout)
+DESKTOP_FEEDS_CONTENT = "#summary"  # Updated: was #desktop-feeds-content
 MOBILE_SIDEBAR = "#feeds"
-MAIN_CONTENT = "#main-content"
+MAIN_CONTENT = "#summary"  # Updated: was #main-content, now unified
 APP_ROOT = '[data-testid="app-root"]'
 
-# Item detail views
-DESKTOP_ITEM_DETAIL = "#desktop-item-detail"
-MOBILE_ITEM_DETAIL = "#mobile-item-detail"
-ANY_ITEM_DETAIL = "#desktop-item-detail, #mobile-item-detail"
+# Item detail views (updated for unified layout)
+DESKTOP_ITEM_DETAIL = "#detail"  # Updated: was #desktop-item-detail
+MOBILE_ITEM_DETAIL = "#detail"   # Updated: was #mobile-item-detail, now unified
+ANY_ITEM_DETAIL = "#detail"      # Updated: unified detail view
 
 # =============================================================================
 # TEST DATA

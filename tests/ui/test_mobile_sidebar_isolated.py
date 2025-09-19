@@ -56,7 +56,9 @@ class TestMobileSidebarIsolated:
                     
                     # Verify sidebar closes and content updates
                     wait_for_htmx_complete(page)
-                    expect(page.locator("#feeds")).to_be_hidden()
+                    # Check that sidebar drawer is closed (data-drawer attribute removed)
+                    app_root = page.locator("#app-root")
+                    expect(app_root).not_to_have_attribute("data-drawer")
                     
                     # Test article navigation
                     article_items = page.locator("li[id*='mobile-feed-item']").all()

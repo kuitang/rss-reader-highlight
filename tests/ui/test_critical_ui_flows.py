@@ -139,7 +139,7 @@ class TestFormParameterBugFlow:
             
             # 4. EXPECTED BEHAVIOR: Drawer should auto-close after feed click
             # Check that data-drawer attribute is removed from app-root
-            page.wait_for_function("() => !document.getElementById('app-root').hasAttribute('data-drawer')", timeout=5000)
+            page.wait_for_function("() => !document.getElementById('app-root').hasAttribute('data-drawer')", timeout=constants.MAX_WAIT_MS)
             
             # 5. Verify feed filtering worked (content should be filtered)
             # Check that only posts from the selected feed are shown
@@ -510,7 +510,7 @@ class TestSessionAndSubscriptionFlow:
                 # Click a feed link (should auto-close drawer via onclick handler)
                 feed_links.first.click()
                 # Wait for drawer to close and summary content to load
-                page.wait_for_function("() => !document.getElementById('app-root').hasAttribute('data-drawer')", timeout=5000)
+                page.wait_for_function("() => !document.getElementById('app-root').hasAttribute('data-drawer')", timeout=constants.MAX_WAIT_MS)
 
                 content_selector = '[data-testid="summary"]'
                 articles_selector = "li[id^='feed-item-']"
@@ -716,7 +716,7 @@ class TestComplexNavigationFlows:
         wait_for_htmx_complete(page)
         # Check if we're still in the app or navigated away entirely
         try:
-            page.wait_for_selector('[data-testid="app-root"]', state="visible", timeout=5000)
+            page.wait_for_selector('[data-testid="app-root"]', state="visible", timeout=constants.MAX_WAIT_MS)
         except:
             # If we navigated away from the app, that's acceptable behavior
             # Check if we're on a different page (like browser start page)
@@ -809,7 +809,7 @@ class TestTabSizeAndAlignment:
                     if config['name'] == 'mobile':
                         # Mobile: simplified header with hamburger and feed name (in summary section)
                         icon_bar = page.locator('[data-testid="summary"] #universal-header')
-                        expect(icon_bar).to_be_visible(timeout=5000)
+                        expect(icon_bar).to_be_visible(timeout=constants.MAX_WAIT_MS)
 
                         # Check for hamburger menu button (should be visible in summary section on mobile)
                         hamburger_btn = page.locator('#summary [data-testid="hamburger-btn"]')
@@ -851,7 +851,7 @@ class TestTabSizeAndAlignment:
                     else:
                         # Desktop: unified layout - no mobile header, three panes visible
                         desktop_layout = page.locator('[data-testid="app-root"]')
-                        expect(desktop_layout).to_be_visible(timeout=5000)
+                        expect(desktop_layout).to_be_visible(timeout=constants.MAX_WAIT_MS)
 
                         # Verify all three panes are visible
                         expect(page.locator('[data-testid="feeds"]')).to_be_visible()
@@ -896,7 +896,7 @@ class TestHeaderUpdateBugFixes:
         page.evaluate("() => { try { localStorage.clear(); sessionStorage.clear(); } catch(e) {} }")
 
         # Extra wait to ensure all initial HTMX requests complete
-        page.wait_for_function("() => !document.body.classList.contains('htmx-request')", timeout=5000)
+        page.wait_for_function("() => !document.body.classList.contains('htmx-request')", timeout=constants.MAX_WAIT_MS)
 
         # 1. Verify we start with "All Feeds" header (target the one in summary pane)
         header = page.locator('[data-testid="summary"] #universal-header h1')
@@ -919,7 +919,7 @@ class TestHeaderUpdateBugFixes:
         # Extra robustness: Wait for header content to actually change
         page.wait_for_function(
             "() => document.querySelector('[data-testid=\"summary\"] #universal-header h1')?.textContent !== 'All Feeds'",
-            timeout=10000
+            timeout=constants.MAX_WAIT_MS
         )
 
         # 3. Verify header updated to show the feed name
@@ -1199,7 +1199,7 @@ class TestSearchBarHeightInvariant:
         # Click outside the search bar (on the main content area which should exist)
         # First wait for content to be present
         content = page.locator('[data-testid="summary"]').first
-        expect(content).to_be_visible(timeout=5000)
+        expect(content).to_be_visible(timeout=constants.MAX_WAIT_MS)
         
         # Click on the content area to trigger click-outside
         content.click(position={'x': 100, 'y': 200})
@@ -1250,7 +1250,7 @@ class TestPaginationButtonDuplication:
         
         # Check if pagination exists with explicit wait
         try:
-            pagination_container.wait_for(state="visible", timeout=5000)
+            pagination_container.wait_for(state="visible", timeout=constants.MAX_WAIT_MS)
             pagination_exists = True
         except:
             pagination_exists = False

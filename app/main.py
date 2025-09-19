@@ -292,7 +292,7 @@ def three_pane_layout(data, detail_content=None):
         Section(
             id="summary",
             data_testid="summary",
-            cls="overflow-y-auto lg:border-r"
+            cls="overflow-y-auto lg:border-r h-full lg:h-auto"
         )(
             universal_header,  # Header is now inside summary section
             FeedsContent(data.session_id, data.feed_id, data.unread, data.page, data=data)
@@ -432,7 +432,16 @@ def viewport_styles():
 
             /* Mobile layout adjustments */
             #app-root {
-                display: block !important; /* Switch from grid to block on mobile */
+                display: flex !important; /* Use flexbox on mobile for proper height constraints */
+                flex-direction: column !important;
+                height: 100dvh !important;
+                overflow: hidden !important;
+            }
+
+            #summary {
+                flex: 1 !important; /* Take remaining height after header */
+                overflow-y: auto !important; /* Enable scrolling */
+                min-height: 0 !important; /* Important for flexbox child scrolling */
             }
         }
 
@@ -643,19 +652,83 @@ app, rt = fast_app(
         htmx.config.includeIndicatorStyles = false;
         
         // Scroll restoration for unified layout
+        // Store scroll position before navigating away
+        htmx.on('htmx:beforeRequest', function(evt) {
+            // If we're navigating to an item page, store the current scroll
+            if (evt.detail.path && evt.detail.path.includes('/item/')) {
+                const summary = document.getElementById('summary');
+                if (summary && window.innerWidth < 1024) {
+                    const currentUrl = window.location.pathname + window.location.search;
+                    sessionStorage.setItem('scrollPos_' + currentUrl, summary.scrollTop);
+                    console.log('Stored scroll position:', summary.scrollTop, 'for URL:', currentUrl);
+                }
+            }
+        });
+
         htmx.on('htmx:afterSwap', function(evt) {
-            // Handle pagination - reset scroll to top for summary updates
-            if (evt.detail.target && (evt.detail.target.id === 'summary' || evt.detail.target.id === 'feeds-list-container')) {
+            // Check if this is a back navigation with scroll position to restore
+            const urlParams = new URLSearchParams(window.location.search);
+            const scrollPos = urlParams.get('_scroll');
+
+            // Handle back button navigation with scroll restoration (from back button URL)
+            if (evt.detail.target && evt.detail.target.id === 'detail-content' && scrollPos) {
+                // Back navigation from UI back button - restore scroll position
                 setTimeout(() => {
                     const summary = document.getElementById('summary');
                     if (summary) {
-                        summary.scrollTop = 0;
+                        summary.scrollTop = parseInt(scrollPos);
+                        console.log('Restored scroll from URL param:', scrollPos);
                     }
                 }, 50);
-            }
 
+                // Clean up URL by removing _scroll parameter
+                urlParams.delete('_scroll');
+                const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+                window.history.replaceState({}, '', newUrl);
+            }
+            // Handle browser back button or feed list navigation
+            else if (evt.detail.target && (evt.detail.target.id === 'summary' || evt.detail.target.id === 'feeds-list-container')) {
+                // Try to restore scroll from sessionStorage for browser back button
+                const currentUrl = window.location.pathname + window.location.search;
+                const storedScroll = sessionStorage.getItem('scrollPos_' + currentUrl);
+
+                if (storedScroll) {
+                    setTimeout(() => {
+                        const summary = document.getElementById('summary');
+                        if (summary) {
+                            summary.scrollTop = parseInt(storedScroll);
+                            console.log('Restored scroll from sessionStorage:', storedScroll);
+                            // Clean up after restore
+                            sessionStorage.removeItem('scrollPos_' + currentUrl);
+                        }
+                    }, 50);
+                }
+                // Otherwise check URL parameter (from direct navigation)
+                else if (scrollPos) {
+                    setTimeout(() => {
+                        const summary = document.getElementById('summary');
+                        if (summary) {
+                            summary.scrollTop = parseInt(scrollPos);
+                            console.log('Restored scroll from URL:', scrollPos);
+                        }
+                        // Clean up URL
+                        urlParams.delete('_scroll');
+                        const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+                        window.history.replaceState({}, '', newUrl);
+                    }, 50);
+                }
+                // No scroll to restore - reset to top (for pagination)
+                else {
+                    setTimeout(() => {
+                        const summary = document.getElementById('summary');
+                        if (summary) {
+                            summary.scrollTop = 0;
+                        }
+                    }, 50);
+                }
+            }
             // Handle detail updates (article view)
-            if (evt.detail.target && evt.detail.target.id === 'detail') {
+            else if (evt.detail.target && evt.detail.target.id === 'detail') {
                 // Reset detail scroll to top when new article loads
                 setTimeout(() => {
                     const detail = document.getElementById('detail');
@@ -667,11 +740,32 @@ app, rt = fast_app(
         });
         
         // Mobile sidebar auto-close now handled via hx-on:click on individual feed links
-        
+
         // Form targeting now handled via hx-on:htmx:config-request on individual forms
-        
+
         // Body class management now handled in scroll restoration handler above
-        
+
+        // Initial scroll restoration from URL parameter (for fresh tab loads)
+        window.addEventListener('DOMContentLoaded', function() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const scrollPos = urlParams.get('_scroll');
+
+            if (scrollPos) {
+                // Apply initial scroll position after page loads
+                setTimeout(() => {
+                    const summary = document.getElementById('summary');
+                    if (summary) {
+                        summary.scrollTop = parseInt(scrollPos);
+                    }
+                }, 100);
+
+                // Clean up URL by removing _scroll parameter
+                urlParams.delete('_scroll');
+                const newUrl = window.location.pathname + (urlParams.toString() ? '?' + urlParams.toString() : '');
+                window.history.replaceState({}, '', newUrl);
+            }
+        });
+
         """),
         Style("""
         .htmx-indicator { display: none; }
@@ -992,7 +1086,9 @@ def FeedItem(item, unread_view=False, feed_id=None, page=1):
         "hx_get": item_url,
         "hx_target": "#detail-content",
         "hx_trigger": "click",
-        "hx_push_url": "true"
+        "hx_push_url": "true",
+        # Capture scroll position for mobile (desktop uses separate columns)
+        "hx_vals": 'js:{_scroll: window.innerWidth < 1024 ? (document.getElementById("summary")?.scrollTop || 0) : 0}'
     }
     
     return Li(
@@ -1100,12 +1196,14 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, data=None)
     else:
         feed_name = "All Feeds"
     
-    # Build URL parameters for pagination (excluding unread for tab navigation)
+    # Build URL parameters for pagination (including unread state)
     url_params = []
     if feed_id:
         url_params.append(f"feed_id={feed_id}")
-    
-    # Base URL for tab navigation (without unread parameter)
+    # Always include unread state to preserve filter
+    url_params.append(f"unread={'1' if unread_only else '0'}")
+
+    # Base URL for navigation (with unread parameter)
     base_url = "/?" + "&".join(url_params) if url_params else "/"
     
     def pagination_footer():
@@ -1297,7 +1395,35 @@ def show_item(item_id: int, htmx, sess, unread_view: bool = False, feed_id: int 
         return (layout, viewport_styles())
 
     # HTMX request - return fragment(s)
-    # If item was unread, return detail view + surgical container update
+    # Build back button URL with all state preserved
+    back_url = "/"
+    back_params = []
+    if feed_id:
+        back_params.append(f"feed_id={feed_id}")
+    if unread_view:
+        back_params.append(f"unread=1")
+    else:
+        back_params.append(f"unread=0")
+    if page > 1:
+        back_params.append(f"page={page}")
+    if _scroll:
+        back_params.append(f"_scroll={_scroll}")
+
+    if back_params:
+        back_url += "?" + "&".join(back_params)
+
+    # Update back button via out-of-band swap to include scroll position
+    updated_back_button = Button(
+        UkIcon('arrow-left'),
+        hx_get=back_url,
+        hx_target="#detail-content",
+        hx_swap="innerHTML",
+        cls="back-btn absolute top-0 left-0 p-3 rounded border hover:bg-secondary min-h-[44px] min-w-[44px] z-10",
+        data_testid="back-button",
+        hx_swap_oob="true"
+    )
+
+    # If item was unread, return detail view + surgical container update + back button
     if was_unread:
         # Surgical update: return updated title container with read state styling
         updated_title_container = Div(
@@ -1312,10 +1438,10 @@ def show_item(item_id: int, htmx, sess, unread_view: bool = False, feed_id: int 
             hx_swap_oob="true"
         )
 
-        return (ItemDetailView(item), updated_title_container)
+        return (ItemDetailView(item), updated_title_container, updated_back_button)
     else:
-        # Item was already read, just return detail view
-        return ItemDetailView(item)
+        # Item was already read, just return detail view + back button
+        return (ItemDetailView(item), updated_back_button)
 
 @rt('/api/feed/add')
 def add_feed(htmx, sess, new_feed_url: str = ""):

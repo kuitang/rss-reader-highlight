@@ -117,7 +117,7 @@ class TestComprehensiveRegression:
                     summary_content.scroll_into_view_if_needed()
                     page.mouse.wheel(0, 800)
                     # Wait for any HTMX updates after scroll
-                    page.wait_for_selector("body:not(.htmx-request)", timeout=2000)
+                    page.wait_for_selector("body:not(.htmx-request)", timeout=constants.MAX_WAIT_MS)
                     
                     # Click on an article
                     article_items = page.locator("li[data-testid='feed-item']").all()

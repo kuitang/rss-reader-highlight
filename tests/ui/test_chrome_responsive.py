@@ -21,7 +21,7 @@ class TestUnifiedChromeResponsive:
         page.wait_for_load_state("networkidle")
 
         # Desktop view assertions
-        desktop_chrome = page.locator("#desktop-chrome-container")
+        desktop_chrome = page.locator("#universal-header")
         mobile_header = page.locator("#mobile-top-bar")
 
         # Desktop chrome should be visible
@@ -39,7 +39,7 @@ class TestUnifiedChromeResponsive:
         expect(desktop_buttons).to_have_count(3)
 
         # Test scrolling in desktop - chrome should stay fixed
-        feeds_content = page.locator("#desktop-feeds-content")
+        feeds_content = page.locator("#summary")
         initial_chrome_position = desktop_chrome.bounding_box()["y"]
 
         # Scroll the feeds content
@@ -47,7 +47,7 @@ class TestUnifiedChromeResponsive:
         # Wait for scroll to complete
         page.wait_for_function(
             "(selector) => document.querySelector(selector).scrollTop === 200",
-            arg="#desktop-feeds-content",
+            arg="#summary",
             timeout=MAX_WAIT_MS
         )
 
@@ -81,7 +81,7 @@ class TestUnifiedChromeResponsive:
         expect(mobile_buttons).to_have_count(3)
 
         # Test scrolling in mobile - header should stay fixed
-        main_content = page.locator("#main-content")
+        main_content = page.locator("#summary")
         initial_header_position = mobile_header.bounding_box()["y"]
 
         # Scroll the main content
@@ -89,7 +89,7 @@ class TestUnifiedChromeResponsive:
         # Wait for scroll to complete
         page.wait_for_function(
             "(selector) => document.querySelector(selector).scrollTop === 200",
-            arg="#main-content",
+            arg="#summary",
             timeout=MAX_WAIT_MS
         )
 
@@ -116,7 +116,7 @@ class TestUnifiedChromeResponsive:
             page.set_viewport_size({"width": viewport["width"], "height": viewport["height"]})
             wait_for_viewport_transition(page)
 
-            desktop_chrome = page.locator("#desktop-chrome-container")
+            desktop_chrome = page.locator("#universal-header")
             mobile_header = page.locator("#mobile-top-bar")
 
             if viewport["expect_desktop"]:
@@ -173,7 +173,7 @@ class TestUnifiedChromeResponsive:
 
         # Desktop view - verify initial feed name
         page.set_viewport_size(DESKTOP_VIEWPORT)
-        desktop_feed_name = page.locator("#desktop-chrome-container h3")
+        desktop_feed_name = page.locator("#universal-header h1")
         expect(desktop_feed_name).to_contain_text("All Feeds")
 
         # Click on a specific feed in desktop sidebar (if available)

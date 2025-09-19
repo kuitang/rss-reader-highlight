@@ -80,9 +80,11 @@ class TestTextWrapping:
         assert 'overflow-x: hidden' in css_content, "Should prevent horizontal overflow"
         assert 'max-width: 100vw' in css_content, "Should limit to viewport width"
         
-        # Check for minimum touch target size
-        assert 'min-height: 44px' in css_content, "Should have minimum height for touch targets"
-        assert 'min-width: 44px' in css_content, "Should have minimum width for touch targets"
+        # Check for minimum touch target size via Tailwind classes in DOM
+        # Get the actual HTML content to check for Tailwind classes
+        html_content = page.content()
+        assert 'min-h-[44px]' in html_content, "Should have minimum height Tailwind class for touch targets"
+        assert 'min-w-[44px]' in html_content, "Should have minimum width Tailwind class for touch targets"
         
         print("✓ All CSS rules are properly implemented")
     

@@ -55,7 +55,7 @@ class TestAddFeedFlows:
                 # Mobile form elements
                 feed_input = page.locator('#feeds input[placeholder="Enter RSS URL"]')
                 add_button = page.locator('#feeds button.uk-btn.add-feed-button')
-                layout_selector = "#main-content"
+                layout_selector = "#summary"
                 
                 expect(feed_input).to_be_visible()
                 expect(add_button).to_be_visible()
@@ -149,10 +149,10 @@ class TestAddFeedFlows:
                 
                 # Test navigation
                 feed_links = page.locator("#sidebar a[href*='feed_id=']")
-                content_selector = "#desktop-feeds-content"
+                content_selector = "#summary"
             else:
                 # Mobile layout
-                mobile_content = page.locator("#main-content")
+                mobile_content = page.locator("#summary")
                 expect(mobile_content).to_be_visible()
                 print("✓ Mobile layout confirmed")
                 
@@ -174,7 +174,7 @@ class TestAddFeedFlows:
                 
                 # Test navigation
                 feed_links = page.locator('#feeds a[href*="feed_id="]')
-                content_selector = "#main-content"
+                content_selector = "#summary"
             
             # Navigate to first feed
             if feed_links.count() > 0:

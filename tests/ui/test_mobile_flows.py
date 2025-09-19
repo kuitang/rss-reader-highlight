@@ -222,7 +222,7 @@ class TestMobileFlows:
         
         # Test UK Filter functionality (if implemented)
         search_input.fill("test search")
-        wait_for_htmx_complete(page, timeout=2000)  # FIXED: Don't expect sidebar visible after search
+        wait_for_htmx_complete(page, timeout=constants.MAX_WAIT_MS)  # FIXED: Don't expect sidebar visible after search
         
         # The search should work with uk-filter (MonsterUI)
         # This is mainly testing that the form doesn't break
@@ -230,7 +230,7 @@ class TestMobileFlows:
         
         # Clear search
         search_input.clear()
-        wait_for_htmx_complete(page, timeout=2000)
+        wait_for_htmx_complete(page, timeout=constants.MAX_WAIT_MS)
         
         expect(search_input).to_have_value("")
     
@@ -264,12 +264,12 @@ class TestMobileFlows:
         """Test that mobile content areas scroll properly within fixed viewport"""
         
         # Main content should be scrollable
-        main_content = page.locator("#main-content")
+        main_content = page.locator("#summary")
         expect(main_content).to_be_visible()
         
         # Check if main content has proper scrolling styles
         main_content_overflow = page.evaluate("""() => {
-            const mainContent = document.getElementById('main-content');
+            const mainContent = document.getElementById('summary');
             if (mainContent) {
                 const computed = window.getComputedStyle(mainContent);
                 return {
@@ -362,7 +362,7 @@ class TestMobileFlows:
 
             if is_mobile:
                 # Mobile should have mobile header
-                expect(page.locator("#mobile-header")).to_be_visible()
+                expect(page.locator("#universal-header")).to_be_visible()
                 # Article detail should be visible
                 expect(page.locator("#detail")).to_be_visible()
             else:
@@ -417,7 +417,7 @@ class TestMobileFlows:
             
             # Mobile layout should work
             expect(page.locator("#app-root")).to_be_visible()
-            expect(page.locator("#main-content")).to_be_visible()
+            expect(page.locator("#summary")).to_be_visible()
     
     def test_mobile_url_sharing_with_unread_filter(self, page: Page, test_server_url):
         """Test URL sharing with unread filter applied"""
@@ -448,7 +448,7 @@ class TestMobileFlows:
             wait_for_htmx_complete(page)
             
             # Should be back in unread view
-            expect(page.locator("#main-content")).to_be_visible()
+            expect(page.locator("#summary")).to_be_visible()
             
             # Unread tab should be active if it exists
             if page.locator('a[role="button"]:has-text("Unread")').first.is_visible():
@@ -474,7 +474,7 @@ class TestMobileFlows:
         wait_for_htmx_complete(page)
         
         # Verify we're viewing ClaudeAI feed - mobile feed title is in header
-        feed_title = page.locator("#mobile-top-bar h3, #mobile-header h3").first
+        feed_title = page.locator("#universal-header h1").first
         expect(feed_title).to_contain_text("ClaudeAI")
         
         # Click on an article
@@ -484,7 +484,7 @@ class TestMobileFlows:
         wait_for_htmx_complete(page)
         
         # Should be on article view
-        expect(page.locator("#main-content #item-detail")).to_be_visible()
+        expect(page.locator("#detail #item-detail")).to_be_visible()
         
         # Click back button
         back_button = page.locator("#summary [data-testid=\"hamburger-btn\"]").filter(has=page.locator('uk-icon[icon="arrow-left"]'))
@@ -494,7 +494,7 @@ class TestMobileFlows:
         
         # Should be back to feed list with correct feed title
         expect(page.locator("li[data-testid='feed-item']").first).to_be_visible()
-        feed_title_after_back = page.locator("#mobile-top-bar h3, #mobile-header h3").first
+        feed_title_after_back = page.locator("#universal-header h1").first
         expect(feed_title_after_back).to_contain_text("ClaudeAI")  # Should NOT be "BizToc"
 
 if __name__ == "__main__":
