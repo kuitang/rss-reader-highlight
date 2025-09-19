@@ -380,7 +380,7 @@ def viewport_styles():
                 width: 18rem;
                 transform: translateX(-100%);
                 transition: transform 0.3s ease;
-                background: var(--background);
+                background: hsl(var(--background)); /* Use HSL with the CSS variable */
                 opacity: 1; /* Force full opacity */
                 z-index: 50;
                 display: block !important; /* Override the lg:hidden class */
