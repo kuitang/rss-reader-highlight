@@ -141,6 +141,50 @@ class PageData:
 
 # Removed: Old HTMX routing functions - using unified layout now
 
+def create_icon_bar(data, for_oob=False):
+    """Create the icon bar with All Posts, Unread, and Search buttons
+
+    Args:
+        data: PageData object with feed_id and unread state
+        for_oob: If True, adds hx_swap_oob="true" for HTMX OOB updates
+    """
+    attrs = {
+        "cls": "flex items-center space-x-2",
+        "id": "icon-bar"
+    }
+    if for_oob:
+        attrs["hx_swap_oob"] = "true"
+
+    return Div(**attrs)(
+        Button(
+            UkIcon('list'),
+            hx_get=f"/?feed_id={data.feed_id}&unread=0" if hasattr(data, 'feed_id') and data.feed_id else "/?unread=0",
+            hx_target="#feeds-list-container",
+            hx_swap="outerHTML",
+            hx_push_url="true",
+            cls=f"p-2 rounded hover:bg-secondary {'bg-secondary' if not data.unread else ''}",
+            title="All Posts",
+            data_testid="all-posts-btn"
+        ),
+        Button(
+            UkIcon('mail'),
+            hx_get=f"/?feed_id={data.feed_id}" if hasattr(data, 'feed_id') and data.feed_id else "/",
+            hx_target="#feeds-list-container",
+            hx_swap="outerHTML",
+            hx_push_url="true",
+            cls=f"p-2 rounded hover:bg-secondary {'bg-secondary' if data.unread else ''}",
+            title="Unread",
+            data_testid="unread-btn"
+        ),
+        Button(
+            UkIcon('search'),
+            onclick="var bar = document.getElementById('icon-bar'); var search = document.getElementById('search-bar'); bar.style.display='none'; search.style.display='flex'; search.querySelector('input').focus();",
+            cls="p-2 rounded hover:bg-secondary",
+            title="Search",
+            data_testid="search-btn"
+        )
+    )
+
 def three_pane_layout(data, detail_content=None):
     """Unified three-pane layout for all viewports"""
     feed_name = data.feed_name if hasattr(data, 'feed_name') else "All Feeds"
@@ -174,38 +218,7 @@ def three_pane_layout(data, detail_content=None):
             H1(feed_name, cls="text-lg font-semibold flex-1"),
 
             # Action buttons container
-            Div(
-                cls="flex items-center space-x-2",
-                id="icon-bar"
-            )(
-                Button(
-                    UkIcon('list'),
-                    hx_get=f"/?feed_id={data.feed_id}&unread=0" if hasattr(data, 'feed_id') and data.feed_id else "/?unread=0",
-                    hx_target="#feeds-list-container",
-                    hx_swap="outerHTML",
-                    hx_push_url="true",
-                    cls=f"p-2 rounded hover:bg-secondary {'bg-secondary' if not data.unread else ''}",
-                    title="All Posts",
-                    data_testid="all-posts-btn"
-                ),
-                Button(
-                    UkIcon('mail'),
-                    hx_get=f"/?feed_id={data.feed_id}" if hasattr(data, 'feed_id') and data.feed_id else "/",
-                    hx_target="#feeds-list-container",
-                    hx_swap="outerHTML",
-                    hx_push_url="true",
-                    cls=f"p-2 rounded hover:bg-secondary {'bg-secondary' if data.unread else ''}",
-                    title="Unread",
-                    data_testid="unread-btn"
-                ),
-                Button(
-                    UkIcon('search'),
-                    onclick="var bar = document.getElementById('icon-bar'); var search = document.getElementById('search-bar'); bar.style.display='none'; search.style.display='flex'; search.querySelector('input').focus();",
-                    cls="p-2 rounded hover:bg-secondary",
-                    title="Search",
-                    data_testid="search-btn"
-                )
-            ),
+            create_icon_bar(data),
 
             # Expandable search bar (hidden by default)
             Div(
@@ -1204,7 +1217,9 @@ def index(htmx, sess, feed_id: int = None, unread: bool = True, folder_id: int =
     if htmx and getattr(htmx, 'request', None):
         # Return updated summary list for pagination/filtering
         if getattr(htmx, 'target', None) in ['feeds-list-container', 'summary']:  # Handle both targets
-            return FeedsContent(data.session_id, data.feed_id, data.unread, data.page, data=data)
+            # Include OOB update for button states using shared function
+            updated_icon_bar = create_icon_bar(data, for_oob=True)
+            return (FeedsContent(data.session_id, data.feed_id, data.unread, data.page, data=data), updated_icon_bar)
         # Clear detail to show summary (for back button)
         elif getattr(htmx, 'target', None) == 'detail-content':
             return Div(cls="placeholder")
