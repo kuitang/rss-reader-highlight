@@ -353,7 +353,7 @@ class TestWorkingRegression:
                 first_unread.click()
                 wait_for_htmx_complete(page)
                 # Wait for detail panel to load
-                page.wait_for_selector("#desktop-item-detail, #mobile-item-detail", state="visible", timeout=constants.MAX_WAIT_MS)
+                page.wait_for_selector("#detail", state="visible", timeout=constants.MAX_WAIT_MS)
                 
                 # Check unread count decreased
                 remaining_unread = page.locator("li").filter(has=page.locator(".bg-blue-600")).all()

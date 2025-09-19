@@ -58,7 +58,7 @@ class TestMobileSidebarIsolated:
                     wait_for_htmx_complete(page)
                     # Check that sidebar drawer is closed (data-drawer attribute removed)
                     app_root = page.locator("#app-root")
-                    expect(app_root).not_to_have_attribute("data-drawer")
+                    expect(app_root).not_to_have_attribute("data-drawer", "open")
                     
                     # Test article navigation
                     article_items = page.locator("li[id*='mobile-feed-item']").all()
