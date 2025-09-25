@@ -10,6 +10,7 @@ Combines functionality from:
 import pytest
 from playwright.sync_api import Page, expect
 import time
+from tests.ui.conftest import wait_for_htmx_complete, wait_for_page_ready
 
 pytestmark = pytest.mark.needs_server
 
@@ -25,14 +26,14 @@ def wait_for_page_ready(page):
 
 class TestMobileFlows:
     """Test mobile-specific UI flows and behaviors"""
-    
+
     @pytest.fixture(autouse=True)
     def setup(self, page: Page, test_server_url):
         """Set mobile viewport for all tests"""
         page.set_viewport_size({"width": 375, "height": 667})
-        page.goto(test_server_url, timeout=10000)
-        # Wait for mobile layout to be visible
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+        page.goto(test_server_url, timeout=5000)
+        # Wait for main layout to be visible
+        page.wait_for_selector("#main-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
     
     # Navigation Tests (from test_mobile_navigation.py)
@@ -40,17 +41,17 @@ class TestMobileFlows:
         """Test that mobile post navigation uses HTMX without full page reloads"""
         
         # Check that we have the mobile layout
-        expect(page.locator("#mobile-layout")).to_be_visible()
+        expect(page.locator("#main-layout")).to_be_visible()
         
         # Get initial page state
         initial_url = page.url
         
-        # Find first post - updated selector to match app.py (mobile-feed-item prefix)
-        first_post = page.locator("li[id^='mobile-feed-item-']").first
-        expect(first_post).to_be_visible(timeout=10000)
+        # Find first post - updated selector to match app.py (feed-item prefix)
+        first_post = page.locator("li[id^='feed-item-']").first
+        expect(first_post).to_be_visible(timeout=5000)
         
         # Store initial HTML to detect full reload
-        initial_header_html = page.locator("#mobile-header").inner_html()
+        initial_header_html = page.locator("#chrome-container").inner_html()
         
         # Click on first post - should use HTMX
         with page.expect_request(lambda req: "/item/" in req.url) as request_info:
@@ -61,13 +62,13 @@ class TestMobileFlows:
         assert request.headers.get("hx-request") == "true", "Post click didn't use HTMX"
         
         # Wait for article to load in main content
-        page.wait_for_selector("#main-content #item-detail", timeout=10000)
+        page.wait_for_selector("#content-area #item-detail", timeout=5000)
         
         # Verify URL changed (for shareability) 
         assert "/item/" in page.url, "URL didn't update for article"
         
         # Verify back button is shown - updated selector to match app.py CSS classes
-        back_button = page.locator("#mobile-nav-button")  # Back button is first button
+        back_button = page.locator("#nav-button")  # Back button is first button
         expect(back_button).to_be_visible()
         
         # Verify it's actually a back button by checking for arrow-left icon
@@ -79,26 +80,26 @@ class TestMobileFlows:
         wait_for_htmx_complete(page)  # OPTIMIZED: Wait for any HTMX operation to complete
         
         # Wait for feed list to return
-        page.wait_for_selector("li[id^='mobile-feed-item-']", timeout=10000)
+        page.wait_for_selector("li[id^='feed-item-']", timeout=5000)
         
         # Verify we're back at the list by checking for feed items (more reliable than container visibility)
-        expect(page.locator("li[id^='mobile-feed-item-']").first).to_be_visible()
+        expect(page.locator("li[id^='feed-item-']").first).to_be_visible()
     
     def test_mobile_feed_filter_preserved(self, page: Page, test_server_url):
         """Test that feed filter state is preserved during navigation"""
         
         # Open mobile sidebar - updated selector
-        menu_button = page.locator('#mobile-nav-button')
+        menu_button = page.locator('#nav-button')
         menu_button.click()
         
         # Wait for sidebar - check for hidden attribute
-        page.wait_for_selector("#mobile-sidebar", state="visible")
-        sidebar = page.locator("#mobile-sidebar")
+        page.wait_for_selector("#sidebar", state="visible")
+        sidebar = page.locator("#sidebar")
         # Sidebar should be visible (no hidden attribute or hidden=false)
         expect(sidebar).to_be_visible()
         
         # Click on a specific feed (not "All Feeds")
-        feed_links = page.locator("#mobile-sidebar a[href*='feed_id=']")
+        feed_links = page.locator("#sidebar a[href*='feed_id=']")
         if feed_links.count() > 0:
             first_feed = feed_links.first
             feed_url = first_feed.get_attribute("href")
@@ -114,10 +115,10 @@ class TestMobileFlows:
             assert f"feed_id={feed_id}" in page.url
             
             # Verify sidebar closed
-            expect(sidebar).to_have_attribute("hidden", "true")
+            expect(sidebar).not_to_be_visible()
             
             # Click on a post - should preserve feed context
-            posts = page.locator("li[id^='mobile-feed-item-']")
+            posts = page.locator("li[id^='feed-item-']")
             if posts.count() > 0:
                 first_post = posts.first
                 first_post.click()
@@ -127,7 +128,7 @@ class TestMobileFlows:
                 assert f"feed_id={feed_id}" in page.url or "/item/" in page.url
                 
                 # Go back - should return to filtered feed view
-                back_button = page.locator("#mobile-nav-button")
+                back_button = page.locator("#nav-button")
                 back_button.click()
                 wait_for_htmx_complete(page)  # FIXED: Don't expect sidebar visible after back navigation
                 
@@ -139,24 +140,24 @@ class TestMobileFlows:
         """Test mobile header search functionality (moved from persistent header to main header)"""
         
         # Verify we're in mobile mode
-        desktop_layout = page.locator("#desktop-layout")
-        mobile_content = page.locator("#main-content")
+        desktop_layout = page.locator("#main-layout")
+        mobile_content = page.locator("#content-area")
         
         expect(desktop_layout).to_be_hidden()
         expect(mobile_content).to_be_visible()
         
         # Check for main header with icon bar (new structure)
-        mobile_top_bar = page.locator("#mobile-top-bar")
+        mobile_top_bar = page.locator("#chrome-container")
         expect(mobile_top_bar).to_be_visible()
         
         # Click search button to expand search
         # Mobile viewport test - use mobile search button
-        search_button = page.locator('#mobile-icon-bar button[title="Search"]')
+        search_button = page.locator('#icon-bar button[title="Search"]')
         expect(search_button).to_be_visible()
         search_button.click()
         
         # Find search input in expanded search bar
-        search_input = page.locator('#mobile-search-input')
+        search_input = page.locator('#search-input')
         expect(search_input).to_be_visible()
         
         # Enter some search text to create state
@@ -170,24 +171,24 @@ class TestMobileFlows:
         # Close search to return to icon bar - test core functionality not specific button
         # Use JavaScript to close search (more robust than button clicking)
         page.evaluate("""() => {
-            const searchBar = document.getElementById('mobile-search-bar');
-            const iconBar = document.getElementById('mobile-icon-bar');
+            const searchBar = document.getElementById('search-bar');
+            const iconBar = document.getElementById('icon-bar');
             if (searchBar) searchBar.style.display = 'none';
             if (iconBar) iconBar.style.display = 'flex';
         }""")
 
         # Verify search closed
-        icon_bar = page.locator('#mobile-icon-bar')
+        icon_bar = page.locator('#icon-bar')
         expect(icon_bar).to_be_visible()
         
         # Click on an article - should navigate to article view
-        first_post = page.locator("li[id^='mobile-feed-item-']").first
+        first_post = page.locator("li[id^='feed-item-']").first
         if first_post.is_visible():
             first_post.click()
             wait_for_htmx_complete(page)
             
             # Should be in article view - verify back button appears
-            back_button = page.locator("#mobile-nav-button")
+            back_button = page.locator("#nav-button")
             expect(back_button).to_be_visible()
             
             # Click back button to return to list
@@ -195,16 +196,16 @@ class TestMobileFlows:
             wait_for_htmx_complete(page)
             
             # Should be back in list view - verify hamburger button appears
-            hamburger_button = page.locator("#mobile-nav-button")
+            hamburger_button = page.locator("#nav-button")
             expect(hamburger_button).to_be_visible()
             
             # Main header should be back to icon bar view
-            icon_bar = page.locator('#mobile-icon-bar')
+            icon_bar = page.locator('#icon-bar')
             expect(icon_bar).to_be_visible()
             
             # Search functionality should be accessible again
             # Mobile viewport test - use mobile search button
-            search_button = page.locator('#mobile-icon-bar button[title="Search"]')
+            search_button = page.locator('#icon-bar button[title="Search"]')
             expect(search_button).to_be_visible()
     
     def test_mobile_search_form_functionality(self, page: Page, test_server_url):
@@ -212,12 +213,12 @@ class TestMobileFlows:
         
         # Click search button to expand search
         # Mobile viewport test - use mobile search button
-        search_button = page.locator('#mobile-icon-bar button[title="Search"]')
+        search_button = page.locator('#icon-bar button[title="Search"]')
         expect(search_button).to_be_visible()
         search_button.click()
         
         # Find the search input in expanded search bar
-        search_input = page.locator('#mobile-search-input')
+        search_input = page.locator('#search-input')
         expect(search_input).to_be_visible()
         
         # Test UK Filter functionality (if implemented)
@@ -264,7 +265,7 @@ class TestMobileFlows:
         """Test that mobile content areas scroll properly within fixed viewport"""
         
         # Main content should be scrollable
-        main_content = page.locator("#main-content")
+        main_content = page.locator("#content-area")
         expect(main_content).to_be_visible()
         
         # Check if main content has proper scrolling styles
@@ -288,12 +289,12 @@ class TestMobileFlows:
         """Test that mobile sidebar scrolls properly when opened"""
         
         # Open mobile sidebar
-        menu_button = page.locator('#mobile-nav-button')
+        menu_button = page.locator('#nav-button')
         menu_button.click()
-        page.wait_for_selector("#mobile-sidebar", state="visible")
+        page.wait_for_selector("#sidebar", state="visible")
         
         # Sidebar should be visible and scrollable
-        sidebar = page.locator("#mobile-sidebar")
+        sidebar = page.locator("#sidebar")
         expect(sidebar).to_be_visible()
         
         # Check sidebar content area scrolling
@@ -302,7 +303,7 @@ class TestMobileFlows:
         
         # Sidebar should have proper overflow handling
         sidebar_styles = page.evaluate("""() => {
-            const sidebarContent = document.querySelector('#mobile-sidebar .bg-background.w-80');
+            const sidebarContent = document.querySelector('#sidebar .bg-background.w-80');
             if (sidebarContent) {
                 const computed = window.getComputedStyle(sidebarContent);
                 return {
@@ -320,14 +321,14 @@ class TestMobileFlows:
         """Test that article URLs are shareable and work when opened directly"""
         
         # Navigate to an article
-        first_post = page.locator("li[id^='mobile-feed-item-']").first
-        expect(first_post).to_be_visible(timeout=10000)
+        first_post = page.locator("li[id^='feed-item-']").first
+        expect(first_post).to_be_visible(timeout=5000)
         
         first_post.click()
         wait_for_htmx_complete(page)
         
         # Should be on article page (use mobile-specific selector)
-        expect(page.locator("#main-content #item-detail")).to_be_visible()
+        expect(page.locator("#content-area #item-detail")).to_be_visible()
         article_url = page.url
         assert "/item/" in article_url, "Should be on article page"
         
@@ -335,41 +336,41 @@ class TestMobileFlows:
         article_title = page.locator("#item-detail strong").first.text_content()
         
         # Navigate away and then back to test direct URL access
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=5000)
         # Wait for mobile layout to be visible
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+        page.wait_for_selector("#main-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)  # FIXED: Don't expect sidebar visible on main page
         
         # Now navigate directly to the article URL
-        page.goto(article_url, timeout=10000)
+        page.goto(article_url, timeout=5000)
         # Wait for article detail to be visible
         page.wait_for_selector("#item-detail", state="visible", timeout=5000)
         wait_for_page_ready(page)
         
         # Should show the same article
-        expect(page.locator("#main-content #item-detail")).to_be_visible()
+        expect(page.locator("#content-area #item-detail")).to_be_visible()
         
         # Article title should match (if we got one)
         if article_title:
-            expect(page.locator("#main-content #item-detail")).to_contain_text(article_title)
+            expect(page.locator("#content-area #item-detail")).to_contain_text(article_title)
         
         # Mobile layout should still work
-        expect(page.locator("#mobile-layout")).to_be_visible()
+        expect(page.locator("#main-layout")).to_be_visible()
         
         # Should have back button since we're in article view
-        back_button = page.locator("#mobile-nav-button")
+        back_button = page.locator("#nav-button")
         expect(back_button).to_be_visible()
     
     def test_mobile_url_sharing_feed_filter(self, page: Page, test_server_url):
         """Test that feed filter URLs are shareable"""
         
         # Open sidebar and select a feed
-        menu_button = page.locator('#mobile-nav-button')
+        menu_button = page.locator('#nav-button')
         menu_button.click()
-        page.wait_for_selector("#mobile-sidebar", state="visible")
+        page.wait_for_selector("#sidebar", state="visible")
         
         # Click on a feed
-        feed_links = page.locator("#mobile-sidebar a[href*='feed_id=']")
+        feed_links = page.locator("#sidebar a[href*='feed_id=']")
         if feed_links.count() > 0:
             first_feed = feed_links.first
             feed_url = first_feed.get_attribute("href")
@@ -382,23 +383,23 @@ class TestMobileFlows:
             assert "feed_id=" in current_url, "Should be on filtered feed view"
             
             # Navigate away and back to test sharing
-            page.goto(test_server_url, timeout=10000)
+            page.goto(test_server_url, timeout=5000)
             # Wait for mobile layout to be visible
-            page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+            page.wait_for_selector("#main-layout", state="visible", timeout=5000)
             wait_for_page_ready(page)  # OPTIMIZED: Wait for page to load, sidebar is hidden by default
             
             # Navigate directly to the feed URL
-            page.goto(current_url, timeout=10000)
+            page.goto(current_url, timeout=5000)
             # Wait for mobile layout to be visible
-            page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+            page.wait_for_selector("#main-layout", state="visible", timeout=5000)
             wait_for_page_ready(page)
             
             # Should be back on the filtered view
             assert "feed_id=" in page.url, "Should maintain feed filter"
             
             # Mobile layout should work
-            expect(page.locator("#mobile-layout")).to_be_visible()
-            expect(page.locator("#main-content")).to_be_visible()
+            expect(page.locator("#main-layout")).to_be_visible()
+            expect(page.locator("#content-area")).to_be_visible()
     
     def test_mobile_url_sharing_with_unread_filter(self, page: Page, test_server_url):
         """Test URL sharing with unread filter applied"""
@@ -415,21 +416,21 @@ class TestMobileFlows:
             
             # Navigate away and back
             # Click on first available feed to navigate away
-            feed_link = page.locator("#mobile-sidebar a[href*='feed_id']").first
+            feed_link = page.locator("#sidebar a[href*='feed_id']").first
             if feed_link.is_visible():
                 feed_link.click()
             else:
-                page.goto(test_server_url + "/", timeout=10000)  # Go to home as fallback
-            page.wait_for_selector("#mobile-sidebar", state="visible")
+                page.goto(test_server_url + "/", timeout=5000)  # Go to home as fallback
+            page.wait_for_selector("#sidebar", state="visible")
             
             # Navigate back to unread view
-            page.goto(current_url, timeout=10000)
+            page.goto(current_url, timeout=5000)
             # Wait for mobile layout to be visible
-            page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+            page.wait_for_selector("#main-layout", state="visible", timeout=5000)
             wait_for_htmx_complete(page)
             
             # Should be back in unread view
-            expect(page.locator("#main-content")).to_be_visible()
+            expect(page.locator("#content-area")).to_be_visible()
             
             # Unread tab should be active if it exists
             if page.locator('a[role="button"]:has-text("Unread")').first.is_visible():
@@ -444,9 +445,9 @@ class TestMobileFlows:
         """Test that feed title shows correctly after navigating back from article when specific feed is selected"""
         
         # Open mobile sidebar first
-        hamburger_button = page.locator('#mobile-nav-button')
+        hamburger_button = page.locator('#nav-button')
         hamburger_button.click()
-        page.wait_for_selector("#mobile-sidebar", state="visible")
+        page.wait_for_selector("#sidebar", state="visible")
         
         # Select a specific feed (ClaudeAI) - use dynamic feed ID
         claudeai_feed = page.locator('a[href*="feed_id"]:has-text("ClaudeAI")').first
@@ -455,27 +456,27 @@ class TestMobileFlows:
         wait_for_htmx_complete(page)
         
         # Verify we're viewing ClaudeAI feed - mobile feed title is in header
-        feed_title = page.locator("#mobile-top-bar h3, #mobile-header h3").first
+        feed_title = page.locator("#chrome-container h3, #chrome-container h3").first
         expect(feed_title).to_contain_text("ClaudeAI")
         
         # Click on an article
-        first_article = page.locator("li[id^='mobile-feed-item-']").first
+        first_article = page.locator("li[id^='feed-item-']").first
         expect(first_article).to_be_visible()
         first_article.click()
         wait_for_htmx_complete(page)
         
         # Should be on article view
-        expect(page.locator("#main-content #item-detail")).to_be_visible()
+        expect(page.locator("#content-area #item-detail")).to_be_visible()
         
         # Click back button
-        back_button = page.locator("#mobile-nav-button").filter(has=page.locator('uk-icon[icon="arrow-left"]'))
+        back_button = page.locator("#nav-button").filter(has=page.locator('uk-icon[icon="arrow-left"]'))
         expect(back_button).to_be_visible()
         back_button.click()
         wait_for_htmx_complete(page)
         
         # Should be back to feed list with correct feed title
-        expect(page.locator("li[id^='mobile-feed-item-']").first).to_be_visible()
-        feed_title_after_back = page.locator("#mobile-top-bar h3, #mobile-header h3").first
+        expect(page.locator("li[id^='feed-item-']").first).to_be_visible()
+        feed_title_after_back = page.locator("#chrome-container h3, #chrome-container h3").first
         expect(feed_title_after_back).to_contain_text("ClaudeAI")  # Should NOT be "BizToc"
 
 

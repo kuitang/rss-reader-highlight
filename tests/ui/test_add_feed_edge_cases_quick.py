@@ -3,6 +3,7 @@
 import pytest
 from playwright.sync_api import sync_playwright, expect
 import time
+from tests.ui.conftest import wait_for_htmx_complete, wait_for_page_ready
 
 # HTMX Helper Functions for Fast Testing
 def wait_for_htmx_complete(page, timeout=5000):
@@ -25,18 +26,18 @@ def test_add_feed_empty_url_both_viewports(page, test_server_url):
     ]:
         print(f"\n--- Testing {viewport_name} empty URL ---")
         page.set_viewport_size(viewport_size)
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=5000)
         wait_for_page_ready(page)
         
         # Set up viewport-specific selectors
         if viewport_name == "mobile":
             # Open mobile sidebar
-            hamburger = page.locator('#mobile-nav-button')
+            hamburger = page.locator('#nav-button')
             if hamburger.is_visible():
                 hamburger.click()
-                page.wait_for_selector("#mobile-sidebar", state="visible")
-                feed_input = page.locator('#mobile-sidebar input[name="new_feed_url"]')
-                add_button = page.locator('#mobile-sidebar button.add-feed-button')
+                page.wait_for_selector("#sidebar", state="visible")
+                feed_input = page.locator('#sidebar input[name="new_feed_url"]')
+                add_button = page.locator('#sidebar button.add-feed-button')
             else:
                 print(f"  ⚠️ Mobile navigation not available, skipping {viewport_name}")
                 continue
@@ -65,8 +66,8 @@ def test_add_feed_empty_url_both_viewports(page, test_server_url):
             # Check for response message (HTMX may completely replace content)
             try:
                 if viewport_name == "mobile":
-                    if page.locator("#mobile-sidebar").is_visible():
-                        sidebar_text = page.locator("#mobile-sidebar").inner_text()
+                    if page.locator("#sidebar").is_visible():
+                        sidebar_text = page.locator("#sidebar").inner_text()
                     else:
                         sidebar_text = page.locator("body").inner_text()
                 else:

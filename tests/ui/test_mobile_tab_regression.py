@@ -17,17 +17,17 @@ def wait_for_page_ready(page):
 def test_mobile_tab_active_style_updates(page: Page, test_server_url):
     """Test mobile navigation buttons work correctly (icon-based navigation)"""
     page.set_viewport_size({"width": 390, "height": 844})
-    page.goto(test_server_url, timeout=10000)
+    page.goto(test_server_url, timeout=5000)
     # Wait for specific mobile layout element
-    page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+    page.wait_for_selector("#main-layout", state="visible", timeout=5000)
 
     # Wait for page load
     wait_for_page_ready(page)
     
     # Find the navigation buttons in mobile icon bar (new structure)
     # Mobile viewport test - use mobile-specific selectors
-    all_posts_btn = page.locator('#mobile-icon-bar button[title="All Posts"]')
-    unread_btn = page.locator('#mobile-icon-bar button[title="Unread"]') 
+    all_posts_btn = page.locator('#icon-bar button[title="All Posts"]')
+    unread_btn = page.locator('#icon-bar button[title="Unread"]') 
     
     # Verify buttons exist
     expect(all_posts_btn).to_be_visible()
@@ -51,7 +51,7 @@ def test_mobile_tab_active_style_updates(page: Page, test_server_url):
     print(f"✅ Unread navigation working - clicked successfully")
     
     # Verify navigation completed
-    expect(page.locator('#mobile-icon-bar button[title="Unread"]')).to_be_visible()
+    expect(page.locator('#icon-bar button[title="Unread"]')).to_be_visible()
     print("✅ Unread button still accessible after navigation")
     
     # Test 3: Both buttons should remain visible and functional
@@ -62,5 +62,6 @@ def test_mobile_tab_active_style_updates(page: Page, test_server_url):
 
 if __name__ == "__main__":
     import re
+from tests.ui.conftest import wait_for_htmx_complete, wait_for_page_ready
     # Can run this file directly for debugging
     pass

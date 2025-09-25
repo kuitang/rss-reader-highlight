@@ -14,6 +14,7 @@ Rather than complex cleanup logic, simpler to run this test separately.
 import pytest
 from playwright.sync_api import Page, expect
 import time
+from tests.ui.conftest import wait_for_htmx_complete, wait_for_page_ready
 
 pytestmark = pytest.mark.needs_server
 
@@ -33,35 +34,35 @@ class TestMobileSidebarIsolated:
     def test_mobile_sidebar_and_navigation_flow(self, page: Page, test_server_url):
         """Test mobile-specific navigation patterns"""
         page.set_viewport_size({"width": 390, "height": 844})
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=5000)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+        page.wait_for_selector("#main-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)
         
         # Ensure mobile layout and JavaScript are ready
-        expect(page.locator("#mobile-layout")).to_be_visible()
-        expect(page.locator("#mobile-nav-button")).to_be_visible()
+        expect(page.locator("#main-layout")).to_be_visible()
+        expect(page.locator("#nav-button")).to_be_visible()
         wait_for_htmx_complete(page)  # Ensure JS is loaded
         
         # Test sidebar open/close cycle
         for i in range(3):
             # Open sidebar with hamburger
-            hamburger = page.locator("#mobile-nav-button")
+            hamburger = page.locator("#nav-button")
             if hamburger.is_visible():
                 hamburger.click()
-                page.wait_for_selector("#mobile-sidebar", state="visible")  # Wait for sidebar to become visible
+                page.wait_for_selector("#sidebar", state="visible")  # Wait for sidebar to become visible
                 
                 # Select different feed each iteration
-                feed_links = page.locator("#mobile-sidebar a[href*='feed_id']").all()
+                feed_links = page.locator("#sidebar a[href*='feed_id']").all()
                 if len(feed_links) > i % len(feed_links):
                     feed_links[i % len(feed_links)].click()
                     
                     # Verify sidebar closes and content updates
                     wait_for_htmx_complete(page)
-                    expect(page.locator("#mobile-sidebar")).to_be_hidden()
+                    expect(page.locator("#sidebar")).to_be_hidden()
                     
                     # Test article navigation
-                    article_items = page.locator("li[id*='mobile-feed-item']").all()
+                    article_items = page.locator("li[id*='feed-item']").all()
                     if len(article_items) > 0:
                         article_items[0].click()
                         
@@ -71,7 +72,7 @@ class TestMobileSidebarIsolated:
                         assert "/item/" in page.url
                         
                         # Navigate back
-                        back_button = page.locator("#mobile-nav-button")
+                        back_button = page.locator("#nav-button")
                         if back_button.is_visible():
                             back_button.click()
                             wait_for_htmx_complete(page)

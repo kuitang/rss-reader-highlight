@@ -30,25 +30,13 @@ init_db()
 # Default feeds will be set up by background worker on first startup
 
 # =============================================================================
-# ARCHITECTURAL DECISIONS
+# RESPONSIVE SINGLE-ELEMENT ARCHITECTURE
 # =============================================================================
-# This app uses different HTMX targets for mobile and desktop BY DESIGN:
-#
-# MOBILE (Single-column, full-screen navigation):
-#   - Target: #main-content (entire content area swaps)
-#   - Navigation: List view ↔ Article view (full replacement)
-#   - Tabs: Use HTMX to preserve header state
-#   - Scroll: URL-based state preservation for custom containers
-#
-# DESKTOP (Three-column email interface):
-#   - Targets: #desktop-feeds-content (middle), #desktop-item-detail (right)
-#   - Navigation: Columns update independently
-#   - Tabs: Regular links (full page navigation acceptable)
-#   - Scroll: Standard browser scroll in each column
-#
-# This is NOT accidental complexity - it reflects fundamental UX differences:
-# - Mobile users expect full-screen immersion and simple back navigation
-# - Desktop users expect persistent context and multi-column efficiency
+# This app uses a SINGLE HTML structure that adapts responsively:
+# - One set of elements with CSS media queries for responsive behavior
+# - JavaScript only for essential mobile interactions (sidebar, article nav)
+# - HTMX targets remain consistent across viewports
+# - No duplicate elements or conditional rendering
 # =============================================================================
 
 # =============================================================================
@@ -56,41 +44,33 @@ init_db()
 # =============================================================================
 
 class Targets:
-    """HTMX update targets - what gets swapped"""
-    MOBILE_CONTENT = '#main-content'
-    DESKTOP_FEEDS = '#desktop-feeds-content' 
-    DESKTOP_DETAIL = '#desktop-item-detail'
-    MOBILE_SIDEBAR = '#mobile-sidebar'
-    DESKTOP_SIDEBAR = '#sidebar'
+    """HTMX update targets - unified for responsive design"""
+    CONTENT = '#feed-list'
+    DETAIL = '#article-detail'
+    SIDEBAR = '#sidebar'
 
 class ElementIDs:
-    """DOM element identifiers"""
-    MOBILE_SIDEBAR = 'mobile-sidebar'
-    MOBILE_HEADER = 'mobile-header'
-    MOBILE_PERSISTENT_HEADER = 'mobile-persistent-header'
-    MOBILE_NAV_BUTTON = 'mobile-nav-button'
-    DESKTOP_LAYOUT = 'desktop-layout'
-    MOBILE_LAYOUT = 'mobile-layout'
-    MAIN_CONTENT = 'main-content'
-    DESKTOP_FEEDS_CONTENT = 'desktop-feeds-content'
-    DESKTOP_ITEM_DETAIL = 'desktop-item-detail'
+    """DOM element identifiers - single set for responsive design"""
     SIDEBAR = 'sidebar'
+    NAV_BUTTON = 'nav-button'
+    CHROME_CONTAINER = 'chrome-container'
+    FEED_LIST = 'feed-list'
+    ARTICLE_DETAIL = 'article-detail'
+    ICON_BAR = 'icon-bar'
+    SEARCH_BAR = 'search-bar'
+    APP_CONTAINER = 'app-container'
+    CONTENT_AREA = 'content-area'
 
 class Styling:
-    """CSS classes for layouts and components"""
-    MOBILE_LAYOUT = 'lg:hidden fixed inset-0 flex flex-col overflow-hidden'
-    DESKTOP_LAYOUT = 'hidden lg:grid h-screen pt-4'
+    """CSS classes for responsive components"""
+    APP_LAYOUT = 'h-screen w-screen overflow-hidden'
     FEED_ITEM_BASE = 'relative rounded-lg border border-border p-3 text-sm hover:bg-secondary space-y-2 cursor-pointer'
     FEED_ITEM_READ = 'bg-muted tag-read'
     FEED_ITEM_UNREAD = 'tag-unread'
-    SIDEBAR_DESKTOP = 'col-span-1 h-screen overflow-y-auto border-r px-2'
-    DESKTOP_FEEDS_COLUMN = 'col-span-2 h-screen flex flex-col overflow-y-auto border-r px-4'
-    DESKTOP_DETAIL_COLUMN = 'col-span-2 h-screen overflow-y-auto px-6'
-    MOBILE_SIDEBAR_OVERLAY = 'fixed inset-0 z-50 lg:hidden'
-    MOBILE_PERSISTENT_HEADER = 'flex-shrink-0 bg-background border-b z-10 lg:hidden'
-    MOBILE_HEADER = 'lg:hidden fixed top-0 left-0 right-0 bg-background border-b p-4 z-40'
+    SIDEBAR = 'sidebar-responsive'
+    CHROME = 'chrome-responsive'
     BUTTON_SECONDARY = 'p-2 rounded border hover:bg-secondary'
-    BUTTON_NAV = 'p-2 rounded border hover:bg-secondary mr-2'
+    BUTTON_NAV = 'nav-button-responsive'
     SIDEBAR_ITEM = 'hover:bg-secondary p-4 block'
 
 # =============================================================================
@@ -112,23 +92,14 @@ class PageData:
         self.feed_name = self._get_feed_name()
         self.total_pages = self._calculate_total_pages()
         
-        # EXPLICIT DUAL-LAYOUT SUPPORT
-        # Mobile and desktop need different configs - this is by design
-        self.mobile_config = {
-            'target': Targets.MOBILE_CONTENT,  # Full-screen content swap
+        # Unified config - no more dual layout
+        self.config = {
+            'target': Targets.CONTENT,  # Single content target
+            'detail_target': Targets.DETAIL,  # Single detail target
             'push_url': True,
             'show_summary': True,
-            'layout': 'mobile',
-            'id_prefix': 'mobile-'
-        }
-        
-        self.desktop_config = {
-            'feeds_target': Targets.DESKTOP_FEEDS,  # Middle column only
-            'detail_target': Targets.DESKTOP_DETAIL,  # Right column only
-            'push_url': True, 
-            'show_summary': True,
-            'layout': 'desktop',
-            'id_prefix': 'desktop-'
+            'layout': 'responsive',
+            'id_prefix': ''
         }
     
     def _get_feed_name(self):
@@ -163,129 +134,51 @@ class PageData:
             page_size = 20  # Match FeedItemModel.get_items_for_user
             return (total_items + page_size - 1) // page_size if total_items else 1
 
-# =============================================================================
-# MOBILE/DESKTOP FRAGMENT HANDLERS - Explicit separation of layout concerns
-# =============================================================================
+# Removed old mobile/desktop handlers - now using unified responsive handlers
 
-class MobileHandlers:
-    """Mobile uses #main-content for full-screen navigation"""
-    
-    @staticmethod
-    def content(data, update_header=True):
-        """Mobile content area - feeds list or article detail"""
-        responses = [FeedsContent(data.session_id, data.feed_id, data.unread, 
-                    data.page, for_desktop=False, data=data)]
-        
-        # No more persistent header updates - all functionality moved to main header
-        return responses[0]
-    
-    @staticmethod
-    def sidebar(data):
-        """Mobile sidebar overlay"""
-        return MobileSidebar(data.session_id)
-    
-    @staticmethod
-    def navigation_restore(data):
-        """Restore mobile navigation when returning from article"""
-        responses = list(MobileHandlers.content(data, update_header=True))
-        if not isinstance(responses, (list, tuple)):
-            responses = [responses]
-        
-        # Add navigation-specific elements for returning from article view
-        # Body class management now handled in scroll restoration event listener
-        
-        # Restore hamburger button for list view
-        hamburger_button = Button(
-            UkIcon('menu'),
-            cls="p-2 rounded border hover:bg-secondary mr-2",
-            hx_on_click="document.getElementById('mobile-sidebar').removeAttribute('hidden')",
-            id="mobile-nav-button",
-            hx_swap_oob="outerHTML"
-        )
-        responses.append(hamburger_button)
-        
-        return tuple(responses)
+# Unified HTMX handlers
+def unified_feeds_handler(data):
+    """Handle feed list updates"""
+    return FeedsContent(data.session_id, data.feed_id, data.unread, data.page, data=data)
 
-class DesktopHandlers:
-    """Desktop uses separate targets for each column"""
+def unified_article_handler(data, item_id=None):
+    """Handle article detail updates"""
+    if item_id:
+        item = FeedItemModel.get_item_for_user(data.session_id, item_id)
+        return ItemDetailView(item, show_back=False)
+    return ItemDetailView(None)
 
-    @staticmethod
-    def feeds_column(data, is_htmx=False):
-        """Middle column - feeds list with optional chrome update
+def unified_sidebar_handler(data):
+    """Handle sidebar updates"""
+    return responsive_sidebar(data.session_id)
 
-        Args:
-            data: PageData object
-            is_htmx: Whether this is an HTMX request (needs chrome update)
-        """
-        responses = [FeedsContent(data.session_id, data.feed_id, data.unread,
-                                data.page, for_desktop=True, data=data)]
-
-        # Only update chrome for HTMX requests (not initial page load)
-        if is_htmx:
-            feed_name = data.feed_name if hasattr(data, 'feed_name') else "All Feeds"
-            chrome_content, _ = UnifiedChrome(
-                session_id=data.session_id,
-                feed_id=data.feed_id,
-                unread_view=data.unread,
-                feed_name=feed_name,
-                show_back=False,
-                for_mobile=False
-            )
-
-            # Update chrome using hx_swap_oob
-            chrome_update = Div(
-                chrome_content,
-                id="desktop-chrome-content",
-                hx_swap_oob="outerHTML"
-            )
-            responses.append(chrome_update)
-
-        return tuple(responses) if len(responses) > 1 else responses[0]
-
-    @staticmethod
-    def detail_column(data, item_id=None):
-        """Right column - article detail only"""
-        if item_id:
-            item = FeedItemModel.get_item_for_user(data.session_id, item_id)
-            return ItemDetailView(item, show_back=False)
-        return ItemDetailView(None)
-
-    @staticmethod
-    def sidebar_column(data):
-        """Left column - feeds sidebar"""
-        return Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
-            FeedsSidebar(data.session_id, for_mobile=False)
-        )
-
-# ROUTING MAP - Explicit about which handler for which target
+# ROUTING MAP - Unified handlers
 HTMX_ROUTING = {
-    # Mobile targets - include header updates for HTMX requests
-    'main-content': lambda data: MobileHandlers.content(data, update_header=True),
-    '#main-content': lambda data: MobileHandlers.content(data, update_header=True),
-    'mobile-sidebar': MobileHandlers.sidebar,
-    '#mobile-sidebar': MobileHandlers.sidebar,
+    # Feed list targets
+    'feed-list': unified_feeds_handler,
+    '#feed-list': unified_feeds_handler,
 
-    # Desktop targets - pass is_htmx=True for chrome updates
-    'desktop-feeds-content': lambda data: DesktopHandlers.feeds_column(data, is_htmx=True),
-    '#desktop-feeds-content': lambda data: DesktopHandlers.feeds_column(data, is_htmx=True),
-    'desktop-item-detail': DesktopHandlers.detail_column,
-    '#desktop-item-detail': DesktopHandlers.detail_column,
-    'sidebar': DesktopHandlers.sidebar_column,
-    '#sidebar': DesktopHandlers.sidebar_column,
+    # Article detail targets
+    'article-detail': unified_article_handler,
+    '#article-detail': unified_article_handler,
+
+    # Sidebar targets
+    'sidebar': unified_sidebar_handler,
+    '#sidebar': unified_sidebar_handler,
 }
 
 def route_htmx_fragment(htmx, data):
-    """Route HTMX requests using handlers from Step 4"""
-    
-    # Use the HTMX_ROUTING map from Step 4
+    """Route HTMX requests using unified handlers"""
+
+    # Use the HTMX_ROUTING map
     handler = HTMX_ROUTING.get(htmx.target)
     if not handler:
         return Alert(f"Unknown target: {htmx.target}", type='error', cls='m-4')
-    
-    # Special case for mobile navigation restore
-    if htmx.target in ['main-content', '#main-content'] and is_returning_from_article(htmx):
-        return MobileHandlers.navigation_restore(data)
-    
+
+    # Pass item_id for article detail handler if available
+    if 'article-detail' in htmx.target and hasattr(htmx, 'item_id'):
+        return handler(data, htmx.item_id)
+
     # Otherwise use the mapped handler
     return handler(data)
 
@@ -295,75 +188,492 @@ def is_returning_from_article(htmx):
     # This is a simplified check - could be enhanced based on specific needs
     return hasattr(htmx, 'current_url') and '/item/' in str(getattr(htmx, 'current_url', ''))
 
-def full_page_dual_layout(data):
-    """Complete page with both mobile and desktop layouts"""
-    # Get feed name for mobile chrome (same as desktop)
+def unified_page_layout(data):
+    """Single responsive layout - no duplication"""
     feed_name = data.feed_name if hasattr(data, 'feed_name') else "All Feeds"
 
-    # Flatten the mobile_chrome list and return individual elements
-    chrome_elements = mobile_chrome(data.session_id, data.feed_id, data.unread, feed_name)
     return (
-        *chrome_elements,  # Unpack mobile chrome elements
-        desktop_layout(data),
-        mobile_layout(data),
-        viewport_styles()
+        # Single responsive layout
+        Div(id=ElementIDs.APP_CONTAINER, cls="app-container")(
+            # Sidebar (shared, responsive positioning)
+            responsive_sidebar(data.session_id),
+            # Sidebar overlay for mobile
+            Div(id="sidebar-overlay", hx_on_click="window.toggleSidebar()"),
+            # Main layout area
+            Div(id="main-layout", cls="main-layout")(
+                # Unified chrome
+                UnifiedChrome(
+                    session_id=data.session_id,
+                    feed_id=data.feed_id,
+                    unread_view=data.unread,
+                    feed_name=feed_name,
+                    show_back=False
+                ),
+                # Content area with feed list and article detail
+                Div(id=ElementIDs.CONTENT_AREA, cls="content-area")(
+                    # Feed list (middle panel)
+                    Div(id=ElementIDs.FEED_LIST, cls="feed-list")(
+                        FeedsContent(data.session_id, data.feed_id, data.unread,
+                                   data.page, data=data)
+                    ),
+                    # Article detail (right panel/overlay)
+                    Div(id=ElementIDs.ARTICLE_DETAIL, cls="article-detail")(
+                        ItemDetailView(None)  # Empty on initial load
+                    )
+                )
+            )
+        ),
+        responsive_styles(),
+        responsive_javascript()
     )
 
-def mobile_chrome(session_id, feed_id=None, unread=True, feed_name="All Feeds"):
-    """Mobile-specific chrome elements"""
-    return [
-        Div(id='mobile-header')(MobileHeader(session_id, show_back=False, feed_id=feed_id, unread_view=unread, feed_name=feed_name)),
-        MobileSidebar(session_id)
-    ]
+def responsive_sidebar(session_id):
+    """Create responsive sidebar that works for both mobile and desktop"""
+    feeds = FeedModel.get_user_feeds(session_id)
+    folders = FolderModel.get_folders(session_id)
 
-def mobile_layout(data):
-    """Mobile layout - single column, full-screen navigation"""
-    return Div(cls=Styling.MOBILE_LAYOUT, id="mobile-layout")(
-        Div(cls="h-20 flex-shrink-0"),  # Header spacer
-        MobilePersistentHeader(data.session_id, data.feed_id, data.unread),
-        Div(cls="flex-1 overflow-y-auto", id="main-content")(
-            # Just content for initial load, no header update to avoid duplication
-            MobileHandlers.content(data, update_header=False)
+    return Div(id=ElementIDs.SIDEBAR, cls="sidebar")(
+        Ul(
+            Li(
+                DivFullySpaced(
+                    H3("Feeds"),
+                    Button(
+                        UkIcon('refresh-cw'),
+                        hx_post="/api/session/reset",
+                        hx_swap="none",
+                        cls="p-1 hover:bg-secondary rounded",
+                        title="Reset all session data",
+                        hx_confirm="Are you sure? This will clear all your subscriptions and settings."
+                    )
+                ),
+                cls='p-3'
+            ),
+            Li(
+                Form(
+                    DivLAligned(
+                        Input(
+                            placeholder="Enter RSS URL",
+                            name="new_feed_url",
+                            cls="flex-1 mr-2 add-feed-input"
+                        ),
+                        Button(
+                            UkIcon('plus'),
+                            cls="px-2 add-feed-button",
+                            type="submit"
+                        )
+                    ),
+                    hx_post="/api/feed/add",
+                    hx_target=f"#{ElementIDs.SIDEBAR}",
+                    hx_swap="outerHTML",
+                    cls="add-feed-form"
+                ),
+                cls='p-4'
+            ),
+            Li(
+                A(
+                    DivLAligned(
+                        UkIcon('globe', cls="flex-none"),
+                        Span("All Feeds"),
+                        P("", cls="text-xs text-muted"),
+                        cls="gap-3"
+                    ),
+                    href="/",
+                    cls="hover:bg-secondary p-4 block",
+                    hx_on_click="if(window.innerWidth < 1024) window.toggleSidebar()"
+                )
+            ),
+            Div(cls="feeds-list")(*[
+                Li(
+                    A(
+                        DivLAligned(
+                            UkIcon('rss', cls="flex-none"),
+                            Span(feed['title']),
+                            P(f"updated {human_time_diff(feed.get('last_updated'))}", cls="text-xs text-muted ml-auto"),
+                            cls="gap-3"
+                        ),
+                        href=f"/?feed_id={feed['id']}",
+                        cls="hover:bg-secondary p-4 block",
+                        hx_on_click="if(window.innerWidth < 1024) window.toggleSidebar()"
+                    )
+                ) for feed in feeds
+            ]),
+            Li(Hr()),
+            Li(H4("Folders"), cls='p-3'),
+            *[Li(
+                A(
+                    DivLAligned(
+                        UkIcon('folder', cls="flex-none"),
+                        Span(folder['name']),
+                        cls="gap-3"
+                    ),
+                    href=f"/?folder_id={folder['id']}",
+                    cls="hover:bg-secondary p-4 block"
+                )
+            ) for folder in folders],
+            Li(
+                Button(
+                    UkIcon('plus'),
+                    " Add Folder",
+                    hx_post="/api/folder/add",
+                    hx_prompt="Folder name:",
+                    cls="w-full text-left p-4 hover:bg-secondary add-folder-button"
+                )
+            ),
+            cls='mt-3'
         )
     )
 
-def desktop_layout(data):
-    """Desktop layout - three-column email interface with chrome in middle panel"""
+def responsive_styles():
+    """Responsive CSS for single-element layout"""
+    return Style("""
+    /* Base layout */
+    html, body {
+        height: 100%;
+        overflow: hidden;
+        margin: 0;
+        padding: 0;
+    }
 
-    # Get feed name for chrome
-    feed_name = data.feed_name if hasattr(data, 'feed_name') else "All Feeds"
+    .app-container {
+        height: 100vh;
+        width: 100vw;
+        overflow: hidden;
+    }
 
-    # Get chrome components for desktop middle panel
-    chrome_content, click_outside_script = UnifiedChrome(
-        session_id=data.session_id,
-        feed_id=data.feed_id,
-        unread_view=data.unread,
-        feed_name=feed_name,
-        show_back=False,
-        for_mobile=False
-    )
+    /* Desktop layout - 3 columns */
+    @media (min-width: 1024px) {
+        .app-container {
+            display: grid;
+            grid-template-columns: 250px 1fr;
+        }
 
-    return Div(cls=Styling.DESKTOP_LAYOUT, id="desktop-layout")(
-        Grid(
-            DesktopHandlers.sidebar_column(data),
-            # Middle column with chrome at top
-            Div(cls="col-span-2 h-screen flex flex-col border-r")(
-                # Fixed chrome at top
-                Div(cls="flex-shrink-0 bg-background border-b p-4 hidden lg:block", id="desktop-chrome-container")(
-                    chrome_content
-                ),
-                # Scrollable content area below chrome
-                Div(cls="flex-1 overflow-y-auto px-4", id="desktop-feeds-content")(
-                    DesktopHandlers.feeds_column(data, is_htmx=False)  # Initial load, not HTMX
-                )
-            ),
-            Div(id="desktop-item-detail", cls=Styling.DESKTOP_DETAIL_COLUMN)(
-                ItemDetailView(None)  # Empty on initial load
-            ),
-            cols_lg=5, cols_xl=5, gap=4, cls='h-screen gap-4'
-        ),
-        click_outside_script
-    )
+        .main-layout {
+            display: grid;
+            grid-template-rows: auto 1fr;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        .content-area {
+            display: grid;
+            grid-template-columns: 2fr 2fr;
+            gap: 0;
+            overflow: hidden;
+        }
+
+        .sidebar {
+            display: block !important;
+            position: static !important;
+            height: 100vh;
+            overflow-y: auto;
+            border-right: 1px solid var(--border);
+        }
+
+        #sidebar-overlay {
+            display: none !important;
+        }
+
+        .nav-button-responsive {
+            display: none !important;
+        }
+
+        .feed-list {
+            height: 100%;
+            overflow-y: auto;
+            padding: 1rem;
+            border-right: 1px solid var(--border);
+        }
+
+        .article-detail {
+            height: 100%;
+            overflow-y: auto;
+            padding: 1.5rem;
+            display: block !important;
+        }
+
+        .chrome-container {
+            border-bottom: 1px solid var(--border);
+        }
+
+        .feed-name-responsive {
+            font-size: 1.125rem;
+        }
+    }
+
+    /* Mobile layout - single column */
+    @media (max-width: 1023px) {
+        .app-container {
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .main-layout {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+
+        .content-area {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .sidebar {
+            position: fixed;
+            left: -100%;
+            top: 0;
+            bottom: 0;
+            width: 80%;
+            max-width: 320px;
+            z-index: 60;
+            transition: left 0.3s ease;
+            overflow-y: auto;
+            border-right: 1px solid var(--border);
+        }
+
+        .sidebar.open {
+            left: 0;
+        }
+
+        #sidebar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 59;
+        }
+
+        #sidebar-overlay.show {
+            display: block;
+        }
+
+        .nav-button-responsive {
+            display: flex !important;
+            align-items: center;
+            justify-content: center;
+            padding: 0.5rem;
+            border-radius: 0.25rem;
+            border: 1px solid var(--border);
+            margin-right: 0.5rem;
+        }
+
+        .feed-list {
+            height: 100%;
+            overflow-y: auto;
+            padding: 1rem;
+        }
+
+        .article-detail {
+            position: fixed;
+            top: 64px;  /* Below chrome container */
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 50;
+            overflow-y: auto;
+            padding: 1rem;
+            display: none;
+        }
+
+        .article-detail.active {
+            display: block;
+        }
+
+        .feed-list.article-view {
+            display: none;
+        }
+
+        .chrome-container {
+            position: sticky;
+            top: 0;
+            z-index: 40;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .feed-name-responsive {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-right: auto;
+        }
+    }
+
+    /* Search bar responsive styles */
+    .chrome-container {
+        position: relative;
+        height: 64px; /* Fixed height for invariant */
+        overflow: hidden;
+    }
+
+    #search-bar {
+        display: none;
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 64px; /* Match chrome height */
+        z-index: 10;
+    }
+
+    #search-bar.show {
+        display: flex !important;
+    }
+
+    #icon-bar.hide {
+        display: none !important;
+    }
+
+    /* Icon bar is always visible - unified responsive element */
+    #icon-bar {
+        display: flex !important;
+    }
+
+    /* Feed item styles */
+    .feed-item {
+        cursor: pointer;
+    }
+
+    /* Text wrapping */
+    .prose, .prose * {
+        word-wrap: break-word !important;
+        overflow-wrap: break-word !important;
+        max-width: 100% !important;
+    }
+    """)
+
+def responsive_javascript():
+    """JavaScript for mobile interactions"""
+    return Script("""
+    // Sidebar toggle
+    window.toggleSidebar = function() {
+        const sidebar = document.getElementById('sidebar');
+        const overlay = document.getElementById('sidebar-overlay');
+        if (sidebar.classList.contains('open')) {
+            sidebar.classList.remove('open');
+            overlay.classList.remove('show');
+        } else {
+            sidebar.classList.add('open');
+            overlay.classList.add('show');
+        }
+    };
+
+    // Search toggle - improved with proper state management
+    window.toggleSearch = function() {
+        // Unified elements - single source of truth
+        const searchBar = document.getElementById('search-bar');
+        const iconBar = document.getElementById('icon-bar');
+        const searchInput = document.getElementById('search-input');
+
+        if (searchBar && searchBar.classList.contains('show')) {
+            // Close search
+            searchBar.classList.remove('show');
+            if (iconBar) iconBar.classList.remove('hide');
+        } else if (searchBar) {
+            // Open search
+            searchBar.classList.add('show');
+            if (iconBar) iconBar.classList.add('hide');
+            // Focus input after animation
+            setTimeout(() => {
+                if (searchInput) searchInput.focus();
+            }, 50);
+        }
+    };
+
+    // Article view management for mobile
+    window.showArticle = function(itemId) {
+        if (window.innerWidth < 1024) {
+            const articleDetail = document.getElementById('article-detail');
+            const feedList = document.getElementById('feed-list');
+            const navButton = document.getElementById('nav-button');
+
+            articleDetail.classList.add('active');
+            feedList.classList.add('article-view');
+
+            // Update nav button to back
+            if (navButton) {
+                navButton.dataset.mode = 'back';
+                const arrowIcon = document.createElement('div');
+                arrowIcon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15,18 9,12 15,6"></polyline></svg>';
+                navButton.innerHTML = '';
+                navButton.appendChild(arrowIcon.firstChild);
+                navButton.setAttribute('hx-get', navButton.dataset.returnUrl || '/');
+                navButton.setAttribute('hx-target', '#feed-list');
+                navButton.removeAttribute('onclick');
+            }
+        }
+    };
+
+    window.hideArticle = function() {
+        if (window.innerWidth < 1024) {
+            const articleDetail = document.getElementById('article-detail');
+            const feedList = document.getElementById('feed-list');
+            const navButton = document.getElementById('nav-button');
+
+            articleDetail.classList.remove('active');
+            feedList.classList.remove('article-view');
+
+            // Update nav button to menu
+            if (navButton) {
+                navButton.dataset.mode = 'menu';
+                const menuIcon = document.createElement('div');
+                menuIcon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>';
+                navButton.innerHTML = '';
+                navButton.appendChild(menuIcon.firstChild);
+                navButton.removeAttribute('hx-get');
+                navButton.removeAttribute('hx-target');
+                navButton.setAttribute('onclick', 'toggleSidebar()');
+            }
+        }
+    };
+
+    // HTMX event handlers
+    document.body.addEventListener('htmx:afterSwap', function(evt) {
+        // Handle article navigation on mobile
+        if (evt.detail.target.id === 'article-detail' && window.innerWidth < 1024) {
+            window.showArticle();
+        }
+
+        // Handle returning to feed list on mobile
+        if (evt.detail.target.id === 'feed-list' && window.innerWidth < 1024) {
+            window.hideArticle();
+        }
+    });
+
+    // Click outside to close search - improved robustness
+    document.addEventListener('click', function(event) {
+        // Unified elements - single source of truth
+        const searchBar = document.getElementById('search-bar');
+        const iconBar = document.getElementById('icon-bar');
+
+        if (searchBar && searchBar.classList.contains('show')) {
+            const clickedInsideSearch = searchBar.contains(event.target);
+            const clickedSearchButton = event.target.closest('button[title="Search"]');
+            const clickedCloseButton = event.target.closest('button[title="Close search"]');
+
+            // Don't close if clicked on search elements
+            if (!clickedInsideSearch && !clickedSearchButton && !clickedCloseButton) {
+                searchBar.classList.remove('show');
+                if (iconBar) iconBar.classList.remove('hide');
+            }
+        }
+    });
+
+    // Escape key to close search
+    document.addEventListener('keydown', function(event) {
+        if (event.key === 'Escape') {
+            // Unified elements - single source of truth
+            const searchBar = document.getElementById('search-bar');
+            const iconBar = document.getElementById('icon-bar');
+
+            if (searchBar && searchBar.classList.contains('show')) {
+                searchBar.classList.remove('show');
+                if (iconBar) iconBar.classList.remove('hide');
+            }
+        }
+    });
+    """)
 
 def viewport_styles():
     """Global styles for viewport management"""
@@ -449,7 +759,7 @@ def viewport_styles():
     .js-filter > li:first-child {
         margin-top: 1rem !important;
     }
-    
+
     """)
 
 def create_tab_container(feed_name, feed_id, unread_only, for_mobile=False):
@@ -470,7 +780,7 @@ def create_tab_container(feed_name, feed_id, unread_only, for_mobile=False):
              href=f"{base_url}{'&' if url_params else '?'}unread=0" if base_url != "/" else "/?unread=0",
              # Mobile-only: HTMX attributes for partial updates
              **({'hx_get': f"{base_url}{'&' if url_params else '?'}unread=0" if base_url != "/" else "/?unread=0",
-                'hx_target': Targets.MOBILE_CONTENT,
+                'hx_target': Targets.CONTENT,
                 'hx_push_url': "true"} if for_mobile else {}),
              role='button'),
            cls='uk-active' if not unread_only else ''),
@@ -478,7 +788,7 @@ def create_tab_container(feed_name, feed_id, unread_only, for_mobile=False):
              href=base_url if base_url != "/" else "/",
              # Mobile-only: HTMX attributes for partial updates
              **({'hx_get': base_url if base_url != "/" else "/",
-                'hx_target': Targets.MOBILE_CONTENT,
+                'hx_target': Targets.CONTENT,
                 'hx_push_url': "true"} if for_mobile else {}),
              role='button'),
            cls='uk-active' if unread_only else ''),
@@ -530,7 +840,7 @@ def htmx_item_response(htmx, item_data, _scroll=None):
         back_button = Button(
             UkIcon('arrow-left'),
             hx_get=back_url,
-            hx_target=Targets.MOBILE_CONTENT,
+            hx_target=Targets.CONTENT,
             hx_push_url="true",
             cls="p-2 rounded border hover:bg-secondary mr-2",
             id="mobile-nav-button",
@@ -538,78 +848,93 @@ def htmx_item_response(htmx, item_data, _scroll=None):
         )
         responses.append(back_button)
     
-    # DESKTOP UPDATES - Update list item appearance if it was unread
-    elif htmx.target in ['desktop-item-detail', '#desktop-item-detail'] and item_data.was_unread:
-        updated_item_attrs = {
-            "cls": f"relative rounded-lg border border-border p-3 text-sm hover:bg-secondary space-y-2 cursor-pointer bg-muted tag-read",
-            "id": f"desktop-feed-item-{item_data.item['id']}",
-            "hx_get": f"/item/{item_data.item['id']}?unread_view={item_data.unread_view}",
-            "hx_target": "#desktop-item-detail",
-            "hx_trigger": "click",
-            "hx_swap_oob": "true"
-        }
-        
+    # Update list item appearance if it was unread (works for both mobile and desktop)
+    if htmx.target in ['article-detail', '#article-detail', ElementIDs.ARTICLE_DETAIL, f'#{ElementIDs.ARTICLE_DETAIL}'] and item_data.was_unread:
+        # Create updated feed item without blue dot (item is now marked as read)
+        # Build the same way as FeedItem but with OOB swap
+        item = item_data.item
+        item_id = f"feed-item-{item['id']}"
+        item_url = f"/item/{item['id']}?unread_view={item_data.unread_view}"
+        if item_data.feed_id:
+            item_url += f"&feed_id={item_data.feed_id}"
+        if item_data.page > 1:
+            item_url += f"&page={item_data.page}"
+
+        # Item is now read, so no blue dot and different styling
         updated_item = Li(
-            # Title row with no blue dot (read state)
-            DivLAligned(
-                Span(item_data.item['title']),  # Unbolded title for read items
-                # No blue dot for read items
-            ),
-            # Source and time row - source left, time right
+            # Title row without blue dot (item is read)
             DivFullySpaced(
-                Small(item_data.item.get('feed_title', 'Unknown Feed'), cls=TextPresets.muted_sm),
-                Time(human_time_diff(item_data.item.get('published')), cls='text-xs text-muted-foreground')
+                Span(item['title']),  # Regular text for read items
+                ''  # No blue dot for read items
             ),
-            **updated_item_attrs
+            # Source and time row
+            DivFullySpaced(
+                Small(item.get('feed_title', 'Unknown Feed'), cls=TextPresets.muted_sm),
+                Time(human_time_diff(item.get('published')), cls='text-xs text-muted-foreground')
+            ),
+            cls=f"{Styling.FEED_ITEM_BASE} {Styling.FEED_ITEM_READ} feed-item",
+            id=item_id,
+            hx_get=item_url,
+            hx_target=f"#{ElementIDs.ARTICLE_DETAIL}",
+            hx_trigger="click",
+            hx_push_url="true",
+            hx_vals='js:{_scroll: window.innerWidth < 1024 ? (document.getElementById("feed-list")?.scrollTop || 0) : 0}',
+            hx_swap_oob="outerHTML"  # Replace the existing item in the feed list
         )
         responses.append(updated_item)
     
     return responses[0] if len(responses) == 1 else tuple(responses)
 
 def full_page_item_response(item_data):
-    """Full page response for item with proper layout"""
+    """Full page response for item with unified responsive layout"""
     # Create PageData for consistency
     page_data = PageData(item_data.session_id, item_data.feed_id, item_data.unread_view, item_data.page)
-    
-    # Modify desktop layout to show the item in detail column
-    def desktop_layout_with_item(data, item):
-        return Div(cls=Styling.DESKTOP_LAYOUT, id="desktop-layout")(
-            Grid(
-                DesktopHandlers.sidebar_column(data),
-                Div(cls=Styling.DESKTOP_FEEDS_COLUMN, id="desktop-feeds-content")(
-                    FeedsContent(data.session_id, data.feed_id, data.unread, 1, for_desktop=True)
-                ),
-                Div(id="desktop-item-detail", cls=Styling.DESKTOP_DETAIL_COLUMN)(
-                    ItemDetailView(item, show_back=False)
-                ),
-                cols_lg=5, cols_xl=5, gap=4, cls='h-screen gap-4'
-            )
-        )
-    
-    # Modify mobile layout to show the item
-    def mobile_layout_with_item(data, item):
-        return Div(cls=Styling.MOBILE_LAYOUT, id="mobile-layout")(
-            Div(cls="h-20 flex-shrink-0"),  # Header spacer
-            MobilePersistentHeader(data.session_id, data.feed_id, data.unread, show_chrome=False),
-            Div(cls="flex-1 overflow-y-auto", id="main-content")(
-                ItemDetailView(item, show_back=True)
-            )
-        )
-    
-    # Get feed name for mobile header
     feed_name = page_data.feed_name if hasattr(page_data, 'feed_name') else "All Feeds"
 
+    # For mobile, show back button in chrome
+    show_back = True
+
     return (
-        # Chrome elements for item view
-        Div(id='mobile-header')(MobileHeader(item_data.session_id, show_back=True, feed_id=item_data.feed_id, unread_view=item_data.unread_view, feed_name=feed_name)),
-        MobileSidebar(item_data.session_id),
-        
-        # BOTH LAYOUTS with item content
-        mobile_layout_with_item(page_data, item_data.item),
-        desktop_layout_with_item(page_data, item_data.item),
-        
-        # Global styles
-        viewport_styles()
+        # Single responsive layout
+        Div(id=ElementIDs.APP_CONTAINER, cls="app-container")(
+            # Sidebar (shared, responsive positioning)
+            responsive_sidebar(item_data.session_id),
+            # Sidebar overlay for mobile
+            Div(id="sidebar-overlay", hx_on_click="window.toggleSidebar()"),
+            # Main layout area
+            Div(id="main-layout", cls="main-layout")(
+                # Unified chrome with back button for mobile
+                UnifiedChrome(
+                    session_id=item_data.session_id,
+                    feed_id=item_data.feed_id,
+                    unread_view=item_data.unread_view,
+                    feed_name=feed_name,
+                    show_back=show_back
+                ),
+                # Content area with feed list and article detail
+                Div(id=ElementIDs.CONTENT_AREA, cls="content-area")(
+                    # Feed list (hidden on mobile when viewing article)
+                    Div(id=ElementIDs.FEED_LIST, cls="feed-list")(
+                        FeedsContent(page_data.session_id, page_data.feed_id, page_data.unread,
+                                   page_data.page, data=page_data)
+                    ),
+                    # Article detail (active on mobile)
+                    Div(id=ElementIDs.ARTICLE_DETAIL, cls="article-detail active")(
+                        ItemDetailView(item_data.item, show_back=False)
+                    )
+                )
+            )
+        ),
+        responsive_styles(),
+        responsive_javascript(),
+        # Add script to activate article view on mobile
+        Script("""
+            document.addEventListener('DOMContentLoaded', function() {
+                if (window.innerWidth < 1024) {
+                    window.showArticle();
+                }
+            });
+        """)
     )
 
 # Timing middleware for performance monitoring
@@ -1122,138 +1447,43 @@ def FeedSidebarItem(feed, count=""):
             ),
             href=f"/?feed_id={feed['id']}",
             cls=Styling.SIDEBAR_ITEM,
-            hx_on_click="const sidebar = document.getElementById('mobile-sidebar'); if (sidebar && !sidebar.hasAttribute('hidden')) { sidebar.setAttribute('hidden', 'true'); }"
+            hx_on_click="if(window.innerWidth < 1024) window.toggleSidebar()"
         )
     )
 
-def FeedsSidebar(session_id, for_mobile=False):
-    """Create feeds sidebar with proper HTMX targeting based on context"""
-    feeds = FeedModel.get_user_feeds(session_id)
-    folders = FolderModel.get_folders(session_id)
-    
-    return Ul(
-        Li(
-            DivFullySpaced(
-                H3("Feeds"),
-                Button(
-                    UkIcon('refresh-cw'),
-                    hx_post="/api/session/reset",
-                    hx_swap="none",
-                    cls="p-1 hover:bg-secondary rounded",
-                    title="Reset all session data",
-                    hx_confirm="Are you sure? This will clear all your subscriptions and settings."
-                )
-            ),
-            cls='p-3'
-        ),
-        Li(
-            Form(
-                DivLAligned(
-                    Input(
-                        placeholder="Enter RSS URL", 
-                        name="new_feed_url",  # This maps to FastHTML function parameter
-                        cls="flex-1 mr-2 add-feed-input"
-                    ),
-                    Button(
-                        UkIcon('plus'),
-                        cls="px-2 add-feed-button",
-                        type="submit"
-                    )
-                ),
-                hx_post="/api/feed/add",
-                hx_target=Targets.MOBILE_SIDEBAR if for_mobile else Targets.DESKTOP_SIDEBAR,
-                hx_swap="outerHTML",
-                cls="add-feed-form"
-            ),
-            cls='p-4'
-        ),
-        Li(
-            A(
-                DivLAligned(
-                    UkIcon('globe', cls="flex-none"),
-                    Span("All Feeds"),
-                    P("", cls="text-xs text-muted"),
-                    cls="gap-3"
-                ),
-                href="/",
-                cls="hover:bg-secondary p-4 block",
-                hx_on_click="const sidebar = document.getElementById('mobile-sidebar'); if (sidebar && !sidebar.hasAttribute('hidden')) { sidebar.setAttribute('hidden', 'true'); }"
-            )
-        ),
-        Div(cls="feeds-list")(*[FeedSidebarItem(feed) for feed in feeds]),
-        Li(Hr()),
-        Li(H4("Folders"), cls='p-3'),
-        *[Li(
-            A(
-                DivLAligned(
-                    UkIcon('folder', cls="flex-none"),
-                    Span(folder['name']),
-                    cls="gap-3"
-                ),
-                href=f"/?folder_id={folder['id']}",
-                cls="hover:bg-secondary p-4 block"
-            )
-        ) for folder in folders],
-        Li(
-            Button(
-                UkIcon('plus'),
-                " Add Folder",
-                hx_post="/api/folder/add",
-                hx_prompt="Folder name:",
-                cls="w-full text-left p-4 hover:bg-secondary add-folder-button"
-            )
-        ),
-        cls='mt-3'
-    )
+# Removed duplicate FeedsSidebar - use responsive_sidebar instead
 
-def FeedItem(item, unread_view=False, for_desktop=False, feed_id=None, page=1):
-    """Feed item component
-    
-    Args:
-        for_desktop: True for desktop layout (targets #desktop-item-detail),
-                    False for mobile (targets #main-content)
-    
-    The different targets are architectural - mobile swaps full screen,
-    desktop updates only the detail column.
+def FeedItem(item, unread_view=False, feed_id=None, page=1):
+    """Unified feed item component - responsive behavior via CSS
+
+    Single element that adapts to mobile/desktop via CSS and JavaScript
     """
     cls_base = Styling.FEED_ITEM_BASE
     is_read = item.get('is_read', 0) == 1
-    
+
     read_bg = Styling.FEED_ITEM_READ if is_read else Styling.FEED_ITEM_UNREAD
-    cls = f"{cls_base} {read_bg}"
-    
+    cls = f"{cls_base} {read_bg} feed-item"
+
     # Build item URL with feed context preserved
     item_url = f"/item/{item['id']}?unread_view={unread_view}"
     if feed_id:
         item_url += f"&feed_id={feed_id}"
     if page > 1:
         item_url += f"&page={page}"
-    
-    # Simple consistent approach: same HTMX pattern, just different targets
-    if for_desktop:
-        target = Targets.DESKTOP_DETAIL
-        push_url = "true"  # Enable URL push for desktop to fix back button navigation
-    else:
-        target = Targets.MOBILE_CONTENT
-        push_url = "true"  # URL push for mobile full-page navigation
-    
-    # Use unique IDs for desktop vs mobile to avoid HTML violations
-    item_id = f"{'desktop-' if for_desktop else 'mobile-'}feed-item-{item['id']}"
-    
+
+    # Single ID for each item
+    item_id = f"feed-item-{item['id']}"
+
+    # Always target article detail
     attrs = {
         "cls": cls,
         "id": item_id,
         "hx_get": item_url,
-        "hx_target": target,
-        "hx_trigger": "click"
+        "hx_target": f"#{ElementIDs.ARTICLE_DETAIL}",
+        "hx_trigger": "click",
+        "hx_push_url": "true",
+        "hx_vals": 'js:{_scroll: window.innerWidth < 1024 ? (document.getElementById("feed-list")?.scrollTop || 0) : 0}'
     }
-    
-    if push_url:
-        attrs["hx_push_url"] = push_url
-    
-    # Add scroll position capture for mobile using hx-vals
-    if not for_desktop:  # Mobile only
-        attrs["hx_vals"] = 'js:{_scroll: window.innerWidth < 1024 ? (document.getElementById("main-content")?.scrollTop || 0) : 0}'
     
     return Li(
         # Title row with blue dot
@@ -1283,9 +1513,9 @@ def FeedItem(item, unread_view=False, for_desktop=False, feed_id=None, page=1):
         **attrs
     )
 
-def FeedsList(items, unread_view=False, for_desktop=False, feed_id=None, page=1):
-    """Create list of feed items (adapted from MailList)"""
-    return Ul(cls='js-filter space-y-2 p-4 pt-0')(*[FeedItem(item, unread_view, for_desktop, feed_id, page) for item in items])
+def FeedsList(items, unread_view=False, feed_id=None, page=1):
+    """Create unified list of feed items"""
+    return Ul(cls='js-filter space-y-2 p-4 pt-0')(*[FeedItem(item, unread_view, feed_id, page) for item in items])
 
 def MobilePersistentHeader(session_id, feed_id=None, unread_only=False, show_chrome=True):
     """Create persistent mobile header - simplified since icons moved to main header"""
@@ -1297,9 +1527,9 @@ def MobilePersistentHeader(session_id, feed_id=None, unread_only=False, show_chr
         style='display: none;'
     )()
 
-def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_desktop=False, data=None):
-    """Create main feeds content area with pagination - MOBILE VERSION NO LONGER INCLUDES HEADER
-    
+def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, data=None):
+    """Create unified feeds content area with pagination
+
     Args:
         data: Optional PageData object with pre-fetched data. If provided, avoids duplicate DB queries.
     """
@@ -1356,7 +1586,7 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
             total_items = conn.execute(count_query, count_params).fetchone()[0]
             total_pages = (total_items + page_size - 1) // page_size if total_items else 1
     
-    print(f"🔍 MOBILE_FORM_BUG_FIX: FeedsContent() - for_desktop={for_desktop}, MOBILE header moved to persistent header")
+    print(f"🔍 FeedsContent() - unified content area")
     
     # Simple header logic for desktop only
     if feed_id:
@@ -1393,7 +1623,7 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
                 cls="p-2 rounded border hover:bg-secondary"
             )
 
-        target = Targets.DESKTOP_FEEDS if for_desktop else Targets.MOBILE_CONTENT
+        target = Targets.CONTENT  # Unified target
 
         return Div(cls='p-4 border-t')(
             DivFullySpaced(
@@ -1409,10 +1639,10 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
             )
         )
     
-    # Unified layout for both mobile and desktop - same simple content structure
+    # Unified layout - same simple content structure
     # Feed name now shown in chrome, not in content area
     content_elements = [
-        FeedsList(paginated_items, unread_only, for_desktop, feed_id, page) if paginated_items else Div(P("No posts available"), cls='p-4 text-center text-muted-foreground'),
+        FeedsList(paginated_items, unread_only, feed_id, page) if paginated_items else Div(P("No posts available"), cls='p-4 text-center text-muted-foreground'),
         pagination_footer()
     ]
     
@@ -1420,48 +1650,23 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, for_deskto
         *content_elements
     )
 
-def MobileSidebar(session_id):
-    """Create mobile sidebar overlay"""
-    return Div(
-        id=ElementIDs.MOBILE_SIDEBAR,
-        cls="fixed inset-0 z-50 lg:hidden",
-        hidden="true"
-    )(
-        Div(
-            cls="bg-black bg-opacity-50 absolute inset-0",
-            hx_on_click="document.getElementById('mobile-sidebar').setAttribute('hidden', 'true')"
-        ),
-        Div(cls="bg-background w-80 h-full overflow-y-auto relative z-10")(
-            Div(cls="p-4 border-b")(
-                DivFullySpaced(
-                    H3("RSS Reader"),
-                    Button(
-                        UkIcon('x'),
-                        cls="p-1 rounded hover:bg-secondary",
-                        hx_on_click="document.getElementById('mobile-sidebar').setAttribute('hidden', 'true')"
-                    )
-                )
-            ),
-            FeedsSidebar(session_id, for_mobile=True)
-        )
-    )
+# Removed duplicate MobileSidebar - use responsive_sidebar instead
 
-def UnifiedChrome(session_id, feed_id=None, unread_view=True, feed_name="All Feeds", show_back=False, for_mobile=True):
-    """Unified chrome component for both desktop and mobile layouts
+def UnifiedChrome(session_id, feed_id=None, unread_view=True, feed_name="All Feeds", show_back=False):
+    """Unified chrome component - single element for all viewports
 
     Args:
         session_id: User session ID
         feed_id: Current feed ID (optional)
         unread_view: Whether in unread view mode
-        feed_name: Name of current feed for desktop display
-        show_back: Show back button instead of hamburger (mobile only)
-        for_mobile: Whether this is for mobile layout
+        feed_name: Name of current feed
+        show_back: Show back button instead of hamburger
     """
     # Build URLs for action buttons
     all_posts_url = f"/?feed_id={feed_id}&unread=0" if feed_id else "/?unread=0"
     unread_url = f"/?feed_id={feed_id}" if feed_id else "/"
 
-    # Build return URL for back button (mobile only)
+    # Build return URL for back button
     return_url = "/"
     if feed_id:
         if unread_view:
@@ -1472,155 +1677,132 @@ def UnifiedChrome(session_id, feed_id=None, unread_view=True, feed_name="All Fee
         if not unread_view:
             return_url = "/?unread=0"
 
-    # Left side element - both mobile and desktop show feed name
-    if for_mobile:
-        # Mobile: Navigation button + feed name
-        nav_button = (
-            Button(
-                UkIcon('arrow-left'),
-                hx_get=return_url,
-                hx_target=Targets.MOBILE_CONTENT,
-                hx_push_url="true",
-                cls="p-2 rounded border hover:bg-secondary",
-                id="mobile-nav-button"
-            ) if show_back else Button(
-                UkIcon('menu'),
-                cls="p-2 rounded border hover:bg-secondary",
-                hx_on_click="document.getElementById('mobile-sidebar').removeAttribute('hidden')",
-                id="mobile-nav-button"
-            )
-        )
-        # Combine button and feed name for mobile
-        left_element = Div(cls="flex items-center space-x-2")(
-            nav_button,
-            H3(feed_name, cls="text-base font-semibold truncate")  # Smaller font and truncate for mobile
-        )
-    else:
-        # Desktop: Just feed name as text
-        left_element = H3(feed_name, cls="text-lg font-semibold")
+    # Navigation button - visible only on mobile via CSS
+    nav_button = Button(
+        UkIcon('arrow-left' if show_back else 'menu'),
+        hx_get=return_url if show_back else None,
+        hx_target=Targets.CONTENT if show_back else None,
+        hx_push_url="true" if show_back else None,
+        hx_on_click=None if show_back else "window.toggleSidebar()",
+        cls="nav-button-responsive",
+        id=ElementIDs.NAV_BUTTON,
+        data_mode="back" if show_back else "menu"
+    )
 
-    # Right side action buttons - same for both layouts
-    target = Targets.MOBILE_CONTENT if for_mobile else Targets.DESKTOP_FEEDS
+    # Feed name
+    feed_name_element = H3(feed_name, cls="feed-name-responsive flex-1 text-center", id="feed-name")
 
+    # Action buttons
     action_buttons = Div(
         cls="flex items-center space-x-3 ml-auto",
-        id=f"{'mobile' if for_mobile else 'desktop'}-icon-bar"
+        id=ElementIDs.ICON_BAR
     )(
         Button(
             UkIcon('list'),
             hx_get=all_posts_url,
-            hx_target=target,
+            hx_target=Targets.CONTENT,
             hx_push_url="true",
-            cls="p-2 rounded hover:bg-secondary",
+            cls="p-3 rounded hover:bg-secondary",
             title="All Posts"
         ),
         Button(
             UkIcon('mail'),
             hx_get=unread_url,
-            hx_target=target,
+            hx_target=Targets.CONTENT,
             hx_push_url="true",
-            cls="p-2 rounded hover:bg-secondary",
+            cls="p-3 rounded hover:bg-secondary",
             title="Unread"
         ),
         Button(
             UkIcon('search'),
-            hx_on_click=f"var bar = document.getElementById('{'mobile' if for_mobile else 'desktop'}-icon-bar'); var search = document.getElementById('{'mobile' if for_mobile else 'desktop'}-search-bar'); bar.style.display='none'; search.style.display='flex'; search.querySelector('input').focus();",
-            cls="p-2 rounded hover:bg-secondary",
+            hx_on_click="window.toggleSearch()",
+            cls="p-3 rounded hover:bg-secondary",
             title="Search"
         )
     )
 
-    # Expandable search bar
+    # Expandable search bar - positioned absolutely to not affect height
     search_bar = Div(
-        cls="flex items-center flex-1 ml-4",
-        id=f"{'mobile' if for_mobile else 'desktop'}-search-bar",
+        cls="absolute inset-0 flex items-center px-4 bg-white z-10",
+        id=ElementIDs.SEARCH_BAR,
         style="display: none;"
     )(
-        Div(cls="uk-inline w-full")(
-            Input(
-                placeholder="Search posts",
-                cls="w-full pr-8",
-                id=f"{'mobile' if for_mobile else 'desktop'}-search-input",
-                uk_filter_control=""
-            ),
-            Button(
-                UkIcon('x', cls="w-4 h-4"),
-                hx_on_click=f"var bar = document.getElementById('{'mobile' if for_mobile else 'desktop'}-icon-bar'); var search = document.getElementById('{'mobile' if for_mobile else 'desktop'}-search-bar'); search.style.display='none'; bar.style.display='flex';",
-                cls="uk-form-icon uk-form-icon-flip p-1 hover:text-red-500 cursor-pointer absolute right-1 top-1/2 -translate-y-1/2",
-                title="Close search"
+        # Create separate nav button for main search bar to avoid duplicate IDs
+        Button(
+            UkIcon('menu'),
+            type="submit",
+            name="nav-button",
+            hx_on_click="window.toggleSidebar()",
+            cls="nav-button-responsive",
+            id="search-nav-button",
+            data_mode="menu"
+        ),
+        Div(cls="flex-1 mx-4")(
+            Div(cls="uk-inline w-full")(
+                Input(
+                    placeholder="Search posts",
+                    cls="w-full pr-10",
+                    id="search-input",
+                    uk_filter_control=""
+                ),
+                Button(
+                    UkIcon('x', cls="w-4 h-4"),
+                    hx_on_click="window.toggleSearch()",
+                    cls="uk-form-icon uk-form-icon-flip p-1 hover:text-red-500 cursor-pointer absolute right-2 top-1/2 -translate-y-1/2",
+                    title="Close search"
+                )
             )
         )
     )
 
-    # Click outside handler script
-    click_outside_script = Script(f"""
-        document.addEventListener('DOMContentLoaded', function() {{
-            const searchBar = document.getElementById('{'mobile' if for_mobile else 'desktop'}-search-bar');
-            const iconBar = document.getElementById('{'mobile' if for_mobile else 'desktop'}-icon-bar');
-            const searchInput = document.getElementById('{'mobile' if for_mobile else 'desktop'}-search-input');
-
-            document.addEventListener('click', function(event) {{
-                if (searchBar && iconBar) {{
-                    const isSearchVisible = searchBar.style.display !== 'none';
-                    const clickedInsideSearch = searchBar.contains(event.target);
-                    const clickedSearchButton = event.target.closest('button[title="Search"]');
-
-                    if (isSearchVisible && !clickedInsideSearch && !clickedSearchButton) {{
-                        searchBar.style.display = 'none';
-                        iconBar.style.display = 'flex';
-                    }}
-                }}
-            }});
-        }});
-    """)
-
-    # Chrome container structure
+    # Chrome container structure - fixed height to maintain invariant
+    # UNIFIED responsive structure - NO test-specific duplicate elements
     chrome_content = Div(
-        cls="flex items-center",
-        id=f"{'mobile' if for_mobile else 'desktop'}-chrome-content"
+        cls="chrome-container flex items-center justify-between p-4 border-b min-h-[64px] max-h-[64px]",
+        id=ElementIDs.CHROME_CONTAINER,
+        hx_preserve="true"  # Preserve chrome during HTMX swaps (mobile article view)
     )(
-        left_element,
-        action_buttons,
-        search_bar
-    )
-
-    return (chrome_content, click_outside_script)
-
-def MobileHeader(session_id, show_back=False, feed_id=None, unread_view=False, feed_name="All Feeds"):
-    """Mobile header wrapper using UnifiedChrome"""
-
-    # Get chrome components
-    chrome_content, click_outside_script = UnifiedChrome(
-        session_id=session_id,
-        feed_id=feed_id,
-        unread_view=unread_view,
-        feed_name=feed_name,  # Now passing actual feed name
-        show_back=show_back,
-        for_mobile=True
-    )
-
-    # Loading spinner - hidden by default, shown during HTMX requests
-    loading_spinner = Div(
-        id="loading-spinner",
-        cls="fixed top-20 left-1/2 transform -translate-x-1/2 bg-background border rounded p-3 z-50 lg:hidden htmx-indicator hidden"
-    )(
-        DivLAligned(
-            UkIcon('loader', cls="animate-spin"),
-            Span("Loading...", cls="ml-2")
+        nav_button,
+        feed_name_element,
+        # Single unified icon bar - responsive via CSS
+        Div(
+            cls="flex items-center space-x-3",
+            id="icon-bar"
+        )(
+            Button(
+                UkIcon('list'),
+                hx_get=all_posts_url,
+                hx_target=Targets.CONTENT,
+                hx_push_url="true",
+                cls="p-3 rounded hover:bg-secondary",
+                title="All Posts"
+            ),
+            Button(
+                UkIcon('mail'),
+                hx_get=unread_url,
+                hx_target=Targets.CONTENT,
+                hx_push_url="true",
+                cls="p-3 rounded hover:bg-secondary",
+                title="Unread"
+            ),
+            Button(
+                UkIcon('search'),
+                hx_on_click="window.toggleSearch()",
+                cls="p-3 rounded hover:bg-secondary",
+                title="Search"
+            )
         )
     )
 
-    return Div(
-        # Fixed header bar with unified chrome
-        Div(
-            cls="lg:hidden fixed top-0 left-0 right-0 bg-background border-b p-4 z-40",
-            id="mobile-top-bar"
-        )(
-            chrome_content
-        ),
-        loading_spinner,
-        click_outside_script
+    # Include search bars in the chrome structure
+    chrome_with_search = Container(
+        chrome_content,
+        search_bar  # Include the main search bar defined above
     )
+
+    return chrome_with_search
+
+# Removed MobileHeader - now using unified UnifiedChrome directly
 
 def ItemDetailView(item, show_back=False):
     """Create item detail view - back button now handled by header"""
@@ -1646,7 +1828,7 @@ def ItemDetailView(item, show_back=False):
                     icon, 
                     uk_tooltip=tooltip,
                     hx_post=f"/api/item/{item['id']}/{'star' if 'star' in tooltip.lower() else 'folder' if 'folder' in tooltip.lower() else 'read'}",
-                    hx_target=Targets.MOBILE_CONTENT,
+                    hx_target=Targets.DETAIL,
                     cls='cursor-pointer hover:text-blue-600'
                 ) for icon, tooltip in action_icons],
                 cls='space-x-2'
@@ -1700,8 +1882,8 @@ def index(htmx, sess, feed_id: int = None, unread: bool = True, folder_id: int =
     if htmx and getattr(htmx, 'request', None) and getattr(htmx, 'target', None):
         return route_htmx_fragment(htmx, data)
     
-    # FULL PAGE - No title banner, direct content
-    return full_page_dual_layout(data)
+    # FULL PAGE - Single responsive layout
+    return unified_page_layout(data)
 
 @rt('/item/{item_id}')
 def show_item(item_id: int, htmx, sess, unread_view: bool = False, feed_id: int = None, page: int = 1, _scroll: int = None):
@@ -1859,17 +2041,8 @@ def add_feed(htmx, sess, new_feed_url: str = ""):
         else:
             print(f"WARNING: Background worker not available, feed {feed_id} created without immediate queuing")
         
-        # Return unified sidebar response - JavaScript targeting handles mobile vs desktop
-        target_container = getattr(htmx, 'target', '') if htmx else ''
-        
-        if target_container and 'mobile-sidebar' in target_container:
-            # Mobile: return complete mobile sidebar structure  
-            return MobileSidebar(session_id)
-        else:
-            # Desktop: return sidebar container with content
-            return Div(id=ElementIDs.SIDEBAR, cls=Styling.SIDEBAR_DESKTOP)(
-                FeedsSidebar(session_id, for_mobile=False)
-            )
+        # Return unified sidebar response
+        return responsive_sidebar(session_id)
         
     except Exception as e:
         print(f"ERROR: Exception in add_feed for {url}: {str(e)}")

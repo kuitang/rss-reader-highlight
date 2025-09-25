@@ -12,7 +12,42 @@ Server Dependency Management:
 import pytest
 import httpx
 import os
+import time
 from playwright.sync_api import sync_playwright
+
+
+def wait_for_htmx_complete(page, timeout=5000):
+    """Wait for all HTMX requests to complete
+
+    This helper function ensures HTMX operations have finished before proceeding.
+    Replaces arbitrary time.sleep() calls with proper condition-based waiting.
+
+    Args:
+        page: Playwright page object
+        timeout: Maximum wait time in milliseconds (default: 5000ms)
+    """
+    try:
+        # Wait for HTMX to finish processing (no htmx-request class on body)
+        page.wait_for_function(
+            "() => !document.body.classList.contains('htmx-request')",
+            timeout=timeout
+        )
+    except:
+        # If HTMX isn't loaded or timeout occurs, continue
+        pass
+
+
+def wait_for_page_ready(page, timeout=5000):
+    """Wait for page to be fully loaded
+
+    Ensures both DOM content and network activity have settled.
+
+    Args:
+        page: Playwright page object
+        timeout: Maximum wait time in milliseconds (default: 5000ms)
+    """
+    page.wait_for_load_state('domcontentloaded', timeout=timeout)
+    page.wait_for_load_state('networkidle', timeout=timeout)
 
 
 @pytest.fixture(scope="session")
@@ -38,7 +73,8 @@ def test_server_url():
         try:
             response = httpx.get(existing_server, timeout=5)
             if response.status_code == 200:
-                return existing_server
+                yield existing_server
+                return
         except httpx.RequestError:
             pass
     
@@ -110,7 +146,7 @@ def test_server_url():
             if response.status_code == 200:
                 break
         except httpx.RequestError:
-            time.sleep(1)
+            time.sleep(0.5)
     else:
         cleanup_server()
         pytest.skip(f"Failed to start test server on {server_url}")

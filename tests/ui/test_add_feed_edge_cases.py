@@ -3,6 +3,7 @@
 import pytest
 from playwright.sync_api import Page, expect
 import time
+from tests.ui.conftest import wait_for_htmx_complete, wait_for_page_ready
 
 # HTMX Helper Functions for Fast Testing
 def wait_for_htmx_complete(page, timeout=5000):
@@ -25,12 +26,12 @@ def test_add_feed_edge_cases(page: Page, test_server_url):
     ]:
         print(f"\n--- Testing {viewport_name} add feed edge cases ---")
         page.set_viewport_size(viewport_size)
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=5000)
         wait_for_page_ready(page)
         
         # Debug: Check if correct layout is visible
-        desktop_layout_visible = page.locator("#desktop-layout").is_visible()
-        mobile_layout_visible = page.locator("#mobile-layout").is_visible()
+        desktop_layout_visible = page.locator("#main-layout").is_visible()
+        mobile_layout_visible = page.locator("#main-layout").is_visible()
         print(f"  Debug: Desktop layout visible: {desktop_layout_visible}, Mobile layout visible: {mobile_layout_visible}")
         
         # Debug: Check what elements are available
@@ -48,12 +49,12 @@ def test_add_feed_edge_cases(page: Page, test_server_url):
         # Set up viewport-specific selectors
         if viewport_name == "mobile":
             # Open mobile sidebar
-            hamburger = page.locator('#mobile-nav-button')
+            hamburger = page.locator('#nav-button')
             if hamburger.is_visible():
                 hamburger.click()
-                page.wait_for_selector("#mobile-sidebar", state="visible")
-                feed_input = page.locator('#mobile-sidebar input[name="new_feed_url"]')
-                add_button = page.locator('#mobile-sidebar button.add-feed-button')
+                page.wait_for_selector("#sidebar", state="visible")
+                feed_input = page.locator('#sidebar input[name="new_feed_url"]')
+                add_button = page.locator('#sidebar button.add-feed-button')
             else:
                 print(f"  ⚠️ Mobile navigation not available, skipping {viewport_name}")
                 continue
@@ -85,14 +86,14 @@ def test_add_feed_edge_cases(page: Page, test_server_url):
             # Locate fresh elements after potential HTMX updates
             if viewport_name == "mobile":
                 # Ensure mobile sidebar is open
-                if not page.locator("#mobile-sidebar").is_visible():
-                    hamburger = page.locator('#mobile-nav-button')
+                if not page.locator("#sidebar").is_visible():
+                    hamburger = page.locator('#nav-button')
                     if hamburger.is_visible():
                         hamburger.click()
-                        page.wait_for_selector("#mobile-sidebar", state="visible")
+                        page.wait_for_selector("#sidebar", state="visible")
                 
-                feed_input = page.locator('#mobile-sidebar input[name="new_feed_url"]')
-                add_button = page.locator('#mobile-sidebar button.add-feed-button')
+                feed_input = page.locator('#sidebar input[name="new_feed_url"]')
+                add_button = page.locator('#sidebar button.add-feed-button')
             else:
                 # Desktop: locate current form elements
                 feed_input = page.locator('input[placeholder="Enter RSS URL"]')
