@@ -1,0 +1,379 @@
+/* RSS Reader Main Styles */
+
+/* Base layout */
+html, body {
+    height: 100%;
+    overflow: hidden;
+    margin: 0;
+    padding: 0;
+}
+
+.app-container {
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+}
+
+/* Desktop layout - 3 columns */
+@media (min-width: 1024px) {
+    .app-container {
+        display: grid;
+        grid-template-columns: 250px 1fr;
+    }
+
+    .main-layout {
+        display: grid;
+        grid-template-rows: auto 1fr;
+        height: 100vh;
+        overflow: hidden;
+    }
+
+    .content-area {
+        display: grid;
+        grid-template-columns: 2fr 2fr;
+        gap: 0;
+        overflow: hidden;
+    }
+
+    .sidebar {
+        display: block !important;
+        position: static !important;
+        height: 100vh;
+        overflow-y: auto;
+        border-right: 1px solid var(--border);
+        background-color: hsl(var(--background));
+    }
+
+    #sidebar-overlay {
+        display: none !important;
+    }
+
+    .nav-button-responsive {
+        display: none !important;
+    }
+
+    .feed-list {
+        height: 100%;
+        overflow-y: auto;
+        padding: 1rem;
+        border-right: 1px solid var(--border);
+    }
+
+    .article-detail {
+        height: 100%;
+        overflow-y: auto;
+        padding: 1.5rem;
+        display: block !important;
+    }
+
+    .chrome-container {
+        border-bottom: 1px solid var(--border);
+    }
+
+    .feed-name-responsive {
+        font-size: 1.125rem;
+    }
+}
+
+/* Mobile layout - single column */
+@media (max-width: 1023px) {
+    .app-container {
+        display: flex;
+        flex-direction: column;
+        position: relative;
+    }
+
+    .main-layout {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .content-area {
+        flex: 1;
+        overflow: hidden;
+        position: relative;
+    }
+
+    .sidebar {
+        position: fixed;
+        left: -100%;
+        top: 0;
+        bottom: 0;
+        width: 80%;
+        max-width: 320px;
+        z-index: 60;
+        transition: left 0.3s ease;
+        overflow-y: auto;
+        border-right: 1px solid var(--border);
+        background-color: hsl(var(--background));
+    }
+
+    .sidebar.open {
+        left: 0;
+    }
+
+    #sidebar-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 59;
+    }
+
+    #sidebar-overlay.show {
+        display: block;
+    }
+
+    .nav-button-responsive {
+        display: flex !important;
+        align-items: center;
+        justify-content: center;
+        padding: 0.5rem;
+        border-radius: 0.25rem;
+        border: 1px solid var(--border);
+        margin-right: 0.5rem;
+    }
+
+    .feed-list {
+        height: 100%;
+        overflow-y: auto;
+        padding: 1rem;
+    }
+
+    .article-detail {
+        position: fixed;
+        top: 64px;  /* Below chrome container */
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 50;
+        overflow-y: auto;
+        padding: 1rem;
+        display: none;
+    }
+
+    .article-detail.active {
+        display: block;
+    }
+
+    .feed-list.article-view {
+        display: none;
+    }
+
+    .chrome-container {
+        position: sticky;
+        top: 0;
+        z-index: 40;
+        border-bottom: 1px solid var(--border);
+    }
+
+    .feed-name-responsive {
+        font-size: 1rem;
+        font-weight: 600;
+        margin-right: auto;
+    }
+}
+
+/* Search bar responsive styles */
+.chrome-container {
+    position: relative;
+    height: 64px; /* Fixed height for invariant */
+    overflow: hidden;
+}
+
+#search-bar {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 64px; /* Match chrome height */
+    z-index: 10;
+}
+
+#search-bar.show {
+    display: flex !important;
+}
+
+#icon-bar.hide {
+    display: none !important;
+}
+
+/* Icon bar is always visible - unified responsive element */
+#icon-bar {
+    display: flex !important;
+}
+
+/* Feed item styles */
+.feed-item {
+    cursor: pointer;
+}
+
+/* Text wrapping */
+.prose, .prose * {
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    max-width: 100% !important;
+}
+
+/* Icon bar button styling - ensure 44px minimum height but compact width */
+/* Use more specific selector to override UIKit styles */
+#icon-bar .icon-bar-button {
+    min-height: 44px !important;
+    height: 44px !important;  /* Force exact height for touch targets */
+    width: auto !important;
+    padding: 10px 8px !important;  /* Reduced horizontal padding */
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-sizing: border-box !important;
+    line-height: 1 !important;  /* Prevent line height from affecting button height */
+}
+
+/* Fix viewport scrolling - prevent main viewport scroll on ALL devices */
+html, body {
+    height: 100% !important;
+    max-height: 100vh !important;
+    overflow: hidden !important;
+    position: fixed !important;
+    width: 100% !important;
+}
+
+/* Ensure only designated containers can scroll */
+.scrollable-panel {
+    overflow-y: auto !important;
+}
+
+/* Unified responsive form targeting */
+.add-feed-form {
+    /* Desktop: target parent sidebar */
+}
+
+.add-feed-form.mobile-context {
+    /* Mobile: target mobile sidebar container */
+}
+
+.add-feed-button {
+    /* Default desktop targeting */
+}
+
+/* Mobile sidebar context gets different targeting */
+#mobile-sidebar .add-feed-form {
+    /* Mobile-specific HTMX targeting handled via JS */
+}
+
+/* Text wrapping and overflow prevention */
+.prose, .prose * {
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+/* Prevent horizontal scrolling on mobile */
+@media (max-width: 1024px) {
+    * {
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+    }
+
+    /* Ensure all clickable elements meet 44px minimum size */
+    button, a, [role="button"], input[type="submit"], input[type="button"] {
+        min-height: 44px !important;
+        min-width: 44px !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+    }
+
+    /* Override for tab buttons to keep them compact but accessible */
+    .uk-tab-alt {
+        max-width: 10rem !important; /* 160px - preserve max-w-40 constraint */
+    }
+
+    .uk-tab-alt a {
+        min-height: 44px !important;  /* WCAG touch target minimum */
+        min-width: auto !important;
+        height: auto !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        max-width: 5rem !important; /* 80px per button - keep mobile compact */
+    }
+}
+
+/* URL replacement styling */
+.url-replacement {
+    flex-wrap: wrap !important;
+    max-width: 100% !important;
+}
+
+/* First item top spacing without affecting tabs */
+.js-filter > li:first-child {
+    margin-top: 1rem !important;
+}
+
+/* HTMX indicator styles */
+.htmx-indicator {
+    display: none;
+}
+
+.htmx-request .htmx-indicator {
+    display: flex;
+}
+
+/* Hide mobile persistent header when body has article-view class */
+body.article-view #mobile-persistent-header {
+    display: none !important;
+}
+
+/* Fix mobile navigation button state transitions */
+#mobile-nav-button {
+    transition: all 0.2s ease-in-out !important;
+    background-color: transparent !important;
+    color: inherit !important;
+}
+
+#mobile-nav-button:hover {
+    background-color: hsl(var(--secondary)) !important;
+    color: inherit !important;
+}
+
+/* Ensure clean state reset on button swap */
+#mobile-nav-button:not(:hover):not(:active):not(:focus) {
+    background-color: transparent !important;
+    color: inherit !important;
+}
+
+/* Fix viewport scrolling on mobile - more specific and with !important */
+@media (max-width: 1023px) {
+    html, body {
+        height: 100% !important;
+        max-height: 100vh !important;
+        overflow: hidden !important;
+        position: fixed !important;
+        width: 100% !important;
+    }
+}
+
+/* Error page styles */
+body.error-page {
+    font-family: monospace;
+    padding: 20px;
+    background: #1a1a1a;
+    color: #ff6b6b;
+}
+
+body.error-page h1 {
+    color: #ff0000;
+    border-bottom: 3px solid #ff0000;
+    padding-bottom: 10px;
+}
+
+body.error-page h2 {
+    color: #ff9999;
+    margin-top: 30px;
+}

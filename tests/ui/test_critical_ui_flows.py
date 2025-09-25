@@ -273,7 +273,7 @@ class TestBlueIndicatorHTMXFlow:
             else:
                 page.wait_for_selector("li[id^='feed-item-']", timeout=5000)  
                 articles_selector = "li[id^='feed-item-']"
-                detail_selector = "#content-area #item-detail"  # More specific for mobile
+                detail_selector = "#content-area #article-detail"  # More specific for mobile
             
             # 1. Find articles with blue indicators (unread)
             blue_dots = page.locator(".bg-blue-600")  # Blue indicator class
@@ -817,12 +817,15 @@ class TestSearchBarHeightInvariant:
         print(f"Initial header height: {initial_measurements['height']}px")
         print(f"Icon bar visible: {initial_measurements['iconBarVisible']}")
         print(f"Search bar visible: {initial_measurements['searchBarVisible']}")
-        
+
         # Click search button to expand
         # Mobile viewport test - use mobile search button
         search_button = page.locator('#icon-bar button[title="Search"]')
         expect(search_button).to_be_visible()
         search_button.click()
+
+        # Give time for JavaScript to execute
+        page.wait_for_timeout(100)
         
         # Measure expanded height and width
         expanded_measurements = page.evaluate("""() => {

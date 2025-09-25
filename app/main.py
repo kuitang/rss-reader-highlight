@@ -222,9 +222,8 @@ def unified_page_layout(data):
                     )
                 )
             )
-        ),
-        responsive_styles(),
-        responsive_javascript()
+        )
+        # Styles and scripts now loaded from static files
     )
 
 def responsive_sidebar(session_id):
@@ -324,7 +323,12 @@ def responsive_sidebar(session_id):
     )
 
 def responsive_styles():
-    """Responsive CSS for single-element layout"""
+    """Returns Link to external CSS file"""
+    # CSS now served from static/css/main.css
+    return Link(rel='stylesheet', href='/static/css/main.css', type='text/css')
+
+def _old_responsive_styles():
+    """DEPRECATED: CSS moved to static/css/main.css"""
     return Style("""
     /* Base layout */
     html, body {
@@ -367,6 +371,7 @@ def responsive_styles():
             height: 100vh;
             overflow-y: auto;
             border-right: 1px solid var(--border);
+            background-color: hsl(var(--background));
         }
 
         #sidebar-overlay {
@@ -432,6 +437,7 @@ def responsive_styles():
             transition: left 0.3s ease;
             overflow-y: auto;
             border-right: 1px solid var(--border);
+            background-color: hsl(var(--background));
         }
 
         .sidebar.open {
@@ -541,10 +547,29 @@ def responsive_styles():
         overflow-wrap: break-word !important;
         max-width: 100% !important;
     }
+
+    /* Icon bar button styling - ensure 44px minimum height but compact width */
+    /* Use more specific selector to override UIKit styles */
+    #icon-bar .icon-bar-button {
+        min-height: 44px !important;
+        height: 44px !important;  /* Force exact height for touch targets */
+        width: auto !important;
+        padding: 10px 8px !important;  /* Reduced horizontal padding */
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-sizing: border-box !important;
+        line-height: 1 !important;  /* Prevent line height from affecting button height */
+    }
     """)
 
 def responsive_javascript():
-    """JavaScript for mobile interactions"""
+    """Returns Script link to external JavaScript file"""
+    # JavaScript now served from static/js/main.js
+    return Script(src='/static/js/main.js')
+
+def _old_responsive_javascript():
+    """DEPRECATED: JavaScript moved to static/js/main.js"""
     return Script("""
     // Sidebar toggle
     window.toggleSidebar = function() {
@@ -581,15 +606,29 @@ def responsive_javascript():
         }
     };
 
-    // Article view management for mobile
+    // Article view management for mobile with race condition prevention
+    window.articleTransitioning = false;
+    window.currentArticleRequest = null;
+
     window.showArticle = function(itemId) {
         if (window.innerWidth < 1024) {
+            // Prevent race conditions - abort any pending transition
+            if (window.articleTransitioning) {
+                console.log('Article transition already in progress, blocking new request');
+                return;
+            }
+            window.articleTransitioning = true;
+
             const articleDetail = document.getElementById('article-detail');
             const feedList = document.getElementById('feed-list');
             const navButton = document.getElementById('nav-button');
 
-            articleDetail.classList.add('active');
-            feedList.classList.add('article-view');
+            if (articleDetail) {
+                articleDetail.classList.add('active');
+            }
+            if (feedList) {
+                feedList.classList.add('article-view');
+            }
 
             // Update nav button to back
             if (navButton) {
@@ -602,11 +641,18 @@ def responsive_javascript():
                 navButton.setAttribute('hx-target', '#feed-list');
                 navButton.removeAttribute('onclick');
             }
+
+            // Release lock after transition completes
+            setTimeout(() => {
+                window.articleTransitioning = false;
+            }, 300);
         }
     };
 
     window.hideArticle = function() {
         if (window.innerWidth < 1024) {
+            // Prevent race conditions during hide
+            window.articleTransitioning = true;
             const articleDetail = document.getElementById('article-detail');
             const feedList = document.getElementById('feed-list');
             const navButton = document.getElementById('nav-button');
@@ -625,21 +671,15 @@ def responsive_javascript():
                 navButton.removeAttribute('hx-target');
                 navButton.setAttribute('onclick', 'toggleSidebar()');
             }
+
+            // Release lock after transition completes
+            setTimeout(() => {
+                window.articleTransitioning = false;
+            }, 300);
         }
     };
 
-    // HTMX event handlers
-    document.body.addEventListener('htmx:afterSwap', function(evt) {
-        // Handle article navigation on mobile
-        if (evt.detail.target.id === 'article-detail' && window.innerWidth < 1024) {
-            window.showArticle();
-        }
-
-        // Handle returning to feed list on mobile
-        if (evt.detail.target.id === 'feed-list' && window.innerWidth < 1024) {
-            window.hideArticle();
-        }
-    });
+    // Legacy HTMX handlers removed - now handled by global htmx.on handlers
 
     // Click outside to close search - improved robustness
     document.addEventListener('click', function(event) {
@@ -676,7 +716,12 @@ def responsive_javascript():
     """)
 
 def viewport_styles():
-    """Global styles for viewport management"""
+    """Viewport styles are now in main.css"""
+    # Styles consolidated into static/css/main.css
+    return Div()  # Return empty div instead of styles
+
+def _old_viewport_styles():
+    """DEPRECATED: Styles moved to static/css/main.css"""
     return Style("""
     /* Fix viewport scrolling - prevent main viewport scroll on ALL devices */
     html, body {
@@ -735,16 +780,18 @@ def viewport_styles():
             justify-content: center !important;
         }
         
-        /* Override for tab buttons to keep them compact */
+        /* Override for tab buttons to keep them compact but accessible */
         .uk-tab-alt {
             max-width: 10rem !important; /* 160px - preserve max-w-40 constraint */
         }
-        
+
         .uk-tab-alt a {
-            min-height: auto !important;
+            min-height: 44px !important;  /* WCAG touch target minimum */
             min-width: auto !important;
             height: auto !important;
-            display: block !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
             max-width: 5rem !important; /* 80px per button - keep mobile compact */
         }
     }
@@ -837,14 +884,19 @@ def htmx_item_response(htmx, item_data, _scroll=None):
         if _scroll:
             back_url += f"&_scroll={_scroll}" if '?' in back_url else f"?_scroll={_scroll}"
         
+        back_button_attrs = {
+            "id": ElementIDs.NAV_BUTTON,
+            "class": "uk-btn nav-button-responsive",
+            "hx-get": back_url,
+            "hx-target": Targets.CONTENT,
+            "hx-push-url": "true",
+            "hx-swap-oob": "outerHTML",
+            "data-mode": "back",
+            "type": "button"
+        }
         back_button = Button(
             UkIcon('arrow-left'),
-            hx_get=back_url,
-            hx_target=Targets.CONTENT,
-            hx_push_url="true",
-            cls="p-2 rounded border hover:bg-secondary mr-2",
-            id="mobile-nav-button",
-            hx_swap_oob="outerHTML"
+            **back_button_attrs
         )
         responses.append(back_button)
     
@@ -925,8 +977,7 @@ def full_page_item_response(item_data):
                 )
             )
         ),
-        responsive_styles(),
-        responsive_javascript(),
+        # Styles and scripts now loaded from static files
         # Add script to activate article view on mobile
         Script("""
             document.addEventListener('DOMContentLoaded', function() {
@@ -1168,71 +1219,13 @@ async def lifespan(app):
 # FastHTML app with session support and lifespan
 app, rt = fast_app(
     hdrs=Theme.blue.headers() + [
-        Script("""
-        htmx.logAll();
-        htmx.config.includeIndicatorStyles = false;
-        
-        // Scroll restoration using hx-vals (configured per FeedItem)
-        // Restore scroll position after navigating back, reset to top for forward navigation
-        htmx.on('htmx:afterSwap', function(evt) {
-            if (window.innerWidth < 1024 && evt.detail.target && evt.detail.target.id === 'main-content') {
-                // Body class management for mobile article view
-                if (evt.detail.xhr && evt.detail.xhr.responseURL) {
-                    if (evt.detail.xhr.responseURL.includes('/item/')) {
-                        htmx.addClass(document.body, 'article-view');
-                    } else {
-                        htmx.removeClass(document.body, 'article-view');
-                    }
-                }
-                
-                // Check if this is back navigation with scroll position to restore
-                if (evt.detail.pathInfo && evt.detail.pathInfo.requestPath) {
-                    const match = evt.detail.pathInfo.requestPath.match(/_scroll=(\\d+)/);
-                    if (match) {
-                        // Back navigation - restore scroll position
-                        const scrollPos = parseInt(match[1]);
-                        setTimeout(() => {
-                            const mainContent = document.getElementById('main-content');
-                            if (mainContent) {
-                                mainContent.scrollTop = scrollPos;
-                            }
-                        }, 50);
-                    } else {
-                        // Forward navigation - reset scroll to top
-                        setTimeout(() => {
-                            const mainContent = document.getElementById('main-content');
-                            if (mainContent) {
-                                mainContent.scrollTop = 0;
-                            }
-                        }, 50);
-                    }
-                } else {
-                    // No path info - reset scroll to top
-                    setTimeout(() => {
-                        const mainContent = document.getElementById('main-content');
-                        if (mainContent) {
-                            mainContent.scrollTop = 0;
-                        }
-                    }, 50);
-                }
-            } else if (window.innerWidth >= 1024 && evt.detail.target && evt.detail.target.id === 'desktop-feeds-content') {
-                // Desktop pagination - reset scroll to top
-                setTimeout(() => {
-                    const desktopFeeds = document.getElementById('desktop-feeds-content');
-                    if (desktopFeeds) {
-                        desktopFeeds.scrollTop = 0;
-                    }
-                }, 50);
-            }
-        });
-        
-        // Mobile sidebar auto-close now handled via hx-on:click on individual feed links
-        
-        // Form targeting now handled via hx-on:htmx:config-request on individual forms
-        
-        // Body class management now handled in scroll restoration handler above
-        
-        """),
+        Link(rel='stylesheet', href='/static/css/main.css', type='text/css'),
+        Script(src='/static/js/htmx-config.js'),
+        Script(src='/static/js/main.js'),
+        # All JavaScript now loaded from external files
+        # HTMX event handlers moved to /static/js/htmx-config.js
+        # Additional inline CSS for HTMX and mobile-specific styles
+        # (Most styles moved to /static/css/main.css, keeping only critical inline styles)
         Style("""
         .htmx-indicator { display: none; }
         .htmx-request .htmx-indicator { display: flex; }
@@ -1278,6 +1271,17 @@ app, rt = fast_app(
     after=after_middleware,
     lifespan=lifespan
 )
+
+# Static file serving route
+@rt("/static/{fname:path}")
+async def static(fname: str):
+    """Serve static files from the static directory"""
+    from starlette.responses import FileResponse
+    import os
+    file_path = os.path.join("static", fname)
+    if os.path.exists(file_path):
+        return FileResponse(file_path)
+    return Response("Not found", status_code=404)
 
 def process_urls_in_content(content):
     """Replace plain URLs with compact emoji links and copy functionality"""
@@ -1678,23 +1682,34 @@ def UnifiedChrome(session_id, feed_id=None, unread_view=True, feed_name="All Fee
             return_url = "/?unread=0"
 
     # Navigation button - visible only on mobile via CSS
+    # Use manual HTML construction to avoid automatic name attribute
+    nav_button_attrs = {
+        "id": ElementIDs.NAV_BUTTON,
+        "class": "uk-btn nav-button-responsive",
+        "data-mode": "back" if show_back else "menu",
+        "type": "button"
+    }
+
+    if show_back:
+        nav_button_attrs.update({
+            "hx-get": return_url,
+            "hx-target": Targets.CONTENT,
+            "hx-push-url": "true"
+        })
+    else:
+        nav_button_attrs["onclick"] = "toggleSidebar()"
+
     nav_button = Button(
         UkIcon('arrow-left' if show_back else 'menu'),
-        hx_get=return_url if show_back else None,
-        hx_target=Targets.CONTENT if show_back else None,
-        hx_push_url="true" if show_back else None,
-        hx_on_click=None if show_back else "window.toggleSidebar()",
-        cls="nav-button-responsive",
-        id=ElementIDs.NAV_BUTTON,
-        data_mode="back" if show_back else "menu"
+        **nav_button_attrs
     )
 
     # Feed name
     feed_name_element = H3(feed_name, cls="feed-name-responsive flex-1 text-center", id="feed-name")
 
-    # Action buttons
+    # Action buttons (with compact spacing and proper touch targets)
     action_buttons = Div(
-        cls="flex items-center space-x-3 ml-auto",
+        cls="flex items-center space-x-2 sm:space-x-3",
         id=ElementIDs.ICON_BAR
     )(
         Button(
@@ -1702,7 +1717,8 @@ def UnifiedChrome(session_id, feed_id=None, unread_view=True, feed_name="All Fee
             hx_get=all_posts_url,
             hx_target=Targets.CONTENT,
             hx_push_url="true",
-            cls="p-3 rounded hover:bg-secondary",
+            cls="icon-bar-button rounded hover:bg-secondary",
+            style="height: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 10px 8px;",
             title="All Posts"
         ),
         Button(
@@ -1710,13 +1726,15 @@ def UnifiedChrome(session_id, feed_id=None, unread_view=True, feed_name="All Fee
             hx_get=unread_url,
             hx_target=Targets.CONTENT,
             hx_push_url="true",
-            cls="p-3 rounded hover:bg-secondary",
+            cls="icon-bar-button rounded hover:bg-secondary",
+            style="height: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 10px 8px;",
             title="Unread"
         ),
         Button(
             UkIcon('search'),
-            hx_on_click="window.toggleSearch()",
-            cls="p-3 rounded hover:bg-secondary",
+            onclick="window.toggleSearch()",
+            cls="icon-bar-button rounded hover:bg-secondary",
+            style="height: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 10px 8px;",
             title="Search"
         )
     )
@@ -1730,12 +1748,13 @@ def UnifiedChrome(session_id, feed_id=None, unread_view=True, feed_name="All Fee
         # Create separate nav button for main search bar to avoid duplicate IDs
         Button(
             UkIcon('menu'),
-            type="submit",
-            name="nav-button",
-            hx_on_click="window.toggleSidebar()",
-            cls="nav-button-responsive",
-            id="search-nav-button",
-            data_mode="menu"
+            **{
+                "type": "button",
+                "onclick": "toggleSidebar()",
+                "class": "uk-btn nav-button-responsive",
+                "id": "search-nav-button",
+                "data-mode": "menu"
+            }
         ),
         Div(cls="flex-1 mx-4")(
             Div(cls="uk-inline w-full")(
@@ -1747,7 +1766,7 @@ def UnifiedChrome(session_id, feed_id=None, unread_view=True, feed_name="All Fee
                 ),
                 Button(
                     UkIcon('x', cls="w-4 h-4"),
-                    hx_on_click="window.toggleSearch()",
+                    onclick="window.toggleSearch()",
                     cls="uk-form-icon uk-form-icon-flip p-1 hover:text-red-500 cursor-pointer absolute right-2 top-1/2 -translate-y-1/2",
                     title="Close search"
                 )
@@ -1757,16 +1776,18 @@ def UnifiedChrome(session_id, feed_id=None, unread_view=True, feed_name="All Fee
 
     # Chrome container structure - fixed height to maintain invariant
     # UNIFIED responsive structure - NO test-specific duplicate elements
+    # NO PADDING - buttons must be at EDGES
     chrome_content = Div(
-        cls="chrome-container flex items-center justify-between p-4 border-b min-h-[64px] max-h-[64px]",
+        cls="chrome-container flex items-center justify-between border-b min-h-[64px] max-h-[64px]",
         id=ElementIDs.CHROME_CONTAINER,
         hx_preserve="true"  # Preserve chrome during HTMX swaps (mobile article view)
     )(
         nav_button,
         feed_name_element,
         # Single unified icon bar - responsive via CSS
+        # Buttons at RIGHT EDGE
         Div(
-            cls="flex items-center space-x-3",
+            cls="flex items-center space-x-2 sm:space-x-3",
             id="icon-bar"
         )(
             Button(
@@ -1774,7 +1795,8 @@ def UnifiedChrome(session_id, feed_id=None, unread_view=True, feed_name="All Fee
                 hx_get=all_posts_url,
                 hx_target=Targets.CONTENT,
                 hx_push_url="true",
-                cls="p-3 rounded hover:bg-secondary",
+                cls="icon-bar-button rounded hover:bg-secondary",
+                style="height: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 10px 8px;",
                 title="All Posts"
             ),
             Button(
@@ -1782,13 +1804,15 @@ def UnifiedChrome(session_id, feed_id=None, unread_view=True, feed_name="All Fee
                 hx_get=unread_url,
                 hx_target=Targets.CONTENT,
                 hx_push_url="true",
-                cls="p-3 rounded hover:bg-secondary",
+                cls="icon-bar-button rounded hover:bg-secondary",
+                style="height: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 10px 8px;",
                 title="Unread"
             ),
             Button(
                 UkIcon('search'),
-                hx_on_click="window.toggleSearch()",
-                cls="p-3 rounded hover:bg-secondary",
+                onclick="window.toggleSearch()",
+                cls="icon-bar-button rounded hover:bg-secondary",
+                style="height: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 10px 8px;",
                 title="Search"
             )
         )
@@ -1808,8 +1832,7 @@ def ItemDetailView(item, show_back=False):
     """Create item detail view - back button now handled by header"""
     if not item:
         return Container(
-            P("Select a post to read", cls='text-center text-muted-foreground p-8'),
-            id="item-detail"
+            P("Select a post to read", cls='text-center text-muted-foreground p-8')
         )
     
     # Action icons - only show star, folder, and mark unread
@@ -1858,8 +1881,7 @@ def ItemDetailView(item, show_back=False):
         Div(
             NotStr(process_urls_in_content(mistletoe.markdown(item.get('content') or item.get('description') or 'No content available'))),
             cls=TextT.sm + 'p-4 prose max-w-none break-words overflow-wrap-anywhere'
-        ),
-        id="item-detail"
+        )
     )
 
 @rt('/')

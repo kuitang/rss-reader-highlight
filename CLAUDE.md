@@ -342,6 +342,25 @@ def wait_for_page_ready(page):
 - **USE** semantic selectors based on purpose, not presentation
 - **TEST** both desktop and mobile viewports where applicable
 
+### Core Testing Requirements
+
+#### HTTP Client Standards
+- **USE httpx instead of requests** - All HTTP integration tests must use `httpx` for consistency with the FastHTML framework
+- **NO new test dependencies** - Work within the existing dependency set; do not introduce additional testing libraries
+
+#### Test Organization
+- **Consolidate tests into existing files** - Add new test cases to existing test files rather than creating new ones
+- **Maintain consistency** - All new tests must follow the patterns and conventions established in existing tests
+- **Minimize test file count** - Keep the test suite organized by grouping related tests together
+
+#### Timing and Synchronization
+- **NO unconditional waits** - Never use `time.sleep()` or `page.wait_for_timeout()`
+- **Always wait conditionally** - Must wait for specific elements, events, or conditions:
+  - `page.wait_for_selector()` with appropriate selectors
+  - `wait_for_htmx_complete()` for HTMX operations
+  - `page.wait_for_function()` for JavaScript conditions
+  - `page.wait_for_load_state()` for page readiness
+
 ### Philosophy
 Tests focus on **complex workflows that broke during development**, not trivial framework functionality.
 

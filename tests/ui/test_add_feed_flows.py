@@ -24,7 +24,6 @@ def wait_for_page_ready(page):
     page.wait_for_load_state("networkidle")
 
 
-@pytest.mark.skip(reason="All feed submission tests - skipping per user request")
 class TestAddFeedFlows:
     """Test add feed functionality across mobile and desktop interfaces"""
     
