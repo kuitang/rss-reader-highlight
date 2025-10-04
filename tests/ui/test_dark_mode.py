@@ -62,14 +62,14 @@ class TestDarkMode:
             element = page.locator(selector).first
             if element.is_visible():
                 # Check computed styles
-                bg_color = page.evaluate(f"""
+                bg_color = page.evaluate(f"""() => {{
                     const elem = document.querySelector('{selector}');
                     if (elem) {{
                         const computed = window.getComputedStyle(elem);
                         return computed.backgroundColor;
                     }}
                     return null;
-                """)
+                }}""")
 
                 # In dark mode, background should NOT be white (rgb(255, 255, 255))
                 if bg_color and bg_color != 'rgba(0, 0, 0, 0)':  # Skip transparent
