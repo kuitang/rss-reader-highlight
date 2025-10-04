@@ -86,8 +86,7 @@ class TestComprehensiveRegression:
         
         # Wait for page load and verify mobile layout
         expect(page.locator("#main-layout")).to_be_visible()
-        expect(page.locator("#main-layout")).to_be_hidden()
-        
+
         # Test Mobile Navigation Cycle (3 iterations)
         for iteration in range(3):
             print(f"Mobile iteration {iteration + 1}")
@@ -108,7 +107,9 @@ class TestComprehensiveRegression:
                     
                     # Wait for sidebar to close and content to load
                     page.wait_for_selector("li[id^='feed-item-']", state="visible", timeout=5000)
-                    expect(page.locator("#sidebar")).to_be_hidden()
+                    # Sidebar is hidden via CSS positioning (left: -390px), not display:none
+                    # Check that 'open' class is removed instead
+                    page.wait_for_function("() => !document.getElementById('sidebar').classList.contains('open')", timeout=2000)
                     
                     # Scroll down in feed list
                     main_content = page.locator("#content-area")
