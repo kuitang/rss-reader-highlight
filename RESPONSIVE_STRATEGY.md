@@ -21,36 +21,44 @@ python -m pytest tests/ui/test_ui_fixes.py::TestBackButtonFunctionality::test_ba
 - ⏭️ **Skipped**: 10 (need full database)
 - ⚠️  **Test Isolation Issues**: Full suite times out; individual tests pass
 
-### ✅ FIXED IN THIS SESSION (19 tests total):
+### ✅ FIXED IN THIS SESSION (21 tests total):
 
-**Code Fixes (6 tests)**:
+**Code Fixes (8 tests)**:
 1. ✅ Mobile back button navigation (commit a34b5ef)
 2. ✅ Dark mode test syntax error (commit a6c7cdc)
 3. ✅ Test selector issues (commit 2396ddc)
 4. ✅ Mobile comprehensive workflow (commit b8db45e)
 5. ✅ Responsive layout switching (commit d88c32a)
 6. ✅ Fresh user auto-subscription flow (commit 6380af1) - fixed sidebar close timing
+7. ✅ Pagination scroll desktop (commit 795d04c) - fixed HTMX scroll reset
+8. ✅ Pagination scroll mobile (commit 795d04c) - unified scroll behavior
 
 **Tests Now Passing (13 additional tests - ripple effects from fixes)**:
-7. ✅ Dark mode: test_dark_mode_toggle_and_css_variables
-8. ✅ Dark mode: test_mobile_chrome_preserved_in_article_view
-9. ✅ Dark mode: test_banner_layout_spacing[viewport0]
-10. ✅ Dark mode: test_banner_layout_spacing[viewport1]
-11. ✅ Pagination: test_pagination_buttons_no_duplicates
-12. ✅ Search: test_search_expansion_height_invariant
-13. ✅ Search: test_search_click_outside_closes
-14. ✅ Chrome: test_chrome_buttons_at_edges
-15. ✅ Mobile article: test_mobile_article_click_shows_content
-16. ✅ Mobile article: test_desktop_article_click_shows_sidebar
-17. ✅ Mobile tab: test_mobile_tab_active_style_updates
-18. ✅ Pagination scroll: test_pagination_scroll_to_top[viewport0] (flaky)
-19. ✅ Pagination scroll: test_pagination_scroll_to_top[viewport1] (flaky)
+9. ✅ Dark mode: test_dark_mode_toggle_and_css_variables
+10. ✅ Dark mode: test_mobile_chrome_preserved_in_article_view
+11. ✅ Dark mode: test_banner_layout_spacing[viewport0]
+12. ✅ Dark mode: test_banner_layout_spacing[viewport1]
+13. ✅ Pagination: test_pagination_buttons_no_duplicates
+14. ✅ Search: test_search_expansion_height_invariant
+15. ✅ Search: test_search_click_outside_closes
+16. ✅ Chrome: test_chrome_buttons_at_edges
+17. ✅ Mobile article: test_mobile_article_click_shows_content
+18. ✅ Mobile article: test_desktop_article_click_shows_sidebar
+19. ✅ Mobile tab: test_mobile_tab_active_style_updates
+20. ✅ Session: test_fresh_user_auto_subscription_flow
+21. ✅ Session: test_second_browser_tab_independent_session
+
+### ✅ Test Isolation Solution (commit 795d04c):
+- **Added pytest markers**: `@pytest.mark.isolated` for state-sensitive tests
+- **Auto-cleanup fixture**: `isolated_test_cleanup` clears browser state before/after
+- **Run isolated tests**: `pytest -m isolated`
+- **Skip isolated tests**: `pytest -m "not isolated"`
+- **Fixed flaky tests**: Pagination scroll now reliable with proper wait conditions
 
 ### ⚠️ Known Issues:
-- **Test Isolation**: Full suite times out on test_rapid_article_clicking_no_overlap and others
-- **Pagination Scroll Tests**: Pass individually, fail in full run (test state pollution)
-- **Remaining Failures**: test_mobile_handlers_routing (timeout), test_mobile_comprehensive_workflow
-- **Solution**: Use `TEST_SERVER_URL=http://localhost:8080` to avoid pytest server startup failures
+- **Test Isolation**: Full suite times out on test_rapid_article_clicking_no_overlap
+- **Remaining Failures**: test_mobile_handlers_routing (timeout)
+- **Workaround**: Use `export TEST_SERVER_URL=http://localhost:8080` to avoid pytest server startup issues
 
 ---
 
