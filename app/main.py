@@ -1682,12 +1682,13 @@ def UnifiedChrome(session_id, feed_id=None, unread_view=True, feed_name="All Fee
             return_url = "/?unread=0"
 
     # Navigation button - visible only on mobile via CSS
-    # Use manual HTML construction to avoid automatic name attribute
+    # Use explicit empty name to prevent automatic name attribute generation
     nav_button_attrs = {
         "id": ElementIDs.NAV_BUTTON,
         "class": "uk-btn nav-button-responsive",
         "data-mode": "back" if show_back else "menu",
-        "type": "button"
+        "type": "button",
+        "name": ""  # Prevent FastHTML from auto-generating name attribute
     }
 
     if show_back:
@@ -1753,7 +1754,8 @@ def UnifiedChrome(session_id, feed_id=None, unread_view=True, feed_name="All Fee
                 "onclick": "toggleSidebar()",
                 "class": "uk-btn nav-button-responsive",
                 "id": "search-nav-button",
-                "data-mode": "menu"
+                "data-mode": "menu",
+                "name": ""  # Prevent FastHTML from auto-generating name attribute
             }
         ),
         Div(cls="flex-1 mx-4")(
