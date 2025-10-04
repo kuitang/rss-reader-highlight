@@ -277,14 +277,22 @@ Old selectors → New selectors:
 - **Uses CSS variables** - `var(--background)`, `var(--foreground)`, etc.
 - **I broke it** by overriding with explicit colors
 
+### ✅ FIXED: Nav Button Name Attribute Issue
+- **Issue**: FastHTML auto-generates `name` attribute from `id` on buttons
+- **Solution**: Added explicit `name=""` to prevent auto-generation
+- **Fixed**: Both `#nav-button` and `#search-nav-button`
+- **Tests Passing**: `TestHamburgerMenuHTMX::test_hamburger_no_form_submission` ✅
+- **Tests Passing**: `TestHamburgerMenuHTMX::test_search_nav_button_no_form_submission` ✅
+- **Commit**: e0d0e9f
+
 ### ❌ CRITICAL Test Failures Still Present
 
 #### 1. **Mobile Back Button UNRELIABLE** 🔴
-- **Issue**: Back button behavior is inconsistent
-- **Symptom**: Sometimes goes back to feed list, sometimes opens sidebar
-- **Root Cause**: Navigation state management is broken
+- **Issue**: Back button doesn't clear 'active' and 'article-view' classes
+- **Symptom**: Classes persist after clicking back, causing visual issues
+- **Root Cause**: HTMX swap doesn't remove state classes
 - **Impact**: Core mobile UX is broken
-- **Fix Needed**: Debug `navButton.dataset.mode` and click handlers
+- **Fix Needed**: Add HTMX event handlers to clear classes on back navigation
 
 #### 2. **Header Layout NOT Centered** 🔴
 - **Issue**: Header should be `[hamburger] centered-title [buttons]`
