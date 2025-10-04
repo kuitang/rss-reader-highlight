@@ -68,7 +68,10 @@ window.showArticle = function(itemId) {
             navButton.appendChild(arrowIcon);
             navButton.setAttribute('hx-get', navButton.dataset.returnUrl || '/');
             navButton.setAttribute('hx-target', '#feed-list');
+            navButton.setAttribute('hx-push-url', 'true');
             navButton.removeAttribute('onclick');
+            // Process the button so HTMX registers the new attributes
+            htmx.process(navButton);
         }
 
         // Release lock after transition completes
@@ -79,6 +82,7 @@ window.showArticle = function(itemId) {
 };
 
 window.hideArticle = function() {
+    console.log('[hideArticle] Called, innerWidth:', window.innerWidth);
     if (window.innerWidth < 1024) {
         // Prevent race conditions during hide
         window.articleTransitioning = true;
@@ -86,11 +90,20 @@ window.hideArticle = function() {
         const feedList = document.getElementById('feed-list');
         const navButton = document.getElementById('nav-button');
 
+        console.log('[hideArticle] Elements:', {
+            articleDetail: articleDetail?.id,
+            hasActiveClass: articleDetail?.classList.contains('active'),
+            feedList: feedList?.id,
+            hasArticleViewClass: feedList?.classList.contains('article-view')
+        });
+
         if (articleDetail) {
             articleDetail.classList.remove('active');
+            console.log('[hideArticle] Removed active class from article-detail');
         }
         if (feedList) {
             feedList.classList.remove('article-view');
+            console.log('[hideArticle] Removed article-view class from feed-list');
         }
 
         // Update nav button to menu
@@ -103,6 +116,8 @@ window.hideArticle = function() {
             navButton.removeAttribute('hx-get');
             navButton.removeAttribute('hx-target');
             navButton.setAttribute('onclick', 'toggleSidebar()');
+            // DON'T call htmx.process() here - removing attributes and calling process
+            // will un-register HTMX behavior. Just remove the attributes.
         }
 
         // Release lock after transition completes
@@ -210,16 +225,9 @@ htmx.on('htmx:afterSwap', function(evt) {
         showArticle();
     }
 
-    // Handle navigation back
-    if (target && target.id === 'feed-list' && evt.detail.requestConfig && evt.detail.requestConfig.verb === 'get') {
-        const requestUrl = evt.detail.requestConfig.path;
-        if (requestUrl && requestUrl !== window.location.pathname + window.location.search) {
-            // Navigation happened - reset article view
-            if (window.innerWidth < 1024) {
-                hideArticle();
-            }
-        }
-    }
+    // Note: Mobile back navigation is handled in htmx-config.js (lines 62-91)
+    // That handler calls hideArticle() when feed-list is swapped on mobile
+    // We don't need duplicate logic here
 
     // Clear any article request tracking
     if (target && target.id === 'article-detail') {

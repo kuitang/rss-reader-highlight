@@ -82,6 +82,12 @@ class TestBackButtonFunctionality:
             nav_button.click()
             wait_for_htmx_complete(page)
 
+            # Wait for class changes to settle (hideArticle() runs after swap)
+            page.wait_for_function("""() => {
+                const article = document.getElementById('article-detail');
+                return article && !article.classList.contains('active');
+            }""", timeout=2000)
+
             # Verify we're back to feed list (article view deactivated)
             article_after = page.evaluate("""() => {
                 const article = document.getElementById('article-detail');
