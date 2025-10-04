@@ -94,7 +94,7 @@ class TestWorkingRegression:
         page.screenshot(path="/tmp/regression_article_clicked.png")
         
         # Verify article detail is showing
-        article_detail = page.locator("div#item-detail")
+        article_detail = page.locator("#article-detail")
         expect(article_detail).to_be_visible()
         
         # Verify the blue dot disappeared (article marked as read)
