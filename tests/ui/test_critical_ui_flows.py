@@ -1012,6 +1012,7 @@ if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])
 
 
+@pytest.mark.isolated
 class TestPaginationScroll:
     @pytest.mark.parametrize(
         "viewport",
@@ -1074,9 +1075,15 @@ class TestPaginationScroll:
         wait_for_htmx_complete(page)
         page.wait_for_load_state("networkidle")
 
-        # Check that the scroll position is at the top
+        # Wait for scroll position to reset to top (HTMX afterSwap handler does this)
+        page.wait_for_function(
+            f"() => document.getElementById('{feed_container_selector.replace('#', '')}')?.scrollTop === 0",
+            timeout=2000
+        )
+
+        # Verify scroll position is at top
         scroll_top_after = feed_container.evaluate("node => node.scrollTop")
-        assert scroll_top_after == 0
+        assert scroll_top_after == 0, f"Expected scroll position 0, got {scroll_top_after}"
 
 
 class TestChromeButtonsAtEdges:

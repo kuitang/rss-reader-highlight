@@ -134,13 +134,28 @@ htmx.on('htmx:afterSwap', function(evt) {
                 }
             }, 50);
         }
-    } else if (window.innerWidth >= 1024 && evt.detail.target && evt.detail.target.id === 'desktop-feeds-content') {
-        // Desktop pagination - reset scroll to top
-        setTimeout(() => {
-            const desktopFeeds = document.getElementById('desktop-feeds-content');
-            if (desktopFeeds) {
-                desktopFeeds.scrollTop = 0;
-            }
-        }, 50);
+    }
+
+    // Pagination scroll reset - unified for mobile and desktop
+    // When #feed-list is swapped (pagination target), reset scroll to top
+    if (evt.detail.target && evt.detail.target.id === 'feed-list') {
+        // Check if this is pagination (not article navigation with scroll restore)
+        const requestPath = evt.detail.pathInfo?.requestPath || '';
+        const hasScrollRestore = requestPath.includes('_scroll=');
+        const isArticleView = requestPath.includes('/item/');
+
+        // Reset scroll for pagination, feed changes, or non-article navigations
+        // But skip if this is scroll restoration (back button)
+        if (!hasScrollRestore && !isArticleView) {
+            console.log('Resetting #feed-list scroll to top', {path: requestPath});
+            setTimeout(() => {
+                const feedList = document.getElementById('feed-list');
+                if (feedList) {
+                    console.log('Scroll before:', feedList.scrollTop);
+                    feedList.scrollTop = 0;
+                    console.log('Scroll after:', feedList.scrollTop);
+                }
+            }, 100);  // Increased timeout for mobile
+        }
     }
 });

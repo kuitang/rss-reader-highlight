@@ -185,3 +185,32 @@ def mobile_context(browser, test_server_url):
     page = context.new_page()
     yield page
     context.close()
+
+
+@pytest.fixture(scope="function", autouse=True)
+def isolated_test_cleanup(request, page):
+    """Auto-cleanup for tests marked as 'isolated' to prevent state pollution
+
+    This fixture:
+    - Runs before and after isolated tests
+    - Clears browser storage, cookies, and cache
+    - Ensures fresh page state for each isolated test
+    """
+    # Check if test is marked as isolated
+    if 'isolated' in [mark.name for mark in request.node.iter_markers()]:
+        # Pre-test cleanup: ensure clean state
+        try:
+            page.context.clear_cookies()
+        except:
+            pass
+
+        yield
+
+        # Post-test cleanup: prevent pollution to next test
+        try:
+            page.evaluate("window.localStorage.clear(); window.sessionStorage.clear();")
+            page.context.clear_cookies()
+        except:
+            pass
+    else:
+        yield
