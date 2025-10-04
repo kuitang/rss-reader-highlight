@@ -16,17 +16,17 @@ python -m pytest tests/ui/test_ui_fixes.py::TestBackButtonFunctionality::test_ba
 ## 📊 Test Status Summary
 
 **Total UI Tests**: 91
-- ✅ **Passing**: 76
-- ❌ **Failing**: 15
+- ✅ **Passing**: 78
+- ❌ **Failing**: 13
 - ⏭️ **Skipped**: 10 (need full database)
 
 ### Critical Failures to Fix (in order):
 1. ✅ Mobile back button navigation (FIXED - commit a34b5ef)
-2. ❌ Main layout visibility on mobile article view
-3. ❌ Dark mode test syntax error
-4. ❌ Multiple tests timing out on mobile
-5. ❌ Sidebar visibility test expectations wrong
-6. ❌ Test selector issues (div#item-detail → #article-detail)
+2. ✅ Dark mode test syntax error (FIXED - commit a6c7cdc)
+3. ✅ Test selector issues (FIXED - commit 2396ddc)
+4. ❌ Main layout visibility on mobile article view
+5. ❌ Multiple tests timing out on mobile
+6. ❌ Sidebar visibility test expectations wrong
 
 ---
 
@@ -102,6 +102,67 @@ assert not article.classList.contains('active')  # Passes ✅
 **Files Modified**:
 - `static/js/main.js`: htmx.process() call (line 74), removed duplicate handler (line 228), added debug logging
 - `tests/ui/test_ui_fixes.py`: Added wait_for_function() for class removal timing (lines 86-89)
+
+### 3. Dark Mode Test Syntax Error (FIXED ✅)
+**Commit**: a6c7cdc
+
+**Problem**: Test failing with "SyntaxError: Illegal return statement"
+
+**Root Cause**: Playwright's `page.evaluate()` expects JavaScript functions, not raw code with top-level return statements.
+
+**The Bug**:
+```python
+# OLD - Illegal return statement:
+bg_color = page.evaluate(f"""
+    const elem = document.querySelector('{selector}');
+    if (elem) {{
+        return computed.backgroundColor;
+    }}
+    return null;
+""")
+```
+
+**Solution**: Wrap in arrow function:
+```python
+# NEW - Proper function syntax:
+bg_color = page.evaluate(f"""() => {{
+    const elem = document.querySelector('{selector}');
+    if (elem) {{
+        return computed.backgroundColor;
+    }}
+    return null;
+}}""")
+```
+
+**Tests Now Passing**:
+- `TestDarkMode::test_dark_mode_toggle_and_css_variables` ✅
+
+**Files Modified**:
+- `tests/ui/test_dark_mode.py`: Wrapped evaluate() in arrow function (line 65)
+
+---
+
+### 4. Test Selector Update (FIXED ✅)
+**Commit**: 2396ddc
+
+**Problem**: Test using old element ID `div#item-detail` that no longer exists.
+
+**Root Cause**: Application refactoring changed element ID from `item-detail` to `article-detail`, but test not updated.
+
+**Solution**: Update selector to match current DOM:
+```python
+# OLD:
+article_detail = page.locator("div#item-detail")
+
+# NEW:
+article_detail = page.locator("#article-detail")
+```
+
+**Tests Now Passing**:
+- `TestWorkingRegression::test_basic_functionality_flow` ✅
+
+**Files Modified**:
+- `tests/ui/test_working_regression.py`: Updated selector (line 97)
 
 ---
 
@@ -418,11 +479,14 @@ Many tests expect old dual-layout (mobile-* and desktop-* elements). Need to:
 - e0d0e9f: Fix: Prevent FastHTML from auto-generating 'name' attributes on nav buttons
 - 50a0144: Docs: Update RESPONSIVE_STRATEGY.md with nav button fix
 - a34b5ef: Fix: Mobile back button navigation with htmx.process() and proper timing ✅
+- d48b09e: Docs: Update RESPONSIVE_STRATEGY.md with back button fix details
+- a6c7cdc: Fix: Dark mode test syntax error - wrap evaluate() in arrow function ✅
+- 2396ddc: Fix: Update test selector from div#item-detail to #article-detail ✅
 
 **Uncommitted Changes**:
-- RESPONSIVE_STRATEGY.md: Updated with back button fix details
+- RESPONSIVE_STRATEGY.md: Updated with all 3 fixes (back button, dark mode, selector)
 
-**Next Commit**: Update RESPONSIVE_STRATEGY.md then move to next failing test
+**Next Commit**: Update docs then continue with remaining failing tests
 
 ---
 
