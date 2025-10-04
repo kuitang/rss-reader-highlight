@@ -72,6 +72,7 @@ html, body {
 
     .feed-name-responsive {
         font-size: 1.125rem;
+        max-width: 500px;  /* Constrain desktop feed title width */
     }
 }
 
@@ -103,7 +104,7 @@ html, body {
         bottom: 0;
         width: 80%;
         max-width: 320px;
-        z-index: 60;
+        z-index: 80;
         transition: left 0.3s ease;
         overflow-y: auto;
         border-right: 1px solid var(--border);
@@ -119,7 +120,7 @@ html, body {
         position: fixed;
         inset: 0;
         background: rgba(0, 0, 0, 0.5);
-        z-index: 59;
+        z-index: 79;
     }
 
     #sidebar-overlay.show {
@@ -133,7 +134,6 @@ html, body {
         padding: 0.5rem;
         border-radius: 0.25rem;
         border: 1px solid var(--border);
-        margin-right: 0.5rem;
     }
 
     .feed-list {
@@ -165,7 +165,7 @@ html, body {
     .chrome-container {
         position: sticky;
         top: 0;
-        z-index: 40;
+        z-index: 70;
         border-bottom: 1px solid var(--border);
     }
 
@@ -190,7 +190,7 @@ html, body {
     left: 0;
     right: 0;
     height: 64px; /* Match chrome height */
-    z-index: 10;
+    z-index: 100; /* Higher than any chrome content */
 }
 
 #search-bar.show {

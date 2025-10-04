@@ -55,10 +55,10 @@ class TestBackButtonFunctionality:
             wait_for_htmx_complete(page)
 
             # Verify article view is active
-            article_active = page.evaluate("""
+            article_active = page.evaluate("""() => {
                 const article = document.getElementById('article-detail');
                 return article && article.classList.contains('active');
-            """)
+            }""")
             assert article_active, "Article view should be active after clicking feed item"
 
             # Check that nav button exists and has correct configuration
@@ -73,27 +73,27 @@ class TestBackButtonFunctionality:
             assert not has_onclick, "Back button should NOT have onclick attribute"
 
             # Record sidebar state before clicking back
-            sidebar_before = page.evaluate("""
+            sidebar_before = page.evaluate("""() => {
                 const sidebar = document.getElementById('sidebar');
                 return sidebar ? sidebar.classList.contains('open') : false;
-            """)
+            }""")
 
             # Click back button
             nav_button.click()
             wait_for_htmx_complete(page)
 
             # Verify we're back to feed list (article view deactivated)
-            article_after = page.evaluate("""
+            article_after = page.evaluate("""() => {
                 const article = document.getElementById('article-detail');
                 return article && article.classList.contains('active');
-            """)
+            }""")
             assert not article_after, "Article view should be deactivated after back button"
 
             # Verify sidebar state didn't change (should NOT have toggled)
-            sidebar_after = page.evaluate("""
+            sidebar_after = page.evaluate("""() => {
                 const sidebar = document.getElementById('sidebar');
                 return sidebar ? sidebar.classList.contains('open') : false;
-            """)
+            }""")
             assert sidebar_before == sidebar_after, "Back button should NOT toggle sidebar"
 
     def test_nav_button_id_consistency(self, page: Page):
@@ -136,7 +136,7 @@ class TestSidebarOpacity:
         page.wait_for_timeout(500)  # Wait for animation
 
         # Check sidebar background
-        sidebar_bg = page.evaluate("""
+        sidebar_bg = page.evaluate("""() => {
             const sidebar = document.getElementById('sidebar');
             const computedStyle = window.getComputedStyle(sidebar);
             return {
@@ -144,7 +144,7 @@ class TestSidebarOpacity:
                 isOpen: sidebar.classList.contains('open'),
                 display: computedStyle.display
             };
-        """)
+        }""")
 
         assert sidebar_bg['isOpen'], "Sidebar should be open after clicking hamburger"
         # Should have a proper background color, not transparent
@@ -163,7 +163,7 @@ class TestSidebarOpacity:
         page.wait_for_timeout(500)
 
         # Check overlay properties
-        overlay_props = page.evaluate("""
+        overlay_props = page.evaluate("""() => {
             const overlay = document.getElementById('sidebar-overlay');
             const computedStyle = window.getComputedStyle(overlay);
             return {
@@ -172,7 +172,7 @@ class TestSidebarOpacity:
                 isVisible: overlay.classList.contains('show'),
                 zIndex: computedStyle.zIndex
             };
-        """)
+        }""")
 
         assert overlay_props['isVisible'], "Overlay should be visible when sidebar is open"
         assert 'rgba' in overlay_props['backgroundColor'], "Overlay should have rgba background"
@@ -186,10 +186,10 @@ class TestSidebarOpacity:
         page.goto("http://localhost:8080")
         wait_for_page_ready(page)
 
-        overlay_display = page.evaluate("""
+        overlay_display = page.evaluate("""() => {
             const overlay = document.getElementById('sidebar-overlay');
             return window.getComputedStyle(overlay).display;
-        """)
+        }""")
 
         assert overlay_display == 'none', "Overlay should be hidden on desktop"
 
@@ -208,7 +208,7 @@ class TestHamburgerMenuHTMX:
         wait_for_page_ready(page)
 
         # Check hamburger button attributes
-        nav_button_props = page.evaluate("""
+        nav_button_props = page.evaluate("""() => {
             const button = document.getElementById('nav-button');
             return {
                 type: button.getAttribute('type'),
@@ -217,7 +217,7 @@ class TestHamburgerMenuHTMX:
                 hasOnClick: button.hasAttribute('hx-on-click') || button.hasAttribute('onclick'),
                 dataMode: button.getAttribute('data-mode')
             };
-        """)
+        }""")
 
         assert nav_button_props['type'] == 'button', "Hamburger should be type='button' to prevent form submission"
         assert not nav_button_props['hasFormName'], "Hamburger should not have 'name' attribute"
@@ -246,7 +246,7 @@ class TestHamburgerMenuHTMX:
             page.wait_for_timeout(300)
 
             # Check search nav button
-            search_nav_props = page.evaluate("""
+            search_nav_props = page.evaluate("""() => {
                 const button = document.getElementById('search-nav-button');
                 if (button) {
                     return {
@@ -256,7 +256,7 @@ class TestHamburgerMenuHTMX:
                     };
                 }
                 return {exists: false};
-            """)
+            }""")
 
             if search_nav_props.get('exists') is not False:
                 assert search_nav_props['type'] == 'button', "Search nav button should be type='button'"
@@ -276,7 +276,7 @@ class TestChromeLayoutCentering:
         page.goto("http://localhost:8080")
         wait_for_page_ready(page)
 
-        chrome_layout = page.evaluate("""
+        chrome_layout = page.evaluate("""() => {
             const chrome = document.getElementById('chrome-container');
             if (chrome) {
                 const style = window.getComputedStyle(chrome);
@@ -288,7 +288,7 @@ class TestChromeLayoutCentering:
                 };
             }
             return {error: 'Chrome container not found'};
-        """)
+        }""")
 
         assert chrome_layout['display'] == 'flex', "Chrome should use flexbox"
         assert chrome_layout['justifyContent'] == 'space-between', "Chrome should use justify-content: space-between"
@@ -305,7 +305,7 @@ class TestChromeLayoutCentering:
         page.goto("http://localhost:8080")
         wait_for_page_ready(page)
 
-        title_props = page.evaluate("""
+        title_props = page.evaluate("""() => {
             const title = document.getElementById('feed-name');
             if (title) {
                 const style = window.getComputedStyle(title);
@@ -319,7 +319,7 @@ class TestChromeLayoutCentering:
                 };
             }
             return {error: 'Title not found'};
-        """)
+        }""")
 
         assert title_props['hasFlexOne'], "Title should have flex-1 class"
         assert title_props['hasTextCenter'], "Title should have text-center class"
@@ -331,10 +331,10 @@ class TestChromeLayoutCentering:
         page.goto("http://localhost:8080")
         wait_for_page_ready(page)
 
-        icon_bar_classes = page.evaluate("""
+        icon_bar_classes = page.evaluate("""() => {
             const iconBar = document.getElementById('icon-bar');
             return iconBar ? iconBar.className : 'not-found';
-        """)
+        }""")
 
         assert 'ml-auto' not in icon_bar_classes, f"Icon bar should not have ml-auto class, got: {icon_bar_classes}"
 
@@ -381,10 +381,10 @@ class TestComprehensiveUIIntegration:
             wait_for_htmx_complete(page)
 
             # Verify we're back to feed list
-            article_active = page.evaluate("""
+            article_active = page.evaluate("""() => {
                 const article = document.getElementById('article-detail');
                 return article && article.classList.contains('active');
-            """)
+            }""")
             assert not article_active, "Should return to feed list after back button"
 
             # Verify nav button is hamburger again
@@ -405,19 +405,19 @@ class TestComprehensiveUIIntegration:
             wait_for_page_ready(page)
 
             # Check chrome layout consistency
-            chrome_ok = page.evaluate("""
+            chrome_ok = page.evaluate("""() => {
                 const chrome = document.getElementById('chrome-container');
                 const style = window.getComputedStyle(chrome);
                 return chrome && style.display === 'flex' && style.justifyContent === 'space-between';
-            """)
+            }""")
             assert chrome_ok, f"Chrome layout should be consistent at {viewport['width']}px"
 
             # Check sidebar background
-            sidebar_bg_ok = page.evaluate("""
+            sidebar_bg_ok = page.evaluate("""() => {
                 const sidebar = document.getElementById('sidebar');
                 const style = window.getComputedStyle(sidebar);
                 return style.backgroundColor && style.backgroundColor !== 'rgba(0, 0, 0, 0)';
-            """)
+            }""")
             assert sidebar_bg_ok, f"Sidebar should have background at {viewport['width']}px"
 
 

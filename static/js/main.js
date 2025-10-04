@@ -62,10 +62,10 @@ window.showArticle = function(itemId) {
         // Update nav button to back
         if (navButton) {
             navButton.dataset.mode = 'back';
-            const arrowIcon = document.createElement('div');
-            arrowIcon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15,18 9,12 15,6"></polyline></svg>';
+            const arrowIcon = document.createElement('uk-icon');
+            arrowIcon.setAttribute('icon', 'arrow-left');
             navButton.innerHTML = '';
-            navButton.appendChild(arrowIcon.firstChild);
+            navButton.appendChild(arrowIcon);
             navButton.setAttribute('hx-get', navButton.dataset.returnUrl || '/');
             navButton.setAttribute('hx-target', '#feed-list');
             navButton.removeAttribute('onclick');
@@ -86,16 +86,20 @@ window.hideArticle = function() {
         const feedList = document.getElementById('feed-list');
         const navButton = document.getElementById('nav-button');
 
-        articleDetail.classList.remove('active');
-        feedList.classList.remove('article-view');
+        if (articleDetail) {
+            articleDetail.classList.remove('active');
+        }
+        if (feedList) {
+            feedList.classList.remove('article-view');
+        }
 
         // Update nav button to menu
         if (navButton) {
             navButton.dataset.mode = 'menu';
-            const menuIcon = document.createElement('div');
-            menuIcon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>';
+            const menuIcon = document.createElement('uk-icon');
+            menuIcon.setAttribute('icon', 'menu');
             navButton.innerHTML = '';
-            navButton.appendChild(menuIcon.firstChild);
+            navButton.appendChild(menuIcon);
             navButton.removeAttribute('hx-get');
             navButton.removeAttribute('hx-target');
             navButton.setAttribute('onclick', 'toggleSidebar()');

@@ -39,10 +39,10 @@ htmx.on('htmx:afterSwap', function(evt) {
             // Update nav button to back mode
             if (navButton) {
                 navButton.dataset.mode = 'back';
-                const arrowIcon = document.createElement('div');
-                arrowIcon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15,18 9,12 15,6"></polyline></svg>';
+                const arrowIcon = document.createElement('uk-icon');
+                arrowIcon.setAttribute('icon', 'arrow-left');
                 navButton.innerHTML = '';
-                navButton.appendChild(arrowIcon.firstChild);
+                navButton.appendChild(arrowIcon);
                 navButton.setAttribute('hx-get', '/');
                 navButton.setAttribute('hx-target', '#feed-list');
                 navButton.removeAttribute('onclick');
@@ -60,6 +60,7 @@ htmx.on('htmx:afterSwap', function(evt) {
 
     // Handle returning to feed list on mobile (back navigation)
     if (evt.detail.target && evt.detail.target.id === 'feed-list' && window.innerWidth < 1024) {
+        // Always try to hide the article view when swapping feed-list content
         if (window.hideArticle) {
             window.hideArticle();
         } else {
@@ -78,10 +79,10 @@ htmx.on('htmx:afterSwap', function(evt) {
             // Update nav button back to menu
             if (navButton) {
                 navButton.dataset.mode = 'menu';
-                const menuIcon = document.createElement('div');
-                menuIcon.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>';
+                const menuIcon = document.createElement('uk-icon');
+                menuIcon.setAttribute('icon', 'menu');
                 navButton.innerHTML = '';
-                navButton.appendChild(menuIcon.firstChild);
+                navButton.appendChild(menuIcon);
                 navButton.removeAttribute('hx-get');
                 navButton.removeAttribute('hx-target');
                 navButton.setAttribute('onclick', 'toggleSidebar()');
@@ -89,13 +90,17 @@ htmx.on('htmx:afterSwap', function(evt) {
         }
     }
 
-    if (window.innerWidth < 1024 && evt.detail.target && evt.detail.target.id === 'main-content') {
+    if (window.innerWidth < 1024 && evt.detail.target && (evt.detail.target.id === 'main-content' || evt.detail.target.id === 'feed-list')) {
         // Body class management for mobile article view
         if (evt.detail.xhr && evt.detail.xhr.responseURL) {
             if (evt.detail.xhr.responseURL.includes('/item/')) {
                 htmx.addClass(document.body, 'article-view');
             } else {
                 htmx.removeClass(document.body, 'article-view');
+                // Call hideArticle when navigating away from article
+                if (window.hideArticle) {
+                    window.hideArticle();
+                }
             }
         }
 

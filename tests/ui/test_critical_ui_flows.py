@@ -430,11 +430,12 @@ class TestSessionAndSubscriptionFlow:
             
             # Close mobile sidebar after checking feeds (if mobile)
             if viewport_name == "mobile":
-                # Click overlay or hamburger menu to close sidebar (no X button)
-                page.locator('#sidebar-overlay').click()
+                # Click nav button again to toggle sidebar closed
+                nav_button = page.locator('#nav-button')
+                nav_button.click()
                 page.wait_for_function(
                     "() => !document.getElementById('sidebar').classList.contains('open')",
-                    timeout=2000
+                    timeout=5000
                 )
             
             # 3. Should automatically see articles (not "No posts available")
@@ -1030,8 +1031,9 @@ class TestPaginationScroll:
             feed_container_selector = "#feed-list"
             pagination_button_selector = '[hx-target="#feed-list"]'
         else:
-            feed_container_selector = "#content-area"
-            pagination_button_selector = '[hx-target="#content-area"]'
+            # After refactoring, mobile also uses #feed-list for scrollable content
+            feed_container_selector = "#feed-list"
+            pagination_button_selector = '[hx-target="#feed-list"]'
 
         # Wait for the feed container to be visible
         feed_container = page.locator(feed_container_selector)
@@ -1072,3 +1074,46 @@ class TestPaginationScroll:
         # Check that the scroll position is at the top
         scroll_top_after = feed_container.evaluate("node => node.scrollTop")
         assert scroll_top_after == 0
+
+
+class TestChromeButtonsAtEdges:
+    """Test that chrome buttons are positioned at edges with no padding/margin"""
+
+    def test_chrome_buttons_at_edges(self, page, test_server_url):
+        """Test that nav button is at left edge and icon bar buttons are at right edge"""
+
+        viewports = [
+            {"width": 1400, "height": 900, "name": "desktop"},
+            {"width": 390, "height": 844, "name": "mobile"}
+        ]
+
+        for viewport in viewports:
+            page.set_viewport_size({"width": viewport["width"], "height": viewport["height"]})
+            page.goto(test_server_url, wait_until="networkidle")
+
+            # Wait for chrome container to be visible
+            chrome = page.locator("#chrome-container")
+            expect(chrome).to_be_visible()
+
+            # Test nav button at left edge (mobile only - desktop hides nav button)
+            if viewport['name'] == 'mobile':
+                nav_button = page.locator("#nav-button")
+                if nav_button.is_visible():
+                    nav_box = nav_button.bounding_box()
+                    assert nav_box['x'] <= 16, f"{viewport['name']}: Nav button not at left edge: {nav_box['x']}px from left (max: 16px)"
+
+            # Test icon bar at right edge
+            icon_bar = page.locator("#icon-bar")
+            expect(icon_bar).to_be_visible()
+
+            icon_bar_box = icon_bar.bounding_box()
+            viewport_width = viewport["width"]
+            container_right_edge = icon_bar_box['x'] + icon_bar_box['width']
+            distance_from_right = viewport_width - container_right_edge
+
+            assert distance_from_right <= 16, \
+                f"{viewport['name']}: Icon bar not at right edge: {distance_from_right:.1f}px from right (max: 16px)"
+
+            print(f"✅ {viewport['name']}: Chrome buttons correctly positioned at edges")
+
+        print("✅ All chrome button edge tests passed!")

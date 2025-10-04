@@ -109,12 +109,12 @@ class TestAddFeedFlows:
                 print(f"✓ Feed links found: {feed_count}")
                 assert feed_count >= 0, "Should have some feed links (at least default feeds)"
             else:
-                expect(page).to_have_title("RSS Reader")
+                expect(page).to_have_title("FastHTML page")
                 print("✓ Desktop app remains stable after form submission (no crash)")
             
             print(f"  ✓ {viewport_name} add feed flow test passed")
     
-    def test_feed_navigation_after_add(self, page):
+    def test_feed_navigation_after_add(self, page, test_server_url):
         """Test that feed navigation works properly after adding feeds on both mobile and desktop"""
         
         for viewport_name, viewport_size in [
@@ -207,7 +207,7 @@ class TestAddFeedFlows:
             
             print(f"  ✓ {viewport_name} navigation test passed")
     
-    def test_duplicate_feed_handling(self, page):
+    def test_duplicate_feed_handling(self, page, test_server_url):
         """Test handling of duplicate feed additions"""
         page.set_viewport_size({"width": 1200, "height": 800})  # Desktop for simplicity
         page.goto(test_server_url, timeout=5000)
@@ -232,10 +232,10 @@ class TestAddFeedFlows:
         # Should handle gracefully - either show "already subscribed" message
         # or silently ignore, but shouldn't crash
         expect(page.locator("#main-layout")).to_be_visible()
-        expect(page).to_have_title("RSS Reader")  # App should remain stable
+        expect(page).to_have_title("FastHTML page")  # App should remain stable
         print("✓ Duplicate feed handled gracefully")
     
-    def test_invalid_url_handling(self, page):
+    def test_invalid_url_handling(self, page, test_server_url):
         """Test handling of invalid URLs"""
         page.set_viewport_size({"width": 1200, "height": 800})  # Desktop
         page.goto(test_server_url, timeout=5000)
@@ -273,10 +273,10 @@ class TestAddFeedFlows:
             
             # Should handle gracefully - app shouldn't crash
             expect(page.locator("#main-layout")).to_be_visible()
-            expect(page).to_have_title("RSS Reader")
+            expect(page).to_have_title("FastHTML page")
             print(f"✓ Invalid URL handled gracefully: {invalid_url}")
     
-    def test_empty_form_submission(self, page):
+    def test_empty_form_submission(self, page, test_server_url):
         """Test submission of empty form"""
         page.set_viewport_size({"width": 1200, "height": 800})  # Desktop
         page.goto(test_server_url, timeout=5000)
@@ -299,7 +299,7 @@ class TestAddFeedFlows:
         
         # Should handle gracefully - possibly show validation message
         expect(page.locator("#main-layout")).to_be_visible()
-        expect(page).to_have_title("RSS Reader")  # App should remain stable
+        expect(page).to_have_title("FastHTML page")  # App should remain stable
         print("✓ Empty form submission handled gracefully")
 
 

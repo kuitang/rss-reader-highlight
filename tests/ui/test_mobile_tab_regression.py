@@ -62,6 +62,6 @@ def test_mobile_tab_active_style_updates(page: Page, test_server_url):
 
 if __name__ == "__main__":
     import re
-from tests.ui.conftest import wait_for_htmx_complete, wait_for_page_ready
+    from tests.ui.conftest import wait_for_htmx_complete, wait_for_page_ready
     # Can run this file directly for debugging
     pass

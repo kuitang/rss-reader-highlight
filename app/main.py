@@ -1776,18 +1776,17 @@ def UnifiedChrome(session_id, feed_id=None, unread_view=True, feed_name="All Fee
 
     # Chrome container structure - fixed height to maintain invariant
     # UNIFIED responsive structure - NO test-specific duplicate elements
-    # NO PADDING - buttons must be at EDGES
+    # Standard padding for proper UX - px-4 gives 1rem on each side
     chrome_content = Div(
-        cls="chrome-container flex items-center justify-between border-b min-h-[64px] max-h-[64px]",
+        cls="chrome-container flex items-center justify-between border-b min-h-[64px] max-h-[64px] px-4",
         id=ElementIDs.CHROME_CONTAINER,
         hx_preserve="true"  # Preserve chrome during HTMX swaps (mobile article view)
     )(
         nav_button,
         feed_name_element,
         # Single unified icon bar - responsive via CSS
-        # Buttons at RIGHT EDGE
         Div(
-            cls="flex items-center space-x-2 sm:space-x-3",
+            cls="flex items-center",
             id="icon-bar"
         )(
             Button(
@@ -1818,8 +1817,11 @@ def UnifiedChrome(session_id, feed_id=None, unread_view=True, feed_name="All Fee
         )
     )
 
-    # Include search bars in the chrome structure
-    chrome_with_search = Container(
+    # Include search bars in the chrome structure - NO container padding for edge alignment
+    chrome_with_search = Div(
+        cls="relative",  # Remove container padding, keep relative for search bar
+        style="padding: 0; margin: 0;"  # Force no padding/margin for edge buttons
+    )(
         chrome_content,
         search_bar  # Include the main search bar defined above
     )

@@ -456,8 +456,7 @@ class TestRefactoringRegression:
                     raise
                 print(f"Server connection attempt {attempt + 1} failed, retrying...")
                 import time
-from tests.ui.conftest import wait_for_htmx_complete, wait_for_page_ready
-                wait_for_htmx_complete(page)
+                time.sleep(1)
         
         # Click on a feed
         ensure_mobile_sidebar_open(page)  # Open mobile sidebar if needed
