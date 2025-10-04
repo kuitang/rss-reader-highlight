@@ -1,453 +1,510 @@
-# Responsive Refactoring Strategy
+# RSS Reader - Test Fixing Strategy & Progress
 
-## Current Duplication Analysis
+## 🚀 Quick Start
 
-### Duplicated Elements
-1. **Layouts**: `mobile-layout` and `desktop-layout` rendered simultaneously
-2. **Chrome**: `mobile-chrome-content` and `desktop-chrome-content`
-3. **Icon Bars**: `mobile-icon-bar` and `desktop-icon-bar`
-4. **Search Bars**: `mobile-search-bar` and `desktop-search-bar`
-5. **Feed Items**: `mobile-feed-item-X` and `desktop-feed-item-X`
-6. **Sidebars**: `mobile-sidebar` and `sidebar`
-7. **Headers**: `mobile-header`, `mobile-persistent-header`, and desktop chrome
+```bash
+# Start server (in one terminal)
+source venv/bin/activate && MINIMAL_MODE=true python -m app
 
-## New Unified Structure
+# Run all UI tests (in another terminal)
+source venv/bin/activate && python -m pytest tests/ui/ -xvs
 
-### Single HTML Elements
-```
-#app-container
-  #sidebar (shared, responsive positioning)
-  #main-layout
-    #chrome-container (shared chrome)
-      #nav-button (hamburger/back, mobile only via CSS)
-      #feed-name
-      #icon-bar
-      #search-bar
-    #content-area
-      #feed-list (middle panel content)
-      #article-detail (right panel/full screen)
+# Run specific test
+python -m pytest tests/ui/test_ui_fixes.py::TestBackButtonFunctionality::test_back_button_mobile_navigation -xvs
 ```
 
-### CSS Strategy
+## 📊 Test Status Summary
 
-#### Breakpoint: 1024px (lg)
-- Mobile: < 1024px
-- Desktop: >= 1024px
+**Total UI Tests**: 91
+- ✅ **Passing**: 75
+- ❌ **Failing**: 16
+- ⏭️ **Skipped**: 10 (need full database)
 
-#### Layout Grid
-```css
-/* Mobile - Single column */
-@media (max-width: 1023px) {
-  #app-container { display: flex; flex-direction: column; }
-  #main-layout { flex: 1; overflow: hidden; }
-  #content-area { height: 100%; overflow-y: auto; }
-  #article-detail { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 50; }
+### Critical Failures to Fix (in order):
+1. ❌ Mobile back button navigation (partially fixed, see below)
+2. ❌ Main layout visibility on mobile article view
+3. ❌ Dark mode test syntax error
+4. ❌ Multiple tests timing out on mobile
+5. ❌ Sidebar visibility test expectations wrong
+6. ❌ Test selector issues (div#item-detail → #article-detail)
+
+---
+
+## ✅ COMPLETED FIXES
+
+### 1. Nav Button Name Attribute Issue (FIXED ✅)
+**Commits**: e0d0e9f, 50a0144
+
+**Problem**: FastHTML auto-generates `name` attribute from `id`, causing form submission issues.
+
+**Root Cause**:
+```python
+# FastHTML does this automatically:
+Button("Test", id="my-btn")
+# Outputs: <button id="my-btn" name="my-btn">  # ← Auto-added!
+```
+
+**Solution**: Add explicit `name=""` to prevent auto-generation:
+```python
+nav_button_attrs = {
+    "id": ElementIDs.NAV_BUTTON,
+    "name": "",  # ← Prevents FastHTML from auto-generating
+    ...
 }
-
-/* Desktop - Three columns */
-@media (min-width: 1024px) {
-  #app-container { display: grid; grid-template-columns: 1fr 2fr 2fr; }
-  #sidebar { position: static; }
-  #feed-list { overflow-y: auto; }
-  #article-detail { overflow-y: auto; }
-}
 ```
 
-#### Sidebar Behavior
+**Tests Now Passing**:
+- `TestHamburgerMenuHTMX::test_hamburger_no_form_submission` ✅
+- `TestHamburgerMenuHTMX::test_search_nav_button_no_form_submission` ✅
+
+**Files Modified**:
+- `/home/kuitang/git/rss-reader-highlight/app/main.py` (lines 1691, 1758)
+
+---
+
+## 🔧 IN PROGRESS
+
+### 2. Mobile Back Button Navigation (PARTIALLY FIXED)
+
+**Test**: `tests/ui/test_ui_fixes.py::TestBackButtonFunctionality::test_back_button_mobile_navigation`
+
+**Status**: HTTP request works, but classes not removed ❌
+
+**What Works**:
+- ✅ Back button makes HTTP request (verified in server logs)
+- ✅ `htmx.process()` successfully registers HTMX attributes
+- ✅ No duplicate event handlers anymore
+
+**What Doesn't Work**:
+- ❌ `active` class not removed from `#article-detail`
+- ❌ `article-view` class not removed from `#feed-list`
+
+**Root Causes Discovered**:
+
+1. **HTMX Attribute Registration** (FIXED ✅):
+   - Must call `htmx.process(element)` AFTER adding hx-* attributes
+   - Must NOT call `htmx.process(element)` after removing attributes (un-registers behavior)
+
+2. **Duplicate Event Handlers** (FIXED ✅):
+   - `htmx-config.js` (lines 62-91) and `main.js` (lines 217-227) both handled afterSwap
+   - Race condition: first handler removed class, second checked for it and did nothing
+   - Solution: Removed duplicate in main.js
+
+3. **Current Issue** (NOT FIXED ❌):
+   - `hideArticle()` is called by htmx-config.js handler
+   - Classes ARE removed
+   - But something is adding them back or they're not persisting
+   - Need to debug timing/order of HTMX swaps vs class changes
+
+**Files Modified (uncommitted)**:
+- `/home/kuitang/git/rss-reader-highlight/static/js/main.js`:
+  - Line 73: Added `htmx.process(navButton)` after setting attributes
+  - Line 109: Removed `htmx.process(navButton)` after removing attributes (was breaking it)
+  - Lines 218-220: Removed duplicate afterSwap handler
+  - Lines 85-107: Added debug logging to track class removal
+
+**Next Steps**:
+1. Use Playwright MCP subagent to watch class changes in real-time
+2. Check if HTMX afterSettle is re-adding classes
+3. Consider using server-side OOB swaps instead of client-side manipulation
+4. May need to add hx-swap-oob to feed-list response to send nav button state
+
+**Debug Command**:
+```python
+# Use subagent with Playwright MCP to debug:
+Task(
+    subagent_type="general-purpose",
+    description="Debug back button classes",
+    prompt="""
+    At http://localhost:8080, mobile viewport (390x844):
+    1. Inject MutationObserver to watch #article-detail class changes
+    2. Click feed item → Click back button
+    3. Report exact sequence of class additions/removals
+    4. Check if classes removed then re-added
+    5. Check console for hideArticle() debug logs
+    """
+)
+```
+
+---
+
+## ❌ REMAINING ISSUES
+
+### 3. Main Layout Visibility on Mobile
+**Tests Failing**:
+- `test_mobile_comprehensive_workflow`
+- `test_responsive_layout_switching`
+
+**Issue**: `#main-layout` stays visible (display: flex) when article is active on mobile. Should be hidden.
+
+**Expected**: `#main-layout` display:none when `#article-detail.active` on mobile
+**Actual**: `#main-layout` display:flex (always visible)
+
+**Fix Needed**: Add CSS rule or HTMX swap to hide main-layout on mobile article view
+
+---
+
+### 4. Dark Mode Test Syntax Error
+**Test**: `tests/ui/test_dark_mode.py::test_dark_mode_toggle_and_css_variables`
+
+**Error**: `SyntaxError: Illegal return statement at eval (<anonymous>)`
+
+**Root Cause**: Test is using `page.evaluate()` with a return statement outside function context.
+
+**Fix**: Wrap evaluate code in IIFE:
+```python
+# Bad:
+page.evaluate("return document.body.classList")
+
+# Good:
+page.evaluate("() => document.body.classList")
+```
+
+**File to Fix**: `/home/kuitang/git/rss-reader-highlight/tests/ui/test_dark_mode.py`
+
+---
+
+### 5. Mobile Flow Timeouts
+**Tests Failing** (all timeout at 2000ms):
+- `test_mobile_post_navigation_htmx`
+- `test_mobile_feed_filter_preserved`
+- `test_mobile_feed_title_persistence_after_article_navigation`
+
+**Issue**: Using `page.wait_for_function()` with 2000ms timeout - too short for HTMX.
+
+**Fix**: Use `wait_for_htmx_complete()` helper instead:
+```python
+# Bad:
+page.wait_for_function("...", timeout=2000)
+
+# Good:
+wait_for_htmx_complete(page, timeout=5000)
+```
+
+---
+
+### 6. Sidebar Visibility Test Issues
+**Test**: `test_mobile_sidebar_and_navigation_flow`
+
+**Issue**: Test expects sidebar to be `hidden` (CSS display:none), but it's positioned off-screen with CSS.
+
+**Current Implementation**:
 ```css
-/* Mobile - Overlay */
+/* Mobile sidebar is hidden via positioning, not display:none */
 @media (max-width: 1023px) {
   #sidebar {
     position: fixed;
-    left: -100%;
-    top: 0;
-    bottom: 0;
-    width: 80%;
-    max-width: 320px;
-    z-index: 60;
-    transition: left 0.3s;
+    left: -390px;  /* Off-screen */
+    transform: translateX(0);
   }
-  #sidebar.open { left: 0; }
-  #sidebar-overlay {
-    display: none;
-    position: fixed;
-    inset: 0;
-    background: rgba(0,0,0,0.5);
-    z-index: 59;
+  #sidebar.open {
+    left: 0;  /* Slide in */
   }
-  #sidebar.open + #sidebar-overlay { display: block; }
-}
-
-/* Desktop - Persistent */
-@media (min-width: 1024px) {
-  #sidebar { display: block !important; }
-  #sidebar-overlay { display: none !important; }
-  #nav-button { display: none; }
 }
 ```
 
-#### Chrome Adaptation
-```css
-/* Shared chrome with responsive adjustments */
-#chrome-container {
-  display: flex;
-  align-items: center;
-  padding: 1rem;
-  border-bottom: 1px solid var(--border);
-}
-
-/* Mobile-specific chrome elements */
-@media (max-width: 1023px) {
-  #nav-button { display: flex; }
-  #feed-name { font-size: 1rem; }
-  #chrome-container { position: sticky; top: 0; z-index: 40; }
-}
-
-/* Desktop-specific chrome elements */
-@media (min-width: 1024px) {
-  #nav-button { display: none; }
-  #feed-name { font-size: 1.125rem; }
-}
+**Test Expectation** (WRONG):
+```python
+expect(page.locator("#sidebar")).to_be_hidden()  # Fails - sidebar is visible, just positioned off-screen
 ```
 
-#### Article Navigation
-```css
-/* Mobile - Full screen overlay */
-@media (max-width: 1023px) {
-  #article-detail:not(.active) { display: none; }
-  #article-detail.active {
-    display: block;
-    position: fixed;
-    inset: 0;
-    z-index: 50;
-    background: white;
-  }
-  #feed-list.article-view { display: none; }
-}
+**Fix Options**:
+1. Update test to check for `open` class instead
+2. OR change CSS to use display:none instead of positioning
 
-/* Desktop - Side panel */
-@media (min-width: 1024px) {
-  #article-detail {
-    display: block !important;
-    position: static !important;
-  }
-  #feed-list { display: block !important; }
-}
+---
+
+### 7. Test Selector Issues
+**Test**: `test_basic_functionality_flow`
+
+**Error**: `waiting for locator("div#item-detail")` - element not found
+
+**Issue**: Old selector `div#item-detail` doesn't exist. Should be `#article-detail`.
+
+**Fix**: Update test selectors:
+```python
+# Bad:
+page.locator("div#item-detail")
+
+# Good:
+page.locator("#article-detail")
 ```
 
-### JavaScript Requirements
+**File to Fix**: `/home/kuitang/git/rss-reader-highlight/tests/ui/test_working_regression.py`
 
-#### Minimal JS for Mobile Interactions
+---
+
+### 8. HTMX Mobile Handlers Routing
+**Test**: `test_mobile_handlers_routing`
+
+**Error**: `Timeout waiting for locator("#sidebar button[hx-on-click*='setAttribute']")`
+
+**Issue**: Test looking for specific HTMX attribute that may not exist with current implementation.
+
+**Fix**: Review what the test is trying to verify and update selector or implementation.
+
+---
+
+## 🔍 DEBUG PROCEDURES
+
+### Using Subagents for Debugging
+
+**ALWAYS use Playwright MCP subagent for interactive debugging:**
+
+```python
+Task(
+    subagent_type="general-purpose",
+    description="Debug UI issue",
+    prompt="""
+    At http://localhost:8080:
+
+    1. Open in viewport: {"width": 390, "height": 844} (mobile)
+    2. [Specific steps to reproduce]
+    3. Use Playwright MCP to:
+       - Inject JavaScript to monitor events
+       - Check element attributes and classes
+       - Take screenshots
+       - Report console logs
+
+    Return detailed report of:
+    - Exact element states
+    - Console output
+    - Screenshots if helpful
+    """
+)
+```
+
+**Key Debugging Commands**:
+
+1. **Check HTMX Events**:
 ```javascript
-// Sidebar toggle
-function toggleSidebar() {
-  document.getElementById('sidebar').classList.toggle('open');
-}
-
-// Article view management
-function showArticle(itemId) {
-  if (window.innerWidth < 1024) {
-    document.getElementById('article-detail').classList.add('active');
-    document.getElementById('feed-list').classList.add('article-view');
-    // Update nav button to show back arrow
-    updateNavButton(true);
-  }
-}
-
-function hideArticle() {
-  if (window.innerWidth < 1024) {
-    document.getElementById('article-detail').classList.remove('active');
-    document.getElementById('feed-list').classList.remove('article-view');
-    // Update nav button to show hamburger
-    updateNavButton(false);
-  }
-}
-
-function updateNavButton(showBack) {
-  const btn = document.getElementById('nav-button');
-  if (showBack) {
-    btn.innerHTML = '<svg>arrow-left</svg>';
-    btn.onclick = hideArticle;
-  } else {
-    btn.innerHTML = '<svg>menu</svg>';
-    btn.onclick = toggleSidebar;
-  }
+// Inject event logger
+htmx.logger = function(elt, event, data) {
+    console.log(event, data);
 }
 ```
 
-### HTMX Adjustments
-
-#### Unified Targets
-- Use single targets that work for both layouts
-- `hx-target="#feed-list"` for feed updates
-- `hx-target="#article-detail"` for article content
-- Add response handlers to manage mobile article view state
-
-#### Response Processing
+2. **Watch Class Changes**:
 ```javascript
-document.body.addEventListener('htmx:afterSwap', function(evt) {
-  // Handle article navigation on mobile
-  if (evt.detail.target.id === 'article-detail' && window.innerWidth < 1024) {
-    showArticle();
-  }
+const observer = new MutationObserver(mutations => {
+    mutations.forEach(m => {
+        if (m.attributeName === 'class') {
+            console.log('Class changed:', m.target.className);
+        }
+    });
+});
+observer.observe(document.getElementById('article-detail'), {attributes: true});
+```
+
+3. **Check HTMX Attributes**:
+```javascript
+const btn = document.getElementById('nav-button');
+console.log({
+    hasHxGet: btn.hasAttribute('hx-get'),
+    hxGet: btn.getAttribute('hx-get'),
+    hxTarget: btn.getAttribute('hx-target')
 });
 ```
 
-### Migration Steps
+---
 
-1. **Phase 1**: Create unified HTML structure
-2. **Phase 2**: Implement responsive CSS
-3. **Phase 3**: Add minimal JavaScript
-4. **Phase 4**: Update HTMX targets
-5. **Phase 5**: Adjust test selectors
-6. **Phase 6**: Remove old dual-layout code
+## 🏗️ ARCHITECTURE NOTES
 
-### Test Selector Updates
+### Current Structure (Unified Responsive)
 
-Old selectors → New selectors:
-- `#mobile-icon-bar` → `#icon-bar`
-- `#desktop-icon-bar` → `#icon-bar`
-- `#mobile-search-bar` → `#search-bar`
-- `#desktop-search-bar` → `#search-bar`
-- `#mobile-feed-item-X` → `#feed-item-X`
-- `#desktop-feed-item-X` → `#feed-item-X`
-- `#mobile-sidebar` → `#sidebar`
-- `#desktop-chrome-container` → `#chrome-container`
+```
+#app-container
+  #sidebar (responsive via CSS positioning)
+    - Mobile: fixed, left: -100%, slides in with .open class
+    - Desktop: static, always visible
 
-## Implementation Status Report - FINAL
+  #sidebar-overlay (mobile only)
+    - Shows when sidebar.open on mobile
 
-### ✅ Successfully Implemented (100% Complete)
+  #main-layout
+    #chrome-container (hx-preserve="true")
+      #nav-button (mobile only via CSS)
+      #feed-name
+      #icon-bar
+      #search-bar (absolute positioned overlay)
 
-#### 1. **Core Responsive Refactoring** ✅
-- **Single HTML structure**: Eliminated ALL duplicate mobile/desktop elements
-- **Unified element IDs**: Single `#app-container`, `#sidebar`, `#chrome-container`, `#feed-list`, `#article-detail`
-- **CSS-based responsiveness**: All viewport differences handled via media queries at 1024px breakpoint
-- **JavaScript interactions**: Added minimal JS for mobile sidebar toggle and article navigation
-- **No test-specific elements**: Removed all `mobile-*` ID wrappers that were wrongly added
-
-#### 2. **Critical Functionality Fixes** ✅
-- **Mobile Chrome Preservation**: Added `hx-preserve="true"` to keep chrome visible during article view
-- **Article clicking**: Fixed server-side `AttributeError` by updating `Targets.MOBILE_CONTENT` → `Targets.CONTENT`
-- **Mobile sidebar toggle**: Fixed to use CSS classes (`.open`) instead of `hidden` attribute
-- **Navigation button icons**: Properly switches between hamburger (☰) and arrow-left (←) SVG icons
-- **Feed link behavior**: Sidebar auto-closes on mobile when clicking feed links
-- **HTMX Blue Indicators**: Added OOB (out-of-band) updates to remove blue dots when items are read
-
-#### 3. **Dark Mode Support** ✅
-- **System-responsive**: Respects `prefers-color-scheme` media query automatically
-- **No custom code needed**: MonsterUI's CSS variables handle dark mode natively
-- **Fixed white backgrounds**: Removed all explicit `background: white` declarations
-- **Proper inheritance**: Elements inherit background from CSS variables
-
-#### 4. **Layout & Spacing** ✅
-- **Chrome layout**: Uses `justify-between` for proper [hamburger] title [buttons] spacing
-- **Feed name centered**: Added `flex-1 text-center` to center feed name
-- **Height invariant**: Chrome container maintains 64px height when search expands
-- **Mobile article view**: Article positioned at `top: 64px` to stay below chrome
-
-### Critical Mistakes Made & Root Causes
-
-#### ❌ **THE REAL PROBLEM: I Added `background: white`**
-
-**What I broke**:
-```css
-/* I ADDED these explicit white backgrounds - BREAKING dark mode */
-.sidebar { background: white; }  /* Line 370, 433 */
-.chrome-container { background: white; }  /* Line 397 */
-.article-detail { background: white; }  /* Line 478, 497 */
-#search-bar { background: white; }  /* Line 522 */
+    #content-area
+      #feed-list
+      #article-detail
+        - Mobile: fixed fullscreen with .active class
+        - Desktop: static side panel
 ```
 
-**Why this broke everything**:
-1. **MonsterUI already provides `--background` CSS variable** that adapts to dark/light mode
-2. **Setting explicit `white` overrides the CSS variable system**
-3. **Dark mode can't work when backgrounds are hardcoded**
-4. **I tried to "fix" it by adding more CSS** instead of removing the problem
+### Key Files
 
-**The correct fix**:
-```css
-/* DELETE all explicit backgrounds - let CSS variables work */
-.sidebar { /* NO background needed - inherits */ }
-.chrome-container { /* NO background needed */ }
-.article-detail { /* NO background needed */ }
+**Python Backend**:
+- `/home/kuitang/git/rss-reader-highlight/app/main.py` - Main app, chrome components, HTMX logic
+
+**JavaScript**:
+- `/home/kuitang/git/rss-reader-highlight/static/js/main.js` - Main JS, showArticle(), hideArticle()
+- `/home/kuitang/git/rss-reader-highlight/static/js/htmx-config.js` - HTMX event handlers, mobile navigation
+
+**CSS**:
+- `/home/kuitang/git/rss-reader-highlight/static/css/main.css` - Responsive styles, mobile/desktop breakpoints
+
+**Tests**:
+- `/home/kuitang/git/rss-reader-highlight/tests/ui/test_ui_fixes.py` - Critical UI fixes
+- `/home/kuitang/git/rss-reader-highlight/tests/ui/test_mobile_flows.py` - Mobile-specific tests
+- `/home/kuitang/git/rss-reader-highlight/tests/ui/test_comprehensive_regression.py` - Full regression suite
+
+### Mobile Navigation State Machine
+
+```
+[Feed List View]
+  nav-button: onclick="toggleSidebar()", icon="menu"
+  article-detail: no .active class
+  feed-list: no .article-view class
+
+  ↓ (Click feed item - HTMX request)
+
+[Article View]
+  nav-button: hx-get="/", hx-target="#feed-list", icon="arrow-left"
+  article-detail: has .active class
+  feed-list: has .article-view class
+
+  ↓ (Click back button - HTMX request)
+
+[Feed List View]
+  (Should return to initial state, but classes not clearing!)
 ```
 
-**MonsterUI Dark Mode Truth**:
-- **Zero code needed** - It responds to `prefers-color-scheme` automatically
-- **Uses CSS variables** - `var(--background)`, `var(--foreground)`, etc.
-- **I broke it** by overriding with explicit colors
+---
 
-### ✅ FIXED: Nav Button Name Attribute Issue
-- **Issue**: FastHTML auto-generates `name` attribute from `id` on buttons
-- **Solution**: Added explicit `name=""` to prevent auto-generation
-- **Fixed**: Both `#nav-button` and `#search-nav-button`
-- **Tests Passing**: `TestHamburgerMenuHTMX::test_hamburger_no_form_submission` ✅
-- **Tests Passing**: `TestHamburgerMenuHTMX::test_search_nav_button_no_form_submission` ✅
-- **Commit**: e0d0e9f
+## 🎯 NEXT SESSION ACTION PLAN
 
-### ❌ CRITICAL Test Failures Still Present
+### Priority 1: Fix Back Button (Current Focus)
 
-#### 1. **Mobile Back Button UNRELIABLE** 🔴
-- **Issue**: Back button doesn't clear 'active' and 'article-view' classes
-- **Symptom**: Classes persist after clicking back, causing visual issues
-- **Root Cause**: HTMX swap doesn't remove state classes
-- **Impact**: Core mobile UX is broken
-- **Fix Needed**: Add HTMX event handlers to clear classes on back navigation
+**Immediate Debug Steps**:
+1. Start server: `source venv/bin/activate && MINIMAL_MODE=true python -m app`
+2. Run test with console output: `python -m pytest tests/ui/test_ui_fixes.py::TestBackButtonFunctionality::test_back_button_mobile_navigation -xvs`
+3. Use Playwright MCP subagent to watch class changes during back navigation
+4. Check server logs to confirm back request succeeds
+5. Verify hideArticle() is called (check console logs added at line 85)
 
-#### 2. **Header Layout NOT Centered** 🔴
-- **Issue**: Header should be `[hamburger] centered-title [buttons]`
-- **Current**: Title is not properly centered between elements
-- **Root Cause**: Missing proper flexbox layout
-- **Fix Needed**:
-  ```html
-  <!-- Need three-column flex layout -->
-  <div class="flex justify-between items-center">
-    <button>hamburger</button>
-    <h3 class="flex-1 text-center">title</h3>
-    <div>buttons</div>
-  </div>
-  ```
+**Potential Solutions to Try**:
+1. Check if afterSettle is re-adding classes
+2. Use server-side OOB swap for nav button instead of client-side manipulation
+3. Add explicit class removal in HTMX response
+4. Check timing - may need to delay class removal until after swap completes
 
-#### 3. **Button Height Accessibility FAILURE** 🔴
-- **Issue**: Mobile buttons are 40px (MUST be 44px minimum)
-- **Impact**: Fails WCAG touch target guidelines
-- **Fix**: Change ALL buttons from `p-2` to `p-3`
-- **Test**: `test_tabs_correct_size_and_alignment` FAILING
+### Priority 2: Fix Other Critical Tests
 
-#### 4. **Pagination Scroll Broken** 🔴
-- **Issue**: Feed list doesn't scroll to top on pagination
-- **Tests Failing**:
-  - `test_pagination_scroll_to_top[viewport0]` (Desktop)
-  - `test_pagination_scroll_to_top[viewport1]` (Mobile)
-- **Fix Needed**: Add scroll reset to HTMX callbacks
+1. **Main Layout Visibility**: Add CSS to hide #main-layout when article active on mobile
+2. **Dark Mode Test**: Fix evaluate syntax in test
+3. **Mobile Timeouts**: Replace wait_for_function with wait_for_htmx_complete
+4. **Selector Updates**: Change div#item-detail → #article-detail
 
-### Test Architecture Improvements Applied
+### Priority 3: Update Tests for New Architecture
 
-#### ✅ **Import Fixes**
-```python
-# Added to all test files:
-from tests.ui.conftest import wait_for_htmx_complete, wait_for_page_ready
+Many tests expect old dual-layout (mobile-* and desktop-* elements). Need to:
+1. Update all selectors to use unified element IDs
+2. Remove viewport-specific checks where not needed
+3. Update visibility expectations (CSS positioning vs display:none)
+
+---
+
+## 💡 KEY LEARNINGS
+
+### FastHTML Gotchas
+
+1. **Auto-Generated Attributes**: FastHTML adds `name="<id>"` automatically. Use `name=""` to prevent.
+2. **Button Components**: Use explicit attributes dict to control output.
+
+### HTMX Best Practices
+
+1. **Dynamic Attributes**: Call `htmx.process(element)` after adding hx-* attributes
+2. **Removing Attributes**: DON'T call `htmx.process()` after removing - it un-registers behavior
+3. **Event Handlers**: Check for duplicate handlers in multiple JS files
+4. **OOB Swaps**: Consider server-side swaps for complex state changes instead of client-side JS
+
+### Testing Best Practices
+
+1. **Wait Strategies**: Always use `wait_for_htmx_complete()`, never `time.sleep()` or short timeouts
+2. **Selectors**: Use semantic selectors (IDs, roles) not styling classes
+3. **Subagents**: Use Playwright MCP for complex debugging - don't guess, observe!
+4. **Architecture**: Understand if element is hidden via display:none or positioning before writing assertions
+
+---
+
+## 📝 COMMIT LOG
+
+**Committed**:
+- e0d0e9f: Fix: Prevent FastHTML from auto-generating 'name' attributes on nav buttons
+- 50a0144: Docs: Update RESPONSIVE_STRATEGY.md with nav button fix
+
+**Uncommitted Changes**:
+- static/js/main.js: Added htmx.process() calls, removed duplicate handler, added debug logging
+- RESPONSIVE_STRATEGY.md: This comprehensive update
+
+**Next Commit**: Once back button fully working, commit with message:
+```
+Fix: Mobile back button navigation with htmx.process()
+
+- Add htmx.process() after setting hx-* attributes in showArticle()
+- Remove htmx.process() call in hideArticle() (was un-registering)
+- Remove duplicate afterSwap handler causing race condition
+- Back button now makes HTTP request correctly
+
+Tests passing:
+- [List tests that pass]
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
-#### ✅ **Selector Updates**
-- All tests now use unified selectors
-- Removed all `mobile-*` and `desktop-*` prefixes
-- Tests check CSS classes, not DOM visibility
+---
 
-#### ✅ **Wait Strategy**
-- Replaced all `time.sleep()` with `wait_for_htmx_complete()`
-- Maximum timeout of 5 seconds for all waits
-- Condition-based waiting instead of arbitrary delays
+## 🔄 TEST RUNNING GUIDE
 
-### Current Test Results - NOT ACCEPTABLE
+```bash
+# Run ALL tests (takes ~2 minutes)
+python -m pytest tests/ui/ -xvs
 
-#### **Test Suite Status**
-- **Total Tests**: 22 in critical UI flows
-- **Passing**: 13 tests
-- **FAILING**: 3 tests (ALL ARE CRITICAL)
-- **Skipped**: 6 tests (need full DB)
-- **Success Rate**: 81.25% - NOT GOOD ENOUGH
+# Run SPECIFIC test file
+python -m pytest tests/ui/test_ui_fixes.py -xvs
 
-#### **What's Actually Working** ✅
-1. ✅ Mobile chrome preserved in article view (via `hx-preserve`)
-2. ✅ Dark mode (after removing `background: white`)
-3. ✅ Mobile sidebar auto-closes on feed click
-4. ✅ Blue indicators disappear (OOB updates added)
-5. ✅ Search bar maintains height
+# Run SPECIFIC test
+python -m pytest tests/ui/test_ui_fixes.py::TestBackButtonFunctionality -xvs
 
-#### **What's BROKEN** ❌
-1. ❌ **Back button unreliable** - Navigation state broken
-2. ❌ **Header not centered** - Layout issue
-3. ❌ **Buttons too small** - Accessibility failure
-4. ❌ **Scroll not resetting** - UX broken
-5. ❌ **Test architecture** - Still has wrong expectations
+# Run with match pattern
+python -m pytest tests/ui/ -k "mobile" -xvs
 
-### Implementation Status: INCOMPLETE ❌
+# Skip tests needing full DB
+python -m pytest tests/ui/ -m "not need_full_db" -xvs
 
-#### What Still Needs to Be Done
+# Check test output location
+cat all_tests.txt  # If it exists
+```
 
-1. **Fix Back Button Navigation Logic**
-   ```javascript
-   // Current: Unreliable state management
-   // Need: Consistent mode tracking and proper event handlers
-   if (navButton.dataset.mode === 'back') {
-       // MUST go back to feed list
-       window.hideArticle();
-   } else {
-       // MUST open sidebar
-       window.toggleSidebar();
-   }
-   ```
+**Server Management**:
+```bash
+# Kill all Python servers
+pkill -9 -f "python.*app"
 
-2. **Fix Header Layout**
-   ```html
-   <!-- Current: Not properly centered -->
-   <!-- Need: Three-column flex with centered title -->
-   <div id="chrome-container" class="flex justify-between">
-       <button id="nav-button">≡</button>
-       <h3 class="flex-1 text-center">Feed Name</h3>
-       <div id="icon-bar" class="flex">buttons</div>
-   </div>
-   ```
+# Start fresh
+source venv/bin/activate && MINIMAL_MODE=true python -m app
 
-3. **Fix Button Sizes**
-   - Find ALL button elements
-   - Ensure minimum 44px height
-   - Update padding classes
+# Check server
+curl http://localhost:8080 | head -5
+```
 
-4. **Fix Scroll Behavior**
-   - Add HTMX event listener for pagination
-   - Reset scroll position after swap
-   - Test on both mobile and desktop
+---
 
-5. **Update ALL Tests**
-   - Remove expectations of dual layouts
-   - Use unified selectors everywhere
-   - Fix viewport-specific logic
+## END OF STRATEGY DOCUMENT
 
-### Next Steps - MUST COMPLETE
+**Last Updated**: 2025-10-04 20:25 UTC
+**Current Session Tokens Used**: ~121k/200k
+**Status**: Back button partially fixed, 15 tests remaining
 
-#### Immediate Fixes Required
-
-1. **Debug Back Button State Machine**
-   - Log all state transitions
-   - Verify `dataset.mode` updates
-   - Test all navigation paths:
-     - Feed list → Article (button becomes back)
-     - Article → Feed list (button becomes hamburger)
-     - Any view → Sidebar (hamburger click)
-
-2. **Fix Header Flexbox Layout**
-   - Inspect current HTML structure
-   - Add proper flex classes
-   - Verify centering on both viewports
-
-3. **Systematically Fix Button Heights**
-   ```bash
-   # Find all buttons that are too small
-   grep -n "p-2" app/main.py | grep Button
-   # Replace with p-3 for 44px minimum height
-   ```
-
-4. **Add Scroll Reset Handler**
-   ```javascript
-   document.body.addEventListener('htmx:afterSwap', (evt) => {
-       if (evt.detail.target.id === 'feed-list') {
-           evt.detail.target.scrollTop = 0;
-       }
-   });
-   ```
-
-5. **Test Everything Again**
-   - Run full test suite
-   - Manual testing on both viewports
-   - Verify all navigation paths
-
-### Success Criteria
-
-- **100% of critical tests must pass**
-- **Back button must be 100% reliable**
-- **Header must be properly centered**
-- **All buttons ≥ 44px height**
-- **Scroll must reset on pagination**
-- **Dark mode must work without any custom CSS**
+**On Next Session Start**:
+1. Read this file completely
+2. Start server
+3. Focus on back button debug using Playwright MCP
+4. Commit once working
+5. Move to next critical failure
