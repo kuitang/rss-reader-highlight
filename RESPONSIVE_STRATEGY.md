@@ -16,12 +16,12 @@ python -m pytest tests/ui/test_ui_fixes.py::TestBackButtonFunctionality::test_ba
 ## 📊 Test Status Summary
 
 **Total UI Tests**: 91
-- ✅ **Passing**: 75
-- ❌ **Failing**: 16
+- ✅ **Passing**: 76
+- ❌ **Failing**: 15
 - ⏭️ **Skipped**: 10 (need full database)
 
 ### Critical Failures to Fix (in order):
-1. ❌ Mobile back button navigation (partially fixed, see below)
+1. ✅ Mobile back button navigation (FIXED - commit a34b5ef)
 2. ❌ Main layout visibility on mobile article view
 3. ❌ Dark mode test syntax error
 4. ❌ Multiple tests timing out on mobile
@@ -62,75 +62,56 @@ nav_button_attrs = {
 
 ---
 
-## 🔧 IN PROGRESS
+### 2. Mobile Back Button Navigation (FIXED ✅)
+**Commit**: a34b5ef
 
-### 2. Mobile Back Button Navigation (PARTIALLY FIXED)
+**Problem**: Test failing because 'active' class still present after clicking back button.
 
-**Test**: `tests/ui/test_ui_fixes.py::TestBackButtonFunctionality::test_back_button_mobile_navigation`
+**Root Cause Analysis**:
+1. **htmx.process() timing**: Already present in code, working correctly
+2. **Class removal happening**: hideArticle() WAS removing classes successfully
+3. **Real issue**: Test timing - checked before class changes settled
 
-**Status**: HTTP request works, but classes not removed ❌
+**The Bug**: Class changes happen AFTER HTMX afterSwap completes:
+1. Back button clicked → HTMX request fires (working ✅)
+2. HTMX swaps #feed-list content
+3. hideArticle() called (removes classes ✅)
+4. Test checked BEFORE class removal completed ❌
 
-**What Works**:
-- ✅ Back button makes HTTP request (verified in server logs)
-- ✅ `htmx.process()` successfully registers HTMX attributes
-- ✅ No duplicate event handlers anymore
-
-**What Doesn't Work**:
-- ❌ `active` class not removed from `#article-detail`
-- ❌ `article-view` class not removed from `#feed-list`
-
-**Root Causes Discovered**:
-
-1. **HTMX Attribute Registration** (FIXED ✅):
-   - Must call `htmx.process(element)` AFTER adding hx-* attributes
-   - Must NOT call `htmx.process(element)` after removing attributes (un-registers behavior)
-
-2. **Duplicate Event Handlers** (FIXED ✅):
-   - `htmx-config.js` (lines 62-91) and `main.js` (lines 217-227) both handled afterSwap
-   - Race condition: first handler removed class, second checked for it and did nothing
-   - Solution: Removed duplicate in main.js
-
-3. **Current Issue** (NOT FIXED ❌):
-   - `hideArticle()` is called by htmx-config.js handler
-   - Classes ARE removed
-   - But something is adding them back or they're not persisting
-   - Need to debug timing/order of HTMX swaps vs class changes
-
-**Files Modified (uncommitted)**:
-- `/home/kuitang/git/rss-reader-highlight/static/js/main.js`:
-  - Line 73: Added `htmx.process(navButton)` after setting attributes
-  - Line 109: Removed `htmx.process(navButton)` after removing attributes (was breaking it)
-  - Lines 218-220: Removed duplicate afterSwap handler
-  - Lines 85-107: Added debug logging to track class removal
-
-**Next Steps**:
-1. Use Playwright MCP subagent to watch class changes in real-time
-2. Check if HTMX afterSettle is re-adding classes
-3. Consider using server-side OOB swaps instead of client-side manipulation
-4. May need to add hx-swap-oob to feed-list response to send nav button state
-
-**Debug Command**:
+**Solution**: Wait for specific condition instead of just HTMX completion:
 ```python
-# Use subagent with Playwright MCP to debug:
-Task(
-    subagent_type="general-purpose",
-    description="Debug back button classes",
-    prompt="""
-    At http://localhost:8080, mobile viewport (390x844):
-    1. Inject MutationObserver to watch #article-detail class changes
-    2. Click feed item → Click back button
-    3. Report exact sequence of class additions/removals
-    4. Check if classes removed then re-added
-    5. Check console for hideArticle() debug logs
-    """
-)
+# OLD - Too early:
+wait_for_htmx_complete(page)
+assert not article.classList.contains('active')  # Fails - class still there
+
+# NEW - Wait for class removal:
+wait_for_htmx_complete(page)
+page.wait_for_function("() => !document.getElementById('article-detail').classList.contains('active')", timeout=2000)
+assert not article.classList.contains('active')  # Passes ✅
 ```
+
+**Technical Details**:
+- hideArticle() called twice (two event handlers in htmx-config.js lines 62-91 and 93-104)
+- Both handlers trigger on same event but work correctly
+- MutationObserver confirmed classes removed at ~560ms after click
+- HTMX completes at ~500ms, class removal at ~560ms = 60ms gap
+
+**Tests Now Passing**:
+- `TestBackButtonFunctionality::test_back_button_mobile_navigation` ✅
+
+**Files Modified**:
+- `static/js/main.js`: htmx.process() call (line 74), removed duplicate handler (line 228), added debug logging
+- `tests/ui/test_ui_fixes.py`: Added wait_for_function() for class removal timing (lines 86-89)
+
+---
+
+## 🔧 IN PROGRESS
 
 ---
 
 ## ❌ REMAINING ISSUES
 
-### 3. Main Layout Visibility on Mobile
+### 2. Main Layout Visibility on Mobile
 **Tests Failing**:
 - `test_mobile_comprehensive_workflow`
 - `test_responsive_layout_switching`
@@ -436,27 +417,12 @@ Many tests expect old dual-layout (mobile-* and desktop-* elements). Need to:
 **Committed**:
 - e0d0e9f: Fix: Prevent FastHTML from auto-generating 'name' attributes on nav buttons
 - 50a0144: Docs: Update RESPONSIVE_STRATEGY.md with nav button fix
+- a34b5ef: Fix: Mobile back button navigation with htmx.process() and proper timing ✅
 
 **Uncommitted Changes**:
-- static/js/main.js: Added htmx.process() calls, removed duplicate handler, added debug logging
-- RESPONSIVE_STRATEGY.md: This comprehensive update
+- RESPONSIVE_STRATEGY.md: Updated with back button fix details
 
-**Next Commit**: Once back button fully working, commit with message:
-```
-Fix: Mobile back button navigation with htmx.process()
-
-- Add htmx.process() after setting hx-* attributes in showArticle()
-- Remove htmx.process() call in hideArticle() (was un-registering)
-- Remove duplicate afterSwap handler causing race condition
-- Back button now makes HTTP request correctly
-
-Tests passing:
-- [List tests that pass]
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
-
-Co-Authored-By: Claude <noreply@anthropic.com>
-```
+**Next Commit**: Update RESPONSIVE_STRATEGY.md then move to next failing test
 
 ---
 
