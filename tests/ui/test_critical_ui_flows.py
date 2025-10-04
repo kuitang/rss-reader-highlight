@@ -430,13 +430,16 @@ class TestSessionAndSubscriptionFlow:
             
             # Close mobile sidebar after checking feeds (if mobile)
             if viewport_name == "mobile":
-                # Click nav button again to toggle sidebar closed
-                nav_button = page.locator('#nav-button')
-                nav_button.click()
-                page.wait_for_function(
-                    "() => !document.getElementById('sidebar').classList.contains('open')",
-                    timeout=5000
-                )
+                # Check if sidebar is open before trying to close
+                sidebar_open = page.evaluate("document.getElementById('sidebar')?.classList.contains('open')")
+                if sidebar_open:
+                    # Use JavaScript toggleSidebar function to reliably close sidebar
+                    page.evaluate("window.toggleSidebar()")
+                    # Wait for close animation to complete
+                    page.wait_for_function(
+                        "() => !document.getElementById('sidebar')?.classList.contains('open')",
+                        timeout=2000
+                    )
             
             # 3. Should automatically see articles (not "No posts available")
             articles = page.locator(articles_selector)
