@@ -159,8 +159,7 @@ class TestComprehensiveRegression:
         # Start with desktop
         page.set_viewport_size({"width": 1200, "height": 800})
         expect(page.locator("#main-layout")).to_be_visible()
-        expect(page.locator("#main-layout")).to_be_hidden()
-        
+
         # Click an article in desktop mode
         article_items = page.locator("li[id*='feed-item']").all()
         if len(article_items) > 0:
@@ -171,16 +170,14 @@ class TestComprehensiveRegression:
         # Switch to mobile viewport
         page.set_viewport_size({"width": 390, "height": 844})
         wait_for_htmx_complete(page)
-        
+
         expect(page.locator("#main-layout")).to_be_visible()
-        expect(page.locator("#main-layout")).to_be_hidden()
-        
+
         # Switch back to desktop
         page.set_viewport_size({"width": 1200, "height": 800})
         wait_for_htmx_complete(page)
-        
+
         expect(page.locator("#main-layout")).to_be_visible()
-        expect(page.locator("#main-layout")).to_be_hidden()
     
     def test_htmx_state_management(self, page: Page, test_server_url):
         """Test HTMX state updates and out-of-band swaps"""
