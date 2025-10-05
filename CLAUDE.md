@@ -88,6 +88,30 @@ python -m pytest tests/ui/test_add_feed_flows.py -v
 
 # Test mobile-specific flows - requires full database
 python -m pytest tests/ui/test_mobile_flows.py -v
+
+# Run only isolated tests (state-sensitive, pagination, etc.)
+python -m pytest tests/ui/ -v -m isolated
+
+# Skip isolated tests (useful for fast CI runs)
+python -m pytest tests/ui/ -v -m "not isolated"
+```
+
+#### Using the Test Runner Script
+```bash
+# Activate virtual environment first
+source venv/bin/activate
+
+# Run all tests with the script
+./run_all_tests.sh
+
+# Run specific test sections
+./run_all_tests.sh --section core        # Only core tests
+./run_all_tests.sh --section ui          # All UI tests
+./run_all_tests.sh --section isolated    # Only isolated tests
+./run_all_tests.sh --section ui-no-isolated  # UI tests without isolated (faster)
+
+# Show all available options
+./run_all_tests.sh --help
 ```
 
 #### Test Coverage
@@ -400,6 +424,17 @@ Tests focus on **complex workflows that broke during development**, not trivial 
 - **`@pytest.mark.need_full_db`**: Tests that require full database with substantial content
   - Skip when using MINIMAL_MODE environment
   - Example: `python -m pytest -v -m "not need_full_db"` to exclude these tests
+
+- **`@pytest.mark.isolated`**: Tests that need isolation from other tests (browser state sensitive)
+  - Automatically clears browser storage, cookies, and cache before/after test
+  - Used for tests sensitive to state pollution (e.g., pagination scroll tests)
+  - Examples:
+    - `python -m pytest -v -m isolated` - Run only isolated tests
+    - `python -m pytest -v -m "not isolated"` - Skip isolated tests
+
+- **`@pytest.mark.flaky`**: Tests that are flaky when run in full suite but pass individually
+  - Use for documentation purposes to track problematic tests
+  - Consider combining with `isolated` marker to fix flakiness
 
 ### Development Workflow
 
