@@ -14,7 +14,7 @@ import os
 import sys
 from playwright.sync_api import sync_playwright, expect, Page
 from contextlib import contextmanager
-from tests.ui.conftest import wait_for_htmx_complete, wait_for_page_ready
+from tests.ui.conftest import wait_for_htmx_complete, wait_for_page_ready, wait_for_search_expand
 
 pytestmark = pytest.mark.needs_server
 
@@ -828,9 +828,9 @@ class TestSearchBarHeightInvariant:
         expect(search_button).to_be_visible()
         search_button.click()
 
-        # Give time for JavaScript to execute
-        page.wait_for_timeout(100)
-        
+        # Wait for search bar to expand (toggleSearch() adds 'show' class)
+        wait_for_search_expand(page)
+
         # Measure expanded height and width
         expanded_measurements = page.evaluate("""() => {
             const topBar = document.getElementById('chrome-container');

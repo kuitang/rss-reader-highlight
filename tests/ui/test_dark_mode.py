@@ -43,8 +43,15 @@ class TestDarkMode:
             document.head.appendChild(style);
         }""")
 
-        # Wait for CSS to apply
-        page.wait_for_timeout(500)
+        # Wait for CSS variable to be applied
+        page.wait_for_function(
+            """() => {
+                const bg = getComputedStyle(document.documentElement)
+                    .getPropertyValue('--background');
+                return bg && bg.trim() === '#1a1a1a';
+            }""",
+            timeout=2000
+        )
 
         # Take screenshot in dark mode
         page.screenshot(path="dark_mode.png", full_page=True)

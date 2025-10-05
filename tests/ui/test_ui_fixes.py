@@ -9,20 +9,13 @@ Test comprehensive UI fixes for critical issues:
 
 import pytest
 from playwright.sync_api import Page, expect
-import time
-
-# Test helper functions
-def wait_for_htmx_complete(page: Page, timeout=5000):
-    """Wait for all HTMX requests to complete"""
-    page.wait_for_function(
-        "() => !document.body.classList.contains('htmx-request')",
-        timeout=timeout
-    )
-
-def wait_for_page_ready(page: Page):
-    """Wait for page to be fully loaded"""
-    page.wait_for_load_state('domcontentloaded')
-    page.wait_for_load_state('networkidle')
+from tests.ui.conftest import (
+    wait_for_htmx_complete,
+    wait_for_page_ready,
+    wait_for_sidebar_open,
+    wait_for_sidebar_close,
+    wait_for_search_expand
+)
 
 @pytest.fixture
 def setup_page():
@@ -139,7 +132,7 @@ class TestSidebarOpacity:
         # Open sidebar by clicking hamburger menu
         hamburger = page.locator("#nav-button")
         hamburger.click()
-        page.wait_for_timeout(500)  # Wait for animation
+        wait_for_sidebar_open(page)
 
         # Check sidebar background
         sidebar_bg = page.evaluate("""() => {
@@ -166,7 +159,7 @@ class TestSidebarOpacity:
         # Open sidebar
         hamburger = page.locator("#nav-button")
         hamburger.click()
-        page.wait_for_timeout(500)
+        wait_for_sidebar_open(page)
 
         # Check overlay properties
         overlay_props = page.evaluate("""() => {
@@ -233,7 +226,7 @@ class TestHamburgerMenuHTMX:
         # Click hamburger and check for HTMX errors
         hamburger = page.locator("#nav-button")
         hamburger.click()
-        page.wait_for_timeout(500)
+        wait_for_sidebar_open(page)
 
         # Filter for HTMX-related errors
         htmx_errors = [error for error in console_errors if 'htmx' in error.lower() or 'unknown target' in error.lower()]
@@ -249,7 +242,7 @@ class TestHamburgerMenuHTMX:
         search_button = page.locator("button[title='Search']")
         if search_button.count() > 0:
             search_button.click()
-            page.wait_for_timeout(300)
+            wait_for_search_expand(page)
 
             # Check search nav button
             search_nav_props = page.evaluate("""() => {
@@ -357,7 +350,7 @@ class TestComprehensiveUIIntegration:
         # Test hamburger menu works
         hamburger = page.locator("#nav-button")
         hamburger.click()
-        page.wait_for_timeout(500)
+        wait_for_sidebar_open(page)
 
         sidebar_open = page.evaluate("document.getElementById('sidebar').classList.contains('open')")
         assert sidebar_open, "Sidebar should open with hamburger click"
@@ -365,7 +358,7 @@ class TestComprehensiveUIIntegration:
         # Close sidebar by clicking overlay
         overlay = page.locator("#sidebar-overlay")
         overlay.click()
-        page.wait_for_timeout(500)
+        wait_for_sidebar_close(page)
 
         sidebar_closed = page.evaluate("document.getElementById('sidebar').classList.contains('open')")
         assert not sidebar_closed, "Sidebar should close with overlay click"
