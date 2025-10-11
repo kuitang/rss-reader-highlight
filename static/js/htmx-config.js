@@ -30,10 +30,11 @@ htmx.on('htmx:afterSwap', function(evt) {
             const navButton = document.getElementById('nav-button');
 
             if (articleDetail) {
-                articleDetail.classList.add('active');
+                articleDetail.classList.remove('hidden');
+                articleDetail.classList.add('block');
             }
             if (feedList) {
-                feedList.classList.add('article-view');
+                feedList.classList.add('hidden');
             }
 
             // Update nav button to back mode
@@ -70,10 +71,11 @@ htmx.on('htmx:afterSwap', function(evt) {
             const navButton = document.getElementById('nav-button');
 
             if (articleDetail) {
-                articleDetail.classList.remove('active');
+                articleDetail.classList.remove('block');
+                articleDetail.classList.add('hidden');
             }
             if (feedList) {
-                feedList.classList.remove('article-view');
+                feedList.classList.remove('hidden');
             }
 
             // Update nav button back to menu

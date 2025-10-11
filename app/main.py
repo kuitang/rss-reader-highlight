@@ -624,10 +624,11 @@ def _old_responsive_javascript():
             const navButton = document.getElementById('nav-button');
 
             if (articleDetail) {
-                articleDetail.classList.add('active');
+                articleDetail.classList.remove('hidden');
+                articleDetail.classList.add('block');
             }
             if (feedList) {
-                feedList.classList.add('article-view');
+                feedList.classList.add('hidden');
             }
 
             // Update nav button to back
@@ -657,8 +658,9 @@ def _old_responsive_javascript():
             const feedList = document.getElementById('feed-list');
             const navButton = document.getElementById('nav-button');
 
-            articleDetail.classList.remove('active');
-            feedList.classList.remove('article-view');
+            articleDetail.classList.remove('block');
+            articleDetail.classList.add('hidden');
+            feedList.classList.remove('hidden');
 
             // Update nav button to menu
             if (navButton) {
