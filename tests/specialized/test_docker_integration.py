@@ -87,7 +87,9 @@ def test_docker_integration(docker_container):
         # Test main page
         response = client.get(f"{docker_url}/")
         print(f"✓ Main page: {response.status_code} ({len(response.text)} chars)")
-        assert "RSS Reader" in response.text
+        # Check for actual content - feed names or "All Feeds" title
+        assert "All Feeds" in response.text or "Bloomberg" in response.text, \
+            f"Expected feed content in page, got: {response.text[:500]}"
         
         # Test item endpoint (use a likely ID)
         response = client.get(f"{docker_url}/item/1")

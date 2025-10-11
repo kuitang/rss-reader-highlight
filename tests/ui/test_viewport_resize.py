@@ -2,8 +2,10 @@
 
 import pytest
 from playwright.sync_api import Page, expect
-from tests.ui.conftest import wait_for_htmx_complete, wait_for_page_ready
-import time
+from tests.ui.conftest import (
+    wait_for_htmx_complete, wait_for_page_ready, wait_for_sidebar_open,
+    TIMEOUT_PAGE_LOAD, TIMEOUT_ANIMATION, TIMEOUT_ELEMENT_VISIBLE
+)
 
 pytestmark = pytest.mark.needs_server
 
@@ -21,13 +23,13 @@ class TestViewportResize:
         """
         # Start in mobile viewport
         page.set_viewport_size({"width": 390, "height": 844})
-        page.goto(test_server_url, timeout=5000)
+        page.goto(test_server_url, timeout=TIMEOUT_PAGE_LOAD)
         wait_for_page_ready(page)
 
         # Open sidebar on mobile
         menu_button = page.locator('#nav-button')
         menu_button.click()
-        time.sleep(0.3)  # Wait for animation
+        wait_for_sidebar_open(page, timeout=TIMEOUT_ANIMATION)
 
         # Verify sidebar is open
         sidebar_open = page.evaluate("document.getElementById('sidebar')?.classList.contains('left-0')")
@@ -42,7 +44,14 @@ class TestViewportResize:
 
         # Resize to desktop WITH SIDEBAR STILL OPEN
         page.set_viewport_size({"width": 1400, "height": 900})
-        time.sleep(0.3)  # Wait for CSS to apply
+        # Wait for CSS media query to apply (overlay should hide on desktop)
+        page.wait_for_function(
+            """() => {
+                const overlay = document.getElementById('sidebar-overlay');
+                return window.getComputedStyle(overlay).display === 'none';
+            }""",
+            timeout=TIMEOUT_ANIMATION
+        )
 
         # CRITICAL CHECK: Overlay should be hidden on desktop
         overlay_hidden = page.evaluate("""() => {
@@ -78,7 +87,7 @@ class TestViewportResize:
         """Test resizing from desktop to mobile - sidebar should behave correctly"""
         # Start in desktop viewport
         page.set_viewport_size({"width": 1400, "height": 900})
-        page.goto(test_server_url, timeout=5000)
+        page.goto(test_server_url, timeout=TIMEOUT_PAGE_LOAD)
         wait_for_page_ready(page)
 
         # Verify desktop layout
@@ -87,7 +96,14 @@ class TestViewportResize:
 
         # Resize to mobile
         page.set_viewport_size({"width": 390, "height": 844})
-        time.sleep(0.3)  # Wait for CSS
+        # Wait for sidebar to move off-screen
+        page.wait_for_function(
+            """() => {
+                const sidebar = document.getElementById('sidebar');
+                return window.getComputedStyle(sidebar).left.startsWith('-');
+            }""",
+            timeout=TIMEOUT_ANIMATION
+        )
 
         # Sidebar should be hidden off-screen on mobile
         sidebar_position = page.evaluate("""() => {
@@ -107,7 +123,7 @@ class TestViewportResize:
     def test_mobile_padding_removed(self, page: Page, test_server_url):
         """Test that mobile view has no horizontal padding on feed list"""
         page.set_viewport_size({"width": 390, "height": 844})
-        page.goto(test_server_url, timeout=5000)
+        page.goto(test_server_url, timeout=TIMEOUT_PAGE_LOAD)
         wait_for_page_ready(page)
 
         # Check feed list padding
@@ -130,7 +146,7 @@ class TestViewportResize:
     def test_desktop_padding_preserved(self, page: Page, test_server_url):
         """Test that desktop view has correct horizontal padding"""
         page.set_viewport_size({"width": 1400, "height": 900})
-        page.goto(test_server_url, timeout=5000)
+        page.goto(test_server_url, timeout=TIMEOUT_PAGE_LOAD)
         wait_for_page_ready(page)
 
         # Check feed list padding on desktop
@@ -168,7 +184,7 @@ class TestViewportResize:
 
     def test_multiple_resize_cycles(self, page: Page, test_server_url):
         """Test multiple resize cycles to ensure no state pollution"""
-        page.goto(test_server_url, timeout=5000)
+        page.goto(test_server_url, timeout=TIMEOUT_PAGE_LOAD)
         wait_for_page_ready(page)
 
         # Cycle through viewports multiple times
@@ -181,7 +197,16 @@ class TestViewportResize:
 
         for i, viewport in enumerate(viewports):
             page.set_viewport_size(viewport)
-            time.sleep(0.2)
+            # Wait for overlay display to settle after viewport change
+            page.wait_for_function(
+                """() => {
+                    const overlay = document.getElementById('sidebar-overlay');
+                    if (!overlay) return false;
+                    // Overlay should be hidden regardless of viewport
+                    return window.getComputedStyle(overlay).display === 'none';
+                }""",
+                timeout=TIMEOUT_ANIMATION
+            )
 
             is_mobile = viewport['width'] < 1024
 
@@ -202,7 +227,7 @@ class TestViewportResize:
 
             # App should be clickable
             feed_items = page.locator("li[id^='feed-item-']")
-            expect(feed_items.first).to_be_visible(timeout=5000)
+            expect(feed_items.first).to_be_visible(timeout=TIMEOUT_ELEMENT_VISIBLE)
 
         print("✅ All resize cycles successful - no state pollution")
 

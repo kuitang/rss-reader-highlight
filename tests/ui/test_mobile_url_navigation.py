@@ -4,7 +4,10 @@ CRITICAL: Tests scroll position preservation, chevron/hamburger toggle, header v
 
 import pytest
 from playwright.sync_api import Page, expect
-from tests.ui.conftest import wait_for_htmx_complete, wait_for_page_ready
+from tests.ui.conftest import (
+    wait_for_htmx_complete, wait_for_page_ready,
+    TIMEOUT_PAGE_LOAD, TIMEOUT_DOM_READY, TIMEOUT_ELEMENT_VISIBLE
+)
 
 # HTMX Helper Functions for Fast Testing
 def wait_for_htmx_complete(page, timeout=5000):
@@ -12,8 +15,8 @@ def wait_for_htmx_complete(page, timeout=5000):
     page.wait_for_function("() => !document.body.classList.contains('htmx-request')", timeout=timeout)
 
 def wait_for_page_ready(page):
-    """Fast page ready check - waits for network idle instead of fixed timeout"""
-    page.wait_for_load_state("networkidle")
+    """Fast page ready check - waits for DOM load instead of networkidle (which is slow/unreliable in CI)"""
+    page.wait_for_load_state("domcontentloaded")
 
 
 class TestMobileNavigationComplete:
@@ -24,11 +27,12 @@ class TestMobileNavigationComplete:
         """Start each test with fresh page load to reset navigation state (preserve session)"""
         # Set mobile viewport first
         page.set_viewport_size({"width": 390, "height": 844})  # iPhone 13 size
-        
+
         # Navigate to clean starting state (preserves session cookies automatically)
-        page.goto(f"{test_server_url}/?unread=0", wait_until="networkidle", timeout=5000)
+        # Use 'load' instead of 'networkidle' - networkidle is unreliable in CI
+        page.goto(f"{test_server_url}/?unread=0", wait_until="load", timeout=TIMEOUT_PAGE_LOAD)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#main-layout", state="visible", timeout=5000)
+        page.wait_for_selector("#main-layout", state="visible", timeout=TIMEOUT_ELEMENT_VISIBLE)
         wait_for_page_ready(page)
         
         # Ensure clean DOM state - mobile sidebar should be closed by default

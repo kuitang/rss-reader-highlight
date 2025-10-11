@@ -16,7 +16,32 @@ import time
 from playwright.sync_api import sync_playwright
 
 
-def wait_for_htmx_complete(page, timeout=5000):
+# ============================================================================
+# TIMEOUT CONSTANTS - Centralized configuration for all UI tests
+# ============================================================================
+# Philosophy: Use condition-based waiting, but with reasonable timeouts
+# CI environments can be slower than local, so timeouts are generous
+
+# Page navigation and loading
+TIMEOUT_PAGE_LOAD = 10000      # page.goto() - network + rendering
+TIMEOUT_PAGE_READY = 10000     # networkidle state
+TIMEOUT_DOM_READY = 5000       # domcontentloaded
+
+# HTMX operations
+TIMEOUT_HTMX_REQUEST = 5000    # HTMX request completion
+TIMEOUT_HTMX_LONG = 8000       # Slow network operations (add feed, etc.)
+
+# UI interactions
+TIMEOUT_ELEMENT_VISIBLE = 5000 # Element becomes visible
+TIMEOUT_ELEMENT_QUICK = 2000   # Fast UI updates (sidebar, search)
+TIMEOUT_ANIMATION = 1000       # CSS transitions/animations
+TIMEOUT_IMMEDIATE = 500        # Immediate actions (sidebar close on click)
+
+# Server startup (conftest only)
+TIMEOUT_SERVER_START = 30000   # Waiting for test server to start
+
+
+def wait_for_htmx_complete(page, timeout=TIMEOUT_HTMX_REQUEST):
     """Wait for all HTMX requests to complete
 
     This helper function ensures HTMX operations have finished before proceeding.
@@ -37,20 +62,20 @@ def wait_for_htmx_complete(page, timeout=5000):
         pass
 
 
-def wait_for_page_ready(page, timeout=5000):
+def wait_for_page_ready(page, timeout=TIMEOUT_PAGE_READY):
     """Wait for page to be fully loaded
 
     Ensures both DOM content and network activity have settled.
 
     Args:
         page: Playwright page object
-        timeout: Maximum wait time in milliseconds (default: 5000ms)
+        timeout: Maximum wait time in milliseconds (default: TIMEOUT_PAGE_READY)
     """
     page.wait_for_load_state('domcontentloaded', timeout=timeout)
     page.wait_for_load_state('networkidle', timeout=timeout)
 
 
-def wait_for_sidebar_open(page, timeout=2000):
+def wait_for_sidebar_open(page, timeout=TIMEOUT_ELEMENT_QUICK):
     """Wait for sidebar to open (gain 'left-0' class)
 
     Waits for the toggleSidebar() JavaScript function to complete.
@@ -58,7 +83,7 @@ def wait_for_sidebar_open(page, timeout=2000):
 
     Args:
         page: Playwright page object
-        timeout: Maximum wait time in milliseconds (default: 2000ms)
+        timeout: Maximum wait time in milliseconds (default: TIMEOUT_ELEMENT_QUICK)
     """
     page.wait_for_function(
         "() => document.getElementById('sidebar')?.classList.contains('left-0')",
@@ -66,7 +91,7 @@ def wait_for_sidebar_open(page, timeout=2000):
     )
 
 
-def wait_for_sidebar_close(page, timeout=2000):
+def wait_for_sidebar_close(page, timeout=TIMEOUT_ELEMENT_QUICK):
     """Wait for sidebar to close (gain '-left-full' class)
 
     Waits for the toggleSidebar() JavaScript function to complete.
@@ -74,7 +99,7 @@ def wait_for_sidebar_close(page, timeout=2000):
 
     Args:
         page: Playwright page object
-        timeout: Maximum wait time in milliseconds (default: 2000ms)
+        timeout: Maximum wait time in milliseconds (default: TIMEOUT_ELEMENT_QUICK)
     """
     page.wait_for_function(
         "() => document.getElementById('sidebar')?.classList.contains('-left-full')",
@@ -82,7 +107,7 @@ def wait_for_sidebar_close(page, timeout=2000):
     )
 
 
-def wait_for_search_expand(page, timeout=2000):
+def wait_for_search_expand(page, timeout=TIMEOUT_ELEMENT_QUICK):
     """Wait for search bar to expand (gain 'flex' class, not 'show')
 
     Waits for the toggleSearch() JavaScript function to complete.
@@ -90,10 +115,33 @@ def wait_for_search_expand(page, timeout=2000):
 
     Args:
         page: Playwright page object
-        timeout: Maximum wait time in milliseconds (default: 2000ms)
+        timeout: Maximum wait time in milliseconds (default: TIMEOUT_ELEMENT_QUICK)
     """
     page.wait_for_function(
         "() => document.getElementById('search-bar')?.classList.contains('flex')",
+        timeout=timeout
+    )
+
+
+def wait_for_css_transition(page, selector, css_property, expected_value, timeout=TIMEOUT_ANIMATION):
+    """Wait for CSS property to reach expected value (for animations/transitions)
+
+    Replaces time.sleep() after viewport resize or CSS class changes.
+
+    Args:
+        page: Playwright page object
+        selector: CSS selector for element
+        css_property: CSS property name (camelCase, e.g. 'display', 'left')
+        expected_value: Expected value of the CSS property
+        timeout: Maximum wait time in milliseconds (default: TIMEOUT_ANIMATION)
+    """
+    page.wait_for_function(
+        f"""() => {{
+            const elem = document.querySelector('{selector}');
+            if (!elem) return false;
+            const value = window.getComputedStyle(elem).{css_property};
+            return value === '{expected_value}';
+        }}""",
         timeout=timeout
     )
 
