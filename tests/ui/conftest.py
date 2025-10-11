@@ -51,7 +51,7 @@ def wait_for_page_ready(page, timeout=5000):
 
 
 def wait_for_sidebar_open(page, timeout=2000):
-    """Wait for sidebar to open (gain 'open' class)
+    """Wait for sidebar to open (gain 'left-0' class)
 
     Waits for the toggleSidebar() JavaScript function to complete.
     Replaces page.wait_for_timeout() after clicking hamburger menu.
@@ -61,13 +61,13 @@ def wait_for_sidebar_open(page, timeout=2000):
         timeout: Maximum wait time in milliseconds (default: 2000ms)
     """
     page.wait_for_function(
-        "() => document.getElementById('sidebar')?.classList.contains('open')",
+        "() => document.getElementById('sidebar')?.classList.contains('left-0')",
         timeout=timeout
     )
 
 
 def wait_for_sidebar_close(page, timeout=2000):
-    """Wait for sidebar to close (lose 'open' class)
+    """Wait for sidebar to close (gain '-left-full' class)
 
     Waits for the toggleSidebar() JavaScript function to complete.
     Replaces page.wait_for_timeout() after clicking overlay or close button.
@@ -77,13 +77,13 @@ def wait_for_sidebar_close(page, timeout=2000):
         timeout: Maximum wait time in milliseconds (default: 2000ms)
     """
     page.wait_for_function(
-        "() => !document.getElementById('sidebar')?.classList.contains('open')",
+        "() => document.getElementById('sidebar')?.classList.contains('-left-full')",
         timeout=timeout
     )
 
 
 def wait_for_search_expand(page, timeout=2000):
-    """Wait for search bar to expand (gain 'show' class)
+    """Wait for search bar to expand (gain 'flex' class, not 'show')
 
     Waits for the toggleSearch() JavaScript function to complete.
     Replaces page.wait_for_timeout() after clicking search button.
@@ -93,7 +93,7 @@ def wait_for_search_expand(page, timeout=2000):
         timeout: Maximum wait time in milliseconds (default: 2000ms)
     """
     page.wait_for_function(
-        "() => document.getElementById('search-bar')?.classList.contains('show')",
+        "() => document.getElementById('search-bar')?.classList.contains('flex')",
         timeout=timeout
     )
 

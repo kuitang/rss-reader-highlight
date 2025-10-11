@@ -47,12 +47,12 @@ class TestBackButtonFunctionality:
             first_item.click()
             wait_for_htmx_complete(page)
 
-            # Verify article view is active
+            # Verify article view is active (uses 'block' class now, not 'active')
             article_active = page.evaluate("""() => {
                 const article = document.getElementById('article-detail');
-                return article && article.classList.contains('active');
+                return article && article.classList.contains('block');
             }""")
-            assert article_active, "Article view should be active after clicking feed item"
+            assert article_active, "Article view should be active (have 'block' class) after clicking feed item"
 
             # Check that nav button exists and has correct configuration
             nav_button = page.locator("#nav-button")
@@ -65,10 +65,10 @@ class TestBackButtonFunctionality:
             assert has_hx_get, "Back button should have hx-get attribute"
             assert not has_onclick, "Back button should NOT have onclick attribute"
 
-            # Record sidebar state before clicking back
+            # Record sidebar state before clicking back (uses 'left-0' class now)
             sidebar_before = page.evaluate("""() => {
                 const sidebar = document.getElementById('sidebar');
-                return sidebar ? sidebar.classList.contains('open') : false;
+                return sidebar ? sidebar.classList.contains('left-0') : false;
             }""")
 
             # Click back button
@@ -78,20 +78,21 @@ class TestBackButtonFunctionality:
             # Wait for class changes to settle (hideArticle() runs after swap)
             page.wait_for_function("""() => {
                 const article = document.getElementById('article-detail');
-                return article && !article.classList.contains('active');
+                return article && article.classList.contains('hidden');
             }""", timeout=2000)
 
-            # Verify we're back to feed list (article view deactivated)
+            # Verify we're back to feed list (article view deactivated - has 'hidden' class)
             article_after = page.evaluate("""() => {
                 const article = document.getElementById('article-detail');
-                return article && article.classList.contains('active');
+                return article && article.classList.contains('hidden');
             }""")
-            assert not article_after, "Article view should be deactivated after back button"
+            assert article_after, "Article view should be hidden (have 'hidden' class) after back button"
 
             # Verify sidebar state didn't change (should NOT have toggled)
+            # Sidebar uses 'left-0' class now, not 'open'
             sidebar_after = page.evaluate("""() => {
                 const sidebar = document.getElementById('sidebar');
-                return sidebar ? sidebar.classList.contains('open') : false;
+                return sidebar ? sidebar.classList.contains('left-0') : false;
             }""")
             assert sidebar_before == sidebar_after, "Back button should NOT toggle sidebar"
 
@@ -140,12 +141,12 @@ class TestSidebarOpacity:
             const computedStyle = window.getComputedStyle(sidebar);
             return {
                 backgroundColor: computedStyle.backgroundColor,
-                isOpen: sidebar.classList.contains('open'),
+                isOpen: sidebar.classList.contains('left-0'),
                 display: computedStyle.display
             };
         }""")
 
-        assert sidebar_bg['isOpen'], "Sidebar should be open after clicking hamburger"
+        assert sidebar_bg['isOpen'], "Sidebar should be open (have 'left-0' class) after clicking hamburger"
         # Should have a proper background color, not transparent
         assert sidebar_bg['backgroundColor'] not in ['rgba(0, 0, 0, 0)', 'transparent'], \
                f"Sidebar should have background color, got: {sidebar_bg['backgroundColor']}"
@@ -168,12 +169,12 @@ class TestSidebarOpacity:
             return {
                 backgroundColor: computedStyle.backgroundColor,
                 display: computedStyle.display,
-                isVisible: overlay.classList.contains('show'),
+                isVisible: overlay.classList.contains('block'),
                 zIndex: computedStyle.zIndex
             };
         }""")
 
-        assert overlay_props['isVisible'], "Overlay should be visible when sidebar is open"
+        assert overlay_props['isVisible'], "Overlay should be visible (have 'block' class) when sidebar is open"
         assert 'rgba' in overlay_props['backgroundColor'], "Overlay should have rgba background"
         # Should be semi-transparent black
         assert '0.5' in overlay_props['backgroundColor'] or '0, 0, 0' in overlay_props['backgroundColor'], \
@@ -352,16 +353,16 @@ class TestComprehensiveUIIntegration:
         hamburger.click()
         wait_for_sidebar_open(page)
 
-        sidebar_open = page.evaluate("document.getElementById('sidebar').classList.contains('open')")
-        assert sidebar_open, "Sidebar should open with hamburger click"
+        sidebar_open = page.evaluate("document.getElementById('sidebar').classList.contains('left-0')")
+        assert sidebar_open, "Sidebar should open (have 'left-0' class) with hamburger click"
 
         # Close sidebar by clicking overlay
         overlay = page.locator("#sidebar-overlay")
         overlay.click()
         wait_for_sidebar_close(page)
 
-        sidebar_closed = page.evaluate("document.getElementById('sidebar').classList.contains('open')")
-        assert not sidebar_closed, "Sidebar should close with overlay click"
+        sidebar_closed = page.evaluate("document.getElementById('sidebar').classList.contains('left-0')")
+        assert not sidebar_closed, "Sidebar should close (not have 'left-0' class) with overlay click"
 
     def test_sidebar_click_outside_main_content(self, page: Page):
         """Test clicking main content area closes sidebar (not just overlay)"""
@@ -374,15 +375,15 @@ class TestComprehensiveUIIntegration:
         hamburger.click()
         wait_for_sidebar_open(page)
 
-        sidebar_open = page.evaluate("document.getElementById('sidebar').classList.contains('open')")
-        assert sidebar_open, "Sidebar should be open"
+        sidebar_open = page.evaluate("document.getElementById('sidebar').classList.contains('left-0')")
+        assert sidebar_open, "Sidebar should be open (have 'left-0' class)"
 
         # Click main content area (right side, definitely outside sidebar)
         # Sidebar max-width is 320px, so click at x=350 to be safe
         page.mouse.click(350, 400)
         wait_for_sidebar_close(page)
 
-        sidebar_closed = page.evaluate("!document.getElementById('sidebar')?.classList.contains('open')")
+        sidebar_closed = page.evaluate("!document.getElementById('sidebar')?.classList.contains('left-0')")
         assert sidebar_closed, "Sidebar should close when clicking outside on main content"
 
     def test_sidebar_overlay_z_index_above_sidebar(self, page: Page):
