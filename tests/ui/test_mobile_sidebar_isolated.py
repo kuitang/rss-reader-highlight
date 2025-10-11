@@ -31,7 +31,6 @@ def wait_for_page_ready(page):
 class TestMobileSidebarIsolated:
     """Mobile sidebar tests that need isolation from parallel execution"""
     
-    @pytest.mark.skip(reason="CI test server timeout late in run (99%)")
     def test_mobile_sidebar_and_navigation_flow(self, page: Page, test_server_url):
         """Test mobile-specific navigation patterns"""
         page.set_viewport_size({"width": 390, "height": 844})

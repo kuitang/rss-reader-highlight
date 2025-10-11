@@ -146,10 +146,11 @@ def wait_for_css_transition(page, selector, css_property, expected_value, timeou
     )
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def test_server_url():
     """Auto-start test server or use existing server for UI tests
-    
+
+    SCOPE: module - Each test FILE gets a fresh server to prevent degradation.
     This fixture automatically starts a test server in minimal mode,
     or uses an existing server if TEST_SERVER_URL is set.
     

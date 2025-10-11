@@ -19,7 +19,6 @@ def wait_for_page_ready(page):
     page.wait_for_load_state("domcontentloaded")
 
 
-@pytest.mark.skip(reason="CI test server unresponsive late in test run (92-99%)")
 class TestMobileNavigationComplete:
     """CRITICAL mobile navigation test suite - covers scroll position preservation and UI state"""
 

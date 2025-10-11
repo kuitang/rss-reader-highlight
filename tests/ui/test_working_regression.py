@@ -22,7 +22,6 @@ def wait_for_page_ready(page):
 class TestWorkingRegression:
     """Regression tests based on the actual working app structure."""
     
-    @pytest.mark.skip(reason="CI test server timeout late in run (90%)")
     def test_basic_functionality_flow(self, page: Page, test_server_url):
         """
         Test basic RSS reader functionality:
