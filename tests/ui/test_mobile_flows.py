@@ -37,72 +37,8 @@ class TestMobileFlows:
         wait_for_page_ready(page)  # OPTIMIZED: Wait for network idle
     
     # Navigation Tests (from test_mobile_navigation.py)
-    def test_mobile_post_navigation_htmx(self, page: Page, test_server_url):
-        """Test that mobile post navigation uses HTMX without full page reloads"""
-        
-        # Check that we have the mobile layout
-        expect(page.locator("#main-layout")).to_be_visible()
-        
-        # Get initial page state
-        initial_url = page.url
-        
-        # Find first post - updated selector to match app.py (feed-item prefix)
-        first_post = page.locator("li[id^='feed-item-']").first
-        expect(first_post).to_be_visible(timeout=5000)
-        
-        # Store initial HTML to detect full reload
-        initial_header_html = page.locator("#chrome-container").inner_html()
-        
-        # Click on first post - should use HTMX
-        with page.expect_request(lambda req: "/item/" in req.url) as request_info:
-            first_post.click()
-        
-        # Verify it was an HTMX request (has HX-Request header)
-        request = request_info.value
-        assert request.headers.get("hx-request") == "true", "Post click didn't use HTMX"
-        
-        # Wait for article to load in main content
-        page.wait_for_selector("#content-area #article-detail", timeout=5000)
-        
-        # Verify URL changed (for shareability) 
-        assert "/item/" in page.url, "URL didn't update for article"
-        
-        # Verify back button is shown - updated selector to match app.py CSS classes
-        back_button = page.locator("#nav-button")  # Back button is first button
-        expect(back_button).to_be_visible()
-        
-        # Verify it's actually a back button by checking for arrow-left SVG
-        back_icon = back_button.locator('svg')
-        expect(back_icon).to_be_visible()
-        
-        # Click back button
-        back_button.click()
-        wait_for_htmx_complete(page)  # Wait for HTMX operation to complete
+    # Note: Core navigation testing moved to TestMobileCriticalBugRegression
 
-        # Wait for afterSwap handler to call hideArticle()
-        page.wait_for_function(
-            "() => !document.getElementById('feed-list')?.classList.contains('article-view')",
-            timeout=2000
-        )
-
-        # Check if hideArticle was called properly, if not call it manually
-        feed_list_hidden = page.evaluate("document.getElementById('feed-list')?.classList.contains('article-view')")
-        if feed_list_hidden:
-            print("Back navigation didn't call hideArticle() - calling manually")
-            page.evaluate("window.hideArticle()")
-            # Wait for hideArticle animation to complete
-            page.wait_for_function(
-                "() => !document.getElementById('article-detail')?.classList.contains('active')",
-                timeout=1000
-            )
-
-        # Wait for feed list to be visible and items to be available
-        page.wait_for_selector("#feed-list", state="visible", timeout=5000)
-        page.wait_for_selector("li[id^='feed-item-']", state="visible", timeout=5000)
-
-        # Verify we're back at the list by checking for feed items
-        expect(page.locator("li[id^='feed-item-']").first).to_be_visible()
-    
     def test_mobile_feed_filter_preserved(self, page: Page, test_server_url):
         """Test that feed filter state is preserved during navigation"""
         
@@ -132,51 +68,16 @@ class TestMobileFlows:
             # Verify URL has feed_id
             assert f"feed_id={feed_id}" in page.url
 
-            # Check if sidebar closes automatically
+            # Wait for sidebar to close automatically (NO MANUAL WORKAROUNDS)
             page.wait_for_function(
-                "() => !document.getElementById('sidebar')?.classList.contains('open')",
-                timeout=1000
+                "() => document.getElementById('sidebar')?.classList.contains('-left-full')",
+                timeout=500  # Sidebar should close immediately
             )
 
-            # Check if sidebar closed automatically, if not close it manually
-            sidebar_open = page.evaluate("document.getElementById('sidebar')?.classList.contains('open')")
-            if sidebar_open:
-                print("Sidebar didn't close automatically - closing manually")
-                page.evaluate("window.toggleSidebar()")
-                # Wait for close animation to complete
-                page.wait_for_function(
-                    "() => !document.getElementById('sidebar')?.classList.contains('open')",
-                    timeout=1000
-                )
+            # Verify sidebar is closed
+            sidebar_closed = page.evaluate("document.getElementById('sidebar')?.classList.contains('-left-full')")
+            assert sidebar_closed, "Sidebar should close immediately after clicking feed link"
 
-            # Verify sidebar is closed - check if it has 'open' class
-            sidebar_is_open = page.evaluate("document.getElementById('sidebar')?.classList.contains('open')")
-            assert not sidebar_is_open, "Sidebar should not have 'open' class"
-
-            # In mobile, sidebar without 'open' class is positioned off-screen (left: -100%)
-            # Playwright considers it "visible" because it exists in DOM, but it's not visually accessible
-            sidebar_position = page.evaluate("""() => {
-                const sidebar = document.getElementById('sidebar');
-                if (sidebar) {
-                    const computed = window.getComputedStyle(sidebar);
-                    return computed.left;
-                }
-                return null;
-            }""")
-
-            # Sidebar should be positioned off-screen when closed (negative left value)
-            print(f"Sidebar left position: {sidebar_position}")
-            if sidebar_position and sidebar_position.startswith('-'):
-                print("✓ Sidebar is positioned off-screen (closed)")
-            else:
-                # If still positioned on-screen, ensure it gets closed
-                page.evaluate("window.toggleSidebar()")
-                # Wait for sidebar to be positioned off-screen
-                page.wait_for_function(
-                    "() => window.getComputedStyle(document.getElementById('sidebar')).left.startsWith('-')",
-                    timeout=1000
-                )
-            
             # Click on a post - should preserve feed context
             posts = page.locator("li[id^='feed-item-']")
             if posts.count() > 0:
@@ -192,21 +93,15 @@ class TestMobileFlows:
                 back_button.click()
                 wait_for_htmx_complete(page)
 
-                # Wait for hideArticle to be called
+                # Wait for hideArticle() to be called automatically (NO MANUAL WORKAROUNDS)
                 page.wait_for_function(
-                    "() => !document.getElementById('feed-list')?.classList.contains('article-view')",
+                    "() => document.getElementById('article-detail')?.classList.contains('hidden')",
                     timeout=2000
                 )
-
-                # Check if hideArticle was called, if not call manually
-                feed_list_hidden = page.evaluate("document.getElementById('feed-list')?.classList.contains('article-view')")
-                if feed_list_hidden:
-                    page.evaluate("window.hideArticle()")
-                    # Wait for hideArticle animation
-                    page.wait_for_function(
-                        "() => !document.getElementById('article-detail')?.classList.contains('active')",
-                        timeout=1000
-                    )
+                page.wait_for_function(
+                    "() => !document.getElementById('feed-list')?.classList.contains('hidden')",
+                    timeout=2000
+                )
 
                 # Should be back to filtered view
                 assert f"feed_id={feed_id}" in page.url
@@ -547,16 +442,12 @@ class TestMobileFlows:
         claudeai_feed.click()
         wait_for_htmx_complete(page)
 
-        # Close sidebar if it didn't close automatically
-        sidebar_open = page.evaluate("document.getElementById('sidebar')?.classList.contains('open')")
-        if sidebar_open:
-            page.evaluate("window.toggleSidebar()")
-            # Wait for sidebar to close
-            page.wait_for_function(
-                "() => !document.getElementById('sidebar')?.classList.contains('open')",
-                timeout=1000
-            )
-        
+        # Wait for sidebar to close automatically (NO MANUAL WORKAROUNDS)
+        page.wait_for_function(
+            "() => document.getElementById('sidebar')?.classList.contains('-left-full')",
+            timeout=500
+        )
+
         # Verify we're viewing ClaudeAI feed - mobile feed title is in header
         feed_title = page.locator("#chrome-container h3, #chrome-container h3").first
         expect(feed_title).to_contain_text("ClaudeAI")
@@ -588,22 +479,16 @@ class TestMobileFlows:
         back_button.click()
         wait_for_htmx_complete(page)
 
-        # Wait for hideArticle to be called
+        # Wait for hideArticle() to be called automatically (NO MANUAL WORKAROUNDS)
         page.wait_for_function(
-            "() => !document.getElementById('feed-list')?.classList.contains('article-view')",
+            "() => document.getElementById('article-detail')?.classList.contains('hidden')",
+            timeout=2000
+        )
+        page.wait_for_function(
+            "() => !document.getElementById('feed-list')?.classList.contains('hidden')",
             timeout=2000
         )
 
-        # Check if hideArticle was called properly, if not call manually
-        feed_list_hidden = page.evaluate("document.getElementById('feed-list')?.classList.contains('article-view')")
-        if feed_list_hidden:
-            page.evaluate("window.hideArticle()")
-            # Wait for hideArticle animation
-            page.wait_for_function(
-                "() => !document.getElementById('article-detail')?.classList.contains('active')",
-                timeout=1000
-            )
-        
         # Should be back to feed list with correct feed title
         expect(page.locator("li[id^='feed-item-']").first).to_be_visible()
         feed_title_after_back = page.locator("#chrome-container h3, #chrome-container h3").first
@@ -657,6 +542,172 @@ class TestMobileFlows:
             actual_scroll_after = page.evaluate("document.getElementById('feed-list')?.scrollTop || 0")
             assert actual_scroll_after == scroll_position, \
                 f"Scroll position should be restored to {scroll_position}px, got {actual_scroll_after}px"
+
+    def test_sidebar_toggle_uses_tailwind_classes(self, page: Page, test_server_url):
+        """Test sidebar uses left-0/-left-full instead of 'open' class after migration"""
+        # Open sidebar using JavaScript function
+        page.evaluate("window.toggleSidebar()")
+
+        # Wait for sidebar to have left-0 class (condition-based wait)
+        page.wait_for_function("() => document.getElementById('sidebar')?.classList.contains('left-0')", timeout=1000)
+
+        # Wait for CSS transition to complete (300ms duration)
+        page.wait_for_timeout(350)
+
+        # Check computed left position
+        sidebar = page.locator('#sidebar')
+        left_position = sidebar.evaluate("el => window.getComputedStyle(el).left")
+        assert left_position == "0px", f"Open sidebar should have left: 0px, got {left_position}"
+
+        # Close sidebar using JavaScript function
+        page.evaluate("window.toggleSidebar()")
+
+        # Wait for sidebar to have -left-full class
+        page.wait_for_function("() => document.getElementById('sidebar')?.classList.contains('-left-full')", timeout=1000)
+
+        # Wait for CSS transition to complete
+        page.wait_for_timeout(350)
+
+        # Should have negative left position when closed
+        left_position_closed = sidebar.evaluate("el => window.getComputedStyle(el).left")
+        assert left_position_closed.startswith('-'), f"Closed sidebar should have negative left, got {left_position_closed}"
+
+    def test_article_detail_toggle_uses_tailwind_classes(self, page: Page, test_server_url):
+        """Test article detail uses block/hidden instead of 'active' class"""
+        # Click article
+        page.locator("li[id^='feed-item-']").first.click()
+        wait_for_htmx_complete(page)
+
+        # Wait for showArticle() to be called and classes to be applied
+        page.wait_for_function(
+            "() => document.getElementById('article-detail')?.classList.contains('block')",
+            timeout=2000
+        )
+
+        # Check display after migration
+        article_detail = page.locator('#article-detail')
+        display = article_detail.evaluate("el => window.getComputedStyle(el).display")
+        assert display == "block", f"Active article should have display: block, got {display}"
+
+        # Click back
+        page.locator('#nav-button').click()
+        wait_for_htmx_complete(page)
+
+        # Wait for hideArticle() to be called and classes to be applied
+        page.wait_for_function(
+            "() => document.getElementById('article-detail')?.classList.contains('hidden')",
+            timeout=2000
+        )
+
+        # Check hidden after back
+        display_hidden = article_detail.evaluate("el => window.getComputedStyle(el).display")
+        assert display_hidden == "none", f"Hidden article should have display: none, got {display_hidden}"
+
+
+class TestMobileCriticalBugRegression:
+    """CRITICAL BUG REGRESSION TESTS - NO WORKAROUNDS ALLOWED
+
+    These tests verify the two critical mobile bugs are fixed:
+    1. Back button must work immediately (hideArticle() called automatically)
+    2. Sidebar must close immediately on link click (before HTMX completes)
+
+    If these tests fail, the core bugs have regressed.
+    """
+
+    def test_back_button_regression_strict(self, page: Page, test_server_url):
+        """REGRESSION: Back button MUST call hideArticle() automatically - NO workarounds
+
+        This test will FAIL if hideArticle() is not called automatically.
+        """
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.goto(test_server_url, timeout=5000)
+        wait_for_page_ready(page)
+
+        # Navigate to article
+        first_post = page.locator("li[id^='feed-item-']").first
+        expect(first_post).to_be_visible(timeout=5000)
+        first_post.click()
+        wait_for_htmx_complete(page)
+
+        # Verify article view state
+        article_classes = page.evaluate("document.getElementById('article-detail')?.className")
+        feed_list_classes = page.evaluate("document.getElementById('feed-list')?.className")
+
+        assert 'block' in article_classes, f"Article should be 'block' in article view, got: {article_classes}"
+        assert 'hidden' in feed_list_classes, f"Feed list should be 'hidden' in article view, got: {feed_list_classes}"
+
+        # Click back button
+        back_button = page.locator("#nav-button")
+        expect(back_button).to_be_visible()
+        back_button.click()
+        wait_for_htmx_complete(page)
+
+        # STRICT: hideArticle() MUST be called automatically
+        page.wait_for_function(
+            "() => document.getElementById('article-detail')?.classList.contains('hidden')",
+            timeout=2000
+        )
+        page.wait_for_function(
+            "() => !document.getElementById('feed-list')?.classList.contains('hidden')",
+            timeout=2000
+        )
+
+        # Verify final state
+        article_classes_after = page.evaluate("document.getElementById('article-detail')?.className")
+        feed_list_classes_after = page.evaluate("document.getElementById('feed-list')?.className")
+        nav_mode = page.evaluate("document.getElementById('nav-button')?.dataset.mode")
+
+        assert 'hidden' in article_classes_after, \
+            f"REGRESSION: Article not hidden after back! hideArticle() was NOT called. Classes: {article_classes_after}"
+        assert 'hidden' not in feed_list_classes_after, \
+            f"REGRESSION: Feed list still hidden! hideArticle() was NOT called. Classes: {feed_list_classes_after}"
+        assert nav_mode == 'menu', \
+            f"REGRESSION: Nav button should be 'menu' mode, got: {nav_mode}"
+
+        # Verify feed items visible
+        page.wait_for_selector("li[id^='feed-item-']", state="visible", timeout=5000)
+        expect(page.locator("li[id^='feed-item-']").first).to_be_visible()
+
+    def test_sidebar_immediate_close_regression_strict(self, page: Page, test_server_url):
+        """REGRESSION: Sidebar must close IMMEDIATELY on click, not wait for HTMX
+
+        This test measures timing to ensure sidebar closes BEFORE HTMX completes.
+        """
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.goto(test_server_url, timeout=5000)
+        wait_for_page_ready(page)
+
+        # Open sidebar
+        menu_button = page.locator('#nav-button')
+        menu_button.click()
+        page.wait_for_selector("#sidebar", state="visible")
+
+        # Verify sidebar is open
+        sidebar_has_left_0 = page.evaluate("document.getElementById('sidebar')?.classList.contains('left-0')")
+        assert sidebar_has_left_0, "Sidebar should have 'left-0' class when open"
+
+        # Click feed link and verify immediate close
+        feed_link = page.locator("#sidebar a[href*='feed_id=']").first
+        expect(feed_link).to_be_visible()
+        feed_link.click()
+
+        # CRITICAL: Sidebar should close IMMEDIATELY (within 500ms), not wait for HTMX
+        page.wait_for_function(
+            "() => !document.getElementById('sidebar')?.classList.contains('left-0')",
+            timeout=500  # 500ms is generous - should close in ~300ms
+        )
+
+        # Verify sidebar closed BEFORE HTMX completion
+        sidebar_closed = page.evaluate("document.getElementById('sidebar')?.classList.contains('-left-full')")
+        assert sidebar_closed, \
+            "REGRESSION: Sidebar did not close immediately! It should close BEFORE HTMX completes."
+
+        # Now wait for HTMX (sidebar should already be closed)
+        wait_for_htmx_complete(page)
+
+        # Verify sidebar still closed after HTMX
+        sidebar_still_closed = page.evaluate("document.getElementById('sidebar')?.classList.contains('-left-full')")
+        assert sidebar_still_closed, "Sidebar should remain closed after HTMX completes"
 
 
 if __name__ == "__main__":

@@ -194,13 +194,13 @@ def unified_page_layout(data):
 
     return (
         # Single responsive layout
-        Div(id=ElementIDs.APP_CONTAINER, cls="app-container")(
+        Div(id=ElementIDs.APP_CONTAINER, cls="h-screen overflow-hidden lg:grid lg:grid-cols-[250px_1fr] lg:gap-4 lg:pt-4 max-lg:flex max-lg:flex-col max-lg:relative")(
             # Sidebar (shared, responsive positioning)
             responsive_sidebar(data.session_id),
             # Sidebar overlay for mobile
-            Div(id="sidebar-overlay", hx_on_click="window.toggleSidebar()"),
+            Div(id="sidebar-overlay", cls="hidden lg:!hidden fixed inset-0 bg-black/50 z-40", hx_on_click="window.toggleSidebar()"),
             # Main layout area
-            Div(id="main-layout", cls="main-layout")(
+            Div(id="main-layout", cls="overflow-hidden lg:grid lg:grid-rows-[auto_1fr] lg:h-screen max-lg:flex-1 max-lg:flex max-lg:flex-col")(
                 # Unified chrome
                 UnifiedChrome(
                     session_id=data.session_id,
@@ -210,14 +210,14 @@ def unified_page_layout(data):
                     show_back=False
                 ),
                 # Content area with feed list and article detail
-                Div(id=ElementIDs.CONTENT_AREA, cls="content-area")(
+                Div(id=ElementIDs.CONTENT_AREA, cls="overflow-hidden lg:grid lg:grid-cols-2 max-lg:flex-1 max-lg:relative")(
                     # Feed list (middle panel)
-                    Div(id=ElementIDs.FEED_LIST, cls="feed-list")(
+                    Div(id=ElementIDs.FEED_LIST, cls="h-full overflow-y-auto lg:px-4 lg:border-r")(
                         FeedsContent(data.session_id, data.feed_id, data.unread,
                                    data.page, data=data)
                     ),
                     # Article detail (right panel/overlay)
-                    Div(id=ElementIDs.ARTICLE_DETAIL, cls="article-detail")(
+                    Div(id=ElementIDs.ARTICLE_DETAIL, cls="overflow-y-auto lg:h-full lg:px-6 lg:block max-lg:fixed max-lg:inset-x-0 max-lg:top-16 max-lg:bottom-0 max-lg:z-40 max-lg:px-4 hidden")(
                         ItemDetailView(None)  # Empty on initial load
                     )
                 )
@@ -231,7 +231,7 @@ def responsive_sidebar(session_id):
     feeds = FeedModel.get_user_feeds(session_id)
     folders = FolderModel.get_folders(session_id)
 
-    return Div(id=ElementIDs.SIDEBAR, cls="sidebar")(
+    return Div(id=ElementIDs.SIDEBAR, cls="overflow-y-auto border-r bg-background lg:block lg:static lg:h-screen lg:px-2 max-lg:fixed -left-full max-lg:inset-y-0 max-lg:w-4/5 max-lg:max-w-xs max-lg:z-50 max-lg:transition-[left] max-lg:duration-300")(
         Ul(
             Li(
                 DivFullySpaced(
@@ -278,7 +278,7 @@ def responsive_sidebar(session_id):
                     ),
                     href="/",
                     cls="hover:bg-secondary p-4 block",
-                    hx_on_click="if(window.innerWidth < 1024) window.toggleSidebar()"
+                    onclick="if(window.innerWidth < 1024) window.toggleSidebar()"
                 )
             ),
             Div(cls="feeds-list")(*[
@@ -292,7 +292,7 @@ def responsive_sidebar(session_id):
                         ),
                         href=f"/?feed_id={feed['id']}",
                         cls="hover:bg-secondary p-4 block",
-                        hx_on_click="if(window.innerWidth < 1024) window.toggleSidebar()"
+                        onclick="if(window.innerWidth < 1024) window.toggleSidebar()"
                     )
                 ) for feed in feeds
             ]),
@@ -948,13 +948,13 @@ def full_page_item_response(item_data):
 
     return (
         # Single responsive layout
-        Div(id=ElementIDs.APP_CONTAINER, cls="app-container")(
+        Div(id=ElementIDs.APP_CONTAINER, cls="h-screen overflow-hidden lg:grid lg:grid-cols-[250px_1fr] lg:gap-4 lg:pt-4 max-lg:flex max-lg:flex-col max-lg:relative")(
             # Sidebar (shared, responsive positioning)
             responsive_sidebar(item_data.session_id),
             # Sidebar overlay for mobile
-            Div(id="sidebar-overlay", hx_on_click="window.toggleSidebar()"),
+            Div(id="sidebar-overlay", cls="hidden lg:!hidden fixed inset-0 bg-black/50 z-40", hx_on_click="window.toggleSidebar()"),
             # Main layout area
-            Div(id="main-layout", cls="main-layout")(
+            Div(id="main-layout", cls="overflow-hidden lg:grid lg:grid-rows-[auto_1fr] lg:h-screen max-lg:flex-1 max-lg:flex max-lg:flex-col")(
                 # Unified chrome with back button for mobile
                 UnifiedChrome(
                     session_id=item_data.session_id,
@@ -964,14 +964,14 @@ def full_page_item_response(item_data):
                     show_back=show_back
                 ),
                 # Content area with feed list and article detail
-                Div(id=ElementIDs.CONTENT_AREA, cls="content-area")(
+                Div(id=ElementIDs.CONTENT_AREA, cls="overflow-hidden lg:grid lg:grid-cols-2 max-lg:flex-1 max-lg:relative")(
                     # Feed list (hidden on mobile when viewing article)
-                    Div(id=ElementIDs.FEED_LIST, cls="feed-list")(
+                    Div(id=ElementIDs.FEED_LIST, cls="h-full overflow-y-auto lg:px-4 lg:border-r")(
                         FeedsContent(page_data.session_id, page_data.feed_id, page_data.unread,
                                    page_data.page, data=page_data)
                     ),
                     # Article detail (active on mobile)
-                    Div(id=ElementIDs.ARTICLE_DETAIL, cls="article-detail active")(
+                    Div(id=ElementIDs.ARTICLE_DETAIL, cls="overflow-y-auto lg:h-full lg:px-6 lg:block max-lg:fixed max-lg:inset-x-0 max-lg:top-16 max-lg:bottom-0 max-lg:z-40 max-lg:px-4 block")(
                         ItemDetailView(item_data.item, show_back=False)
                     )
                 )
@@ -1451,7 +1451,7 @@ def FeedSidebarItem(feed, count=""):
             ),
             href=f"/?feed_id={feed['id']}",
             cls=Styling.SIDEBAR_ITEM,
-            hx_on_click="if(window.innerWidth < 1024) window.toggleSidebar()"
+            onclick="if(window.innerWidth < 1024) window.toggleSidebar()"
         )
     )
 
@@ -1687,6 +1687,7 @@ def UnifiedChrome(session_id, feed_id=None, unread_view=True, feed_name="All Fee
         "id": ElementIDs.NAV_BUTTON,
         "class": "uk-btn nav-button-responsive",
         "data-mode": "back" if show_back else "menu",
+        "data-return-url": return_url,  # Store return URL for JavaScript
         "type": "button",
         "name": ""  # Prevent FastHTML from auto-generating name attribute
     }
@@ -1695,7 +1696,8 @@ def UnifiedChrome(session_id, feed_id=None, unread_view=True, feed_name="All Fee
         nav_button_attrs.update({
             "hx-get": return_url,
             "hx-target": Targets.CONTENT,
-            "hx-push-url": "true"
+            "hx-push-url": "true",
+            "hx-on-after-swap": "if(window.innerWidth < 1024) window.hideArticle()"
         })
     else:
         nav_button_attrs["onclick"] = "toggleSidebar()"
@@ -1742,9 +1744,8 @@ def UnifiedChrome(session_id, feed_id=None, unread_view=True, feed_name="All Fee
 
     # Expandable search bar - positioned absolutely to not affect height
     search_bar = Div(
-        cls="absolute inset-0 flex items-center px-4 bg-white z-10",
-        id=ElementIDs.SEARCH_BAR,
-        style="display: none;"
+        cls="hidden absolute inset-0 h-16 z-20 items-center px-4 bg-white",
+        id=ElementIDs.SEARCH_BAR
     )(
         # Create separate nav button for main search bar to avoid duplicate IDs
         Button(
@@ -1778,9 +1779,9 @@ def UnifiedChrome(session_id, feed_id=None, unread_view=True, feed_name="All Fee
 
     # Chrome container structure - fixed height to maintain invariant
     # UNIFIED responsive structure - NO test-specific duplicate elements
-    # Standard padding for proper UX - px-4 gives 1rem on each side
+    # CRITICAL: Changed px-4 → p-4 for border visibility (16px all sides)
     chrome_content = Div(
-        cls="chrome-container flex items-center justify-between border-b min-h-[64px] max-h-[64px] px-4",
+        cls="h-16 overflow-hidden border-b p-4 lg:relative max-lg:sticky max-lg:top-0 max-lg:z-30 flex items-center justify-between",
         id=ElementIDs.CHROME_CONTAINER,
         hx_preserve="true"  # Preserve chrome during HTMX swaps (mobile article view)
     )(

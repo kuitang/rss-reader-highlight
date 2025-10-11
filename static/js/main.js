@@ -4,12 +4,16 @@
 window.toggleSidebar = function() {
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebar-overlay');
-    if (sidebar.classList.contains('open')) {
-        sidebar.classList.remove('open');
-        overlay.classList.remove('show');
+    if (sidebar.classList.contains('left-0')) {
+        sidebar.classList.remove('left-0');
+        sidebar.classList.add('-left-full');
+        overlay.classList.remove('block');
+        overlay.classList.add('hidden');
     } else {
-        sidebar.classList.add('open');
-        overlay.classList.add('show');
+        sidebar.classList.remove('-left-full');
+        sidebar.classList.add('left-0');
+        overlay.classList.remove('hidden');
+        overlay.classList.add('block');
     }
 };
 
@@ -20,14 +24,22 @@ window.toggleSearch = function() {
     const iconBar = document.getElementById('icon-bar');
     const searchInput = document.getElementById('search-input');
 
-    if (searchBar && searchBar.classList.contains('show')) {
+    if (searchBar && searchBar.classList.contains('flex')) {
         // Close search
-        searchBar.classList.remove('show');
-        if (iconBar) iconBar.classList.remove('hide');
+        searchBar.classList.remove('flex');
+        searchBar.classList.add('hidden');
+        if (iconBar) {
+            iconBar.classList.remove('hidden');
+            iconBar.classList.add('flex');
+        }
     } else if (searchBar) {
         // Open search
-        searchBar.classList.add('show');
-        if (iconBar) iconBar.classList.add('hide');
+        searchBar.classList.remove('hidden');
+        searchBar.classList.add('flex');
+        if (iconBar) {
+            iconBar.classList.remove('flex');
+            iconBar.classList.add('hidden');
+        }
         // Focus input after animation
         setTimeout(() => {
             if (searchInput) searchInput.focus();
@@ -53,10 +65,11 @@ window.showArticle = function(itemId) {
         const navButton = document.getElementById('nav-button');
 
         if (articleDetail) {
-            articleDetail.classList.add('active');
+            articleDetail.classList.remove('hidden');
+            articleDetail.classList.add('block');
         }
         if (feedList) {
-            feedList.classList.add('article-view');
+            feedList.classList.add('hidden');
         }
 
         // Update nav button to back
@@ -109,18 +122,19 @@ window.hideArticle = function() {
 
         console.log('[hideArticle] Elements:', {
             articleDetail: articleDetail?.id,
-            hasActiveClass: articleDetail?.classList.contains('active'),
+            hasBlockClass: articleDetail?.classList.contains('block'),
             feedList: feedList?.id,
-            hasArticleViewClass: feedList?.classList.contains('article-view')
+            hasHiddenClass: feedList?.classList.contains('hidden')
         });
 
         if (articleDetail) {
-            articleDetail.classList.remove('active');
-            console.log('[hideArticle] Removed active class from article-detail');
+            articleDetail.classList.remove('block');
+            articleDetail.classList.add('hidden');
+            console.log('[hideArticle] Added hidden class, removed block class from article-detail');
         }
         if (feedList) {
-            feedList.classList.remove('article-view');
-            console.log('[hideArticle] Removed article-view class from feed-list');
+            feedList.classList.remove('hidden');
+            console.log('[hideArticle] Removed hidden class from feed-list');
         }
 
         // Update nav button to menu
@@ -153,7 +167,7 @@ document.addEventListener('click', function(event) {
     const overlay = document.getElementById('sidebar-overlay');
 
     // Close sidebar if clicked outside (mobile only)
-    if (window.innerWidth < 1024 && sidebar && sidebar.classList.contains('open')) {
+    if (window.innerWidth < 1024 && sidebar && sidebar.classList.contains('left-0')) {
         const clickedInsideSidebar = sidebar.contains(event.target);
         const clickedHamburger = event.target.closest('#nav-button');
         const clickedSidebarLink = event.target.closest('#sidebar a, #sidebar button');
@@ -165,15 +179,19 @@ document.addEventListener('click', function(event) {
         }
     }
 
-    if (searchBar && searchBar.classList.contains('show')) {
+    if (searchBar && searchBar.classList.contains('flex')) {
         const clickedInsideSearch = searchBar.contains(event.target);
         const clickedSearchButton = event.target.closest('button[title="Search"]');
         const clickedCloseButton = event.target.closest('button[title="Close search"]');
 
         // Don't close if clicked on search elements
         if (!clickedInsideSearch && !clickedSearchButton && !clickedCloseButton) {
-            searchBar.classList.remove('show');
-            if (iconBar) iconBar.classList.remove('hide');
+            searchBar.classList.remove('flex');
+            searchBar.classList.add('hidden');
+            if (iconBar) {
+                iconBar.classList.remove('hidden');
+                iconBar.classList.add('flex');
+            }
         }
     }
 });
@@ -185,9 +203,13 @@ document.addEventListener('keydown', function(event) {
         const searchBar = document.getElementById('search-bar');
         const iconBar = document.getElementById('icon-bar');
 
-        if (searchBar && searchBar.classList.contains('show')) {
-            searchBar.classList.remove('show');
-            if (iconBar) iconBar.classList.remove('hide');
+        if (searchBar && searchBar.classList.contains('flex')) {
+            searchBar.classList.remove('flex');
+            searchBar.classList.add('hidden');
+            if (iconBar) {
+                iconBar.classList.remove('hidden');
+                iconBar.classList.add('flex');
+            }
         }
     }
 });
@@ -296,7 +318,7 @@ htmx.on('htmx:afterSettle', function(evt) {
         // Ensure article is visible
         const articleDetail = document.getElementById('article-detail');
         const feedList = document.getElementById('feed-list');
-        if (articleDetail && !articleDetail.classList.contains('active')) {
+        if (articleDetail && !articleDetail.classList.contains('block')) {
             showArticle();
         }
     }
@@ -340,8 +362,13 @@ document.addEventListener('DOMContentLoaded', function() {
             if (window.innerWidth >= 1024) {
                 const articleDetail = document.getElementById('article-detail');
                 const feedList = document.getElementById('feed-list');
-                if (articleDetail) articleDetail.classList.remove('active');
-                if (feedList) feedList.classList.remove('article-view');
+                if (articleDetail) {
+                    articleDetail.classList.remove('block');
+                    articleDetail.classList.add('hidden');
+                }
+                if (feedList) {
+                    feedList.classList.remove('hidden');
+                }
             }
         }, 250);
     });

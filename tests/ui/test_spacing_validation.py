@@ -219,10 +219,10 @@ class TestSpacingValidation:
             try:
                 page.goto(test_server_url, timeout=5000)
                 wait_for_page_ready(page)
-                
+
                 # Get all containers that should have consistent padding
                 containers = page.locator('[class*="p-4"], [class*="m-4"], [class*="mx-4"]')
-                
+
                 if containers.count() > 0:
                     # Sample the first few containers to check consistency
                     spacing_values = []
@@ -238,15 +238,80 @@ class TestSpacingValidation:
                             }
                         """)
                         spacing_values.append(spacing)
-                    
+
                     # Verify we have consistent spacing patterns
                     assert len(spacing_values) > 0, "Should find containers with spacing classes"
-                    
+
                 else:
                     assert True, "CSS spacing classes are applied in code structure"
-                    
+
             except Exception as e:
                 assert True, f"Browser test failed ({e}), but spacing CSS structure is validated"
+
+@contextmanager
+def desktop_page_context(browser, width=1400, height=900):
+    """Create a desktop-sized page context"""
+    context = browser.new_context(viewport={'width': width, 'height': height})
+    page = context.new_page()
+    try:
+        yield page
+    finally:
+        context.close()
+
+class TestProductionAlignment:
+    """Test production spacing alignment"""
+
+    def test_production_spacing_match_desktop(self, browser, test_server_url):
+        """Test that desktop spacing matches production (CRITICAL for alignment)"""
+        with desktop_page_context(browser, width=1400, height=900) as page:
+            page.goto(test_server_url)
+            wait_for_page_ready(page)
+
+            # CRITICAL CHECK 1: Column gaps (16px)
+            container = page.locator('#app-container')
+            gap = container.evaluate("el => window.getComputedStyle(el).gap")
+            assert gap == "16px", f"Container gap should be 16px (gap-4), got {gap}"
+
+            # CRITICAL CHECK 2: Top padding (16px)
+            padding_top = container.evaluate("el => window.getComputedStyle(el).paddingTop")
+            assert padding_top == "16px", f"Container top padding should be 16px (pt-4), got {padding_top}"
+
+            # CRITICAL CHECK 3: Sidebar horizontal padding (8px)
+            sidebar = page.locator('#sidebar')
+            padding_left = sidebar.evaluate("el => window.getComputedStyle(el).paddingLeft")
+            padding_right = sidebar.evaluate("el => window.getComputedStyle(el).paddingRight")
+            assert padding_left == "8px", f"Sidebar left padding should be 8px (px-2), got {padding_left}"
+            assert padding_right == "8px", f"Sidebar right padding should be 8px (px-2), got {padding_right}"
+
+            # CRITICAL CHECK 4: Chrome padding all sides (16px) - MOST IMPORTANT FOR BORDER
+            chrome = page.locator('#chrome-container')
+            chrome_padding = chrome.evaluate("""el => {
+                const s = window.getComputedStyle(el);
+                return {top: s.paddingTop, right: s.paddingRight, bottom: s.paddingBottom, left: s.paddingLeft};
+            }""")
+            assert chrome_padding['top'] == "16px", f"Chrome top padding should be 16px (p-4), got {chrome_padding['top']}"
+            assert chrome_padding['bottom'] == "16px", f"Chrome bottom padding should be 16px (p-4), got {chrome_padding['bottom']}"
+
+    def test_z_index_standard_scale(self, browser, test_server_url):
+        """Test that all z-index values use standard Tailwind scale (no custom values)"""
+        with mobile_page_context(browser) as page:
+            page.goto(test_server_url)
+            wait_for_page_ready(page)
+
+            # Open sidebar to make all elements visible
+            page.locator('#nav-button').click()
+            page.wait_for_selector('#sidebar', state='visible')
+
+            # Check z-index values
+            sidebar_z = page.locator('#sidebar').evaluate("el => window.getComputedStyle(el).zIndex")
+            overlay_z = page.locator('#sidebar-overlay').evaluate("el => window.getComputedStyle(el).zIndex")
+
+            # Assert standard Tailwind scale (no values like 1001, 1000, 100, 70)
+            assert sidebar_z == "50", f"Sidebar should be z-50, got z-{sidebar_z}"
+            assert overlay_z == "40", f"Overlay should be z-40, got z-{overlay_z}"
+
+            # Assert stacking order: sidebar > overlay
+            assert int(sidebar_z) > int(overlay_z), "Sidebar should be above overlay"
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

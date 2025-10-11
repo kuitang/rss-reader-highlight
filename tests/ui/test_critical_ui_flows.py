@@ -949,6 +949,45 @@ class TestSearchBarHeightInvariant:
         
         print("✅ Click-outside test passed!")
 
+    def test_search_toggle_uses_tailwind_classes(self, page: Page, test_server_url):
+        """Test search bar uses flex/hidden instead of 'show' class"""
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.goto(test_server_url)
+        wait_for_page_ready(page)
+
+        # Initial state: search hidden, icon-bar visible
+        search_display = page.locator('#search-bar').evaluate("el => window.getComputedStyle(el).display")
+        icon_display = page.locator('#icon-bar').evaluate("el => window.getComputedStyle(el).display")
+        assert search_display == "none", f"Search should be hidden initially, got {search_display}"
+        assert icon_display == "flex", f"Icon bar should be visible initially, got {icon_display}"
+
+        # Debug: Check initial classes
+        initial_classes = page.evaluate("document.getElementById('search-bar')?.className")
+        print(f"Initial search-bar classes: {initial_classes}")
+
+        # Toggle search using JavaScript function
+        page.evaluate("window.toggleSearch()")
+
+        # Give JavaScript time to execute
+        page.wait_for_timeout(100)
+
+        # Debug: Check classes after toggle
+        after_classes = page.evaluate("document.getElementById('search-bar')?.className")
+        print(f"After toggle search-bar classes: {after_classes}")
+
+        # After toggle: search visible, icon-bar hidden
+        search_display_open = page.locator('#search-bar').evaluate("el => window.getComputedStyle(el).display")
+        icon_display_hidden = page.locator('#icon-bar').evaluate("el => window.getComputedStyle(el).display")
+
+        # Check if the function worked at all
+        has_flex_class = page.evaluate("document.getElementById('search-bar')?.classList.contains('flex')")
+        print(f"Has flex class: {has_flex_class}")
+        print(f"Search display: {search_display_open}")
+        print(f"Icon bar display: {icon_display_hidden}")
+
+        assert search_display_open == "flex", f"Search should be flex when open, got {search_display_open}. Classes: {after_classes}"
+        assert icon_display_hidden == "none", f"Icon bar should be hidden when search open, got {icon_display_hidden}"
+
 
 class TestPaginationButtonDuplication:
     """Test to prevent duplicate mobile bottom scroll buttons - app.py:1322-1330 bug"""
