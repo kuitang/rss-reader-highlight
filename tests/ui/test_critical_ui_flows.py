@@ -886,8 +886,8 @@ class TestSearchBarHeightInvariant:
             const iconBar = document.getElementById('icon-bar');
             return {
                 height: topBar.offsetHeight,
-                iconBarVisible: iconBar && iconBar.style.display !== 'none',
-                searchBarVisible: searchBar && searchBar.style.display !== 'none'
+                iconBarVisible: iconBar && iconBar.classList.contains('flex'),
+                searchBarVisible: searchBar && searchBar.classList.contains('flex')
             };
         }""")
 
@@ -896,8 +896,8 @@ class TestSearchBarHeightInvariant:
             f"Height invariant violated on close: {initial_measurements['height']}px → {final_measurements['height']}px"
 
         # State should be back to initial
-        assert final_measurements['iconBarVisible'], "Icon bar should be visible after close"
-        assert not final_measurements['searchBarVisible'], "Search bar should be hidden after close"
+        assert final_measurements['iconBarVisible'], "Icon bar should be visible (have 'flex' class) after close"
+        assert not final_measurements['searchBarVisible'], "Search bar should be hidden (not have 'flex' class) after close"
         
         print("✅ Search height invariant test passed!")
     
@@ -935,17 +935,17 @@ class TestSearchBarHeightInvariant:
         # Small wait for JavaScript event handler
         wait_for_htmx_complete(page)
         
-        # Verify search closed - check display style instead of element existence
+        # Verify search closed - check classList instead of inline style
         final_state = page.evaluate("""() => {
             const searchBar = document.getElementById('search-bar');
             const iconBar = document.getElementById('icon-bar');
             return {
-                searchBarVisible: searchBar && searchBar.style.display !== 'none',
-                iconBarVisible: iconBar && iconBar.style.display !== 'none'
+                searchBarVisible: searchBar && searchBar.classList.contains('flex'),
+                iconBarVisible: iconBar && iconBar.classList.contains('flex')
             };
         }""")
-        assert not final_state['searchBarVisible'], "Search bar should be hidden after clicking outside"
-        assert final_state['iconBarVisible'], "Icon bar should be visible after search closes"
+        assert not final_state['searchBarVisible'], "Search bar should be hidden (not have 'flex' class) after clicking outside"
+        assert final_state['iconBarVisible'], "Icon bar should be visible (have 'flex' class) after search closes"
         
         print("✅ Click-outside test passed!")
 

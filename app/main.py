@@ -1744,7 +1744,7 @@ def UnifiedChrome(session_id, feed_id=None, unread_view=True, feed_name="All Fee
 
     # Expandable search bar - positioned absolutely to not affect height
     search_bar = Div(
-        cls="hidden absolute inset-0 h-16 z-20 items-center px-4 bg-white",
+        cls="hidden absolute inset-0 h-16 z-50 items-center px-4 bg-white",
         id=ElementIDs.SEARCH_BAR
     )(
         # Create separate nav button for main search bar to avoid duplicate IDs
