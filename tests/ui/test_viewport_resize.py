@@ -123,7 +123,7 @@ class TestViewportResize:
     def test_mobile_padding_removed(self, page: Page, test_server_url):
         """Test that mobile view has no horizontal padding on feed list"""
         page.set_viewport_size({"width": 390, "height": 844})
-        page.goto(test_server_url, timeout=TIMEOUT_PAGE_LOAD)
+        page.goto(test_server_url, wait_until="domcontentloaded", timeout=TIMEOUT_PAGE_LOAD)
         wait_for_page_ready(page)
 
         # Check feed list padding
@@ -146,7 +146,7 @@ class TestViewportResize:
     def test_desktop_padding_preserved(self, page: Page, test_server_url):
         """Test that desktop view has correct horizontal padding"""
         page.set_viewport_size({"width": 1400, "height": 900})
-        page.goto(test_server_url, timeout=TIMEOUT_PAGE_LOAD)
+        page.goto(test_server_url, wait_until="domcontentloaded", timeout=TIMEOUT_PAGE_LOAD)
         wait_for_page_ready(page)
 
         # Check feed list padding on desktop
@@ -184,7 +184,7 @@ class TestViewportResize:
 
     def test_multiple_resize_cycles(self, page: Page, test_server_url):
         """Test multiple resize cycles to ensure no state pollution"""
-        page.goto(test_server_url, timeout=TIMEOUT_PAGE_LOAD)
+        page.goto(test_server_url, wait_until="domcontentloaded", timeout=TIMEOUT_PAGE_LOAD)
         wait_for_page_ready(page)
 
         # Cycle through viewports multiple times
