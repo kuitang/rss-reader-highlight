@@ -527,11 +527,11 @@ class TestMobileFlows:
             feed_items.first.click()
             wait_for_htmx_complete(page)
 
-            # Verify we're in article view
+            # Verify we're in article view (uses 'block' class now, not 'active')
             article_active = page.evaluate(
-                "document.getElementById('article-detail')?.classList.contains('active')"
+                "document.getElementById('article-detail')?.classList.contains('block')"
             )
-            assert article_active, "Should be in article view"
+            assert article_active, "Should be in article view (have 'block' class)"
 
             # Click back button
             page.locator("#nav-button").click()

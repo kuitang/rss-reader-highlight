@@ -138,7 +138,8 @@ htmx.on('htmx:afterSwap', function(evt) {
 
     // Pagination scroll reset - unified for mobile and desktop
     // When #feed-list is swapped (pagination target), reset scroll to top
-    if (evt.detail.target && evt.detail.target.id === 'feed-list') {
+    // Skip if mobile (already handled above) or if scroll restoration
+    if (evt.detail.target && evt.detail.target.id === 'feed-list' && window.innerWidth >= 1024) {
         // Check if this is pagination (not article navigation with scroll restore)
         const requestPath = evt.detail.pathInfo?.requestPath || '';
         const hasScrollRestore = requestPath.includes('_scroll=');
@@ -147,7 +148,7 @@ htmx.on('htmx:afterSwap', function(evt) {
         // Reset scroll for pagination, feed changes, or non-article navigations
         // But skip if this is scroll restoration (back button)
         if (!hasScrollRestore && !isArticleView) {
-            console.log('Resetting #feed-list scroll to top', {path: requestPath});
+            console.log('Resetting #feed-list scroll to top (desktop)', {path: requestPath});
             setTimeout(() => {
                 const feedList = document.getElementById('feed-list');
                 if (feedList) {

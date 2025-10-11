@@ -115,10 +115,10 @@ class TestDarkMode:
             }""")
             assert has_preserve, "Chrome container missing hx-preserve attribute"
 
-            # Article should be below chrome (top: 64px)
+            # Article should be below chrome (top: 64px on mobile)
             article_top = page.evaluate("""() => {
-                const article = document.querySelector('.article-detail.active');
-                if (article) {
+                const article = document.getElementById('article-detail');
+                if (article && article.classList.contains('block')) {
                     const computed = window.getComputedStyle(article);
                     return computed.top;
                 }

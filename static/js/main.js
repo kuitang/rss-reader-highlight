@@ -84,16 +84,19 @@ window.showArticle = function(itemId) {
             const urlParams = new URLSearchParams(window.location.search);
             const scrollPos = urlParams.get('_scroll') || '0';
 
-            // Create back URL with scroll parameter
-            const currentPath = window.location.pathname;
-            let backUrl = navButton.dataset.returnUrl || currentPath;
+            // Create back URL with scroll parameter, preserving existing params
+            let backUrl = navButton.dataset.returnUrl || window.location.pathname;
 
-            // Remove existing _scroll parameter if any
-            backUrl = backUrl.split('?')[0];
+            // Parse URL to preserve existing parameters (like feed_id)
+            const urlParts = backUrl.split('?');
+            const basePath = urlParts[0];
+            const existingParams = new URLSearchParams(urlParts[1] || '');
 
-            // Build URL with scroll parameter
-            const separator = '?';
-            backUrl = `${backUrl}${separator}_scroll=${scrollPos}`;
+            // Update/add _scroll parameter
+            existingParams.set('_scroll', scrollPos);
+
+            // Rebuild URL
+            backUrl = `${basePath}?${existingParams.toString()}`;
 
             navButton.setAttribute('hx-get', backUrl);
             navButton.setAttribute('data-return-url', backUrl);

@@ -59,7 +59,8 @@ class TestMobileSidebarIsolated:
                     
                     # Verify sidebar closes and content updates
                     wait_for_htmx_complete(page)
-                    expect(page.locator("#sidebar")).to_be_hidden()
+                    # Sidebar is off-screen (has -left-full class), not hidden in DOM
+                    page.wait_for_function("() => document.getElementById('sidebar')?.classList.contains('-left-full')", timeout=2000)
                     
                     # Test article navigation
                     article_items = page.locator("li[id*='feed-item']").all()

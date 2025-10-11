@@ -353,20 +353,22 @@ class TestHTMXArchitectureValidation:
         """Test MobileHandlers routing and content swapping"""
         page.goto(test_server_url, timeout=5000)
         page.set_viewport_size({"width": 390, "height": 844})
-        
+
         # Test mobile content handler
         expect(page.locator("#content-area")).to_be_visible()
-        
+
         # Test mobile sidebar handler
         hamburger = page.locator("#nav-button")
         if hamburger.is_visible():
             hamburger.click()
-            expect(page.locator("#sidebar")).to_be_visible()
-            
-            # Close sidebar
-            close_button = page.locator("#sidebar button[hx-on-click*='setAttribute']")
-            close_button.click()
-            expect(page.locator("#sidebar")).to_be_hidden()
+            # Wait for sidebar to open
+            page.wait_for_function("() => document.getElementById('sidebar')?.classList.contains('left-0')", timeout=2000)
+
+            # Close sidebar by clicking overlay
+            overlay = page.locator("#sidebar-overlay")
+            overlay.click()
+            # Wait for sidebar to close
+            page.wait_for_function("() => document.getElementById('sidebar')?.classList.contains('-left-full')", timeout=2000)
     
     def test_desktop_handlers_routing(self, page: Page, test_server_url):
         """Test DesktopHandlers routing and column updates"""
