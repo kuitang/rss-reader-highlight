@@ -609,6 +609,54 @@ class TestMobileFlows:
         feed_title_after_back = page.locator("#chrome-container h3, #chrome-container h3").first
         expect(feed_title_after_back).to_contain_text("ClaudeAI")  # Should NOT be "BizToc"
 
+    @pytest.mark.isolated
+    def test_mobile_back_button_preserves_scroll_position(self, page: Page, test_server_url):
+        """Test that back button restores scroll position on mobile"""
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.goto(test_server_url)
+        wait_for_page_ready(page)
+
+        # Open sidebar and select feed
+        page.locator("#nav-button").click()
+        time.sleep(0.5)
+        page.evaluate("document.querySelector('#sidebar a[href*=\"feed_id\"]')?.click()")
+        wait_for_htmx_complete(page)
+
+        # Scroll feed list down significantly
+        scroll_position = 800
+        page.evaluate(f"""
+            const feedList = document.getElementById('feed-list');
+            if (feedList) {{
+                feedList.scrollTop = {scroll_position};
+            }}
+        """)
+        time.sleep(0.5)
+
+        # Verify scroll position was set
+        actual_scroll_before = page.evaluate("document.getElementById('feed-list')?.scrollTop || 0")
+        assert actual_scroll_before == scroll_position, f"Scroll should be {scroll_position}px before navigation"
+
+        # Navigate to first article
+        feed_items = page.locator("li[id^='feed-item-']")
+        if feed_items.count() > 0:
+            feed_items.first.click()
+            wait_for_htmx_complete(page)
+
+            # Verify we're in article view
+            article_active = page.evaluate(
+                "document.getElementById('article-detail')?.classList.contains('active')"
+            )
+            assert article_active, "Should be in article view"
+
+            # Click back button
+            page.locator("#nav-button").click()
+            wait_for_htmx_complete(page)
+            time.sleep(0.5)  # Let scroll restoration complete
+
+            # Verify scroll position restored
+            actual_scroll_after = page.evaluate("document.getElementById('feed-list')?.scrollTop || 0")
+            assert actual_scroll_after == scroll_position, \
+                f"Scroll position should be restored to {scroll_position}px, got {actual_scroll_after}px"
 
 
 if __name__ == "__main__":

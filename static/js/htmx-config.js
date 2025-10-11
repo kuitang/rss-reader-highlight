@@ -111,26 +111,26 @@ htmx.on('htmx:afterSwap', function(evt) {
                 // Back navigation - restore scroll position
                 const scrollPos = parseInt(match[1]);
                 setTimeout(() => {
-                    const mainContent = document.getElementById('main-content');
-                    if (mainContent) {
-                        mainContent.scrollTop = scrollPos;
+                    const feedList = document.getElementById('feed-list');
+                    if (feedList) {
+                        feedList.scrollTop = scrollPos;
                     }
                 }, 50);
             } else {
                 // Forward navigation - reset scroll to top
                 setTimeout(() => {
-                    const mainContent = document.getElementById('main-content');
-                    if (mainContent) {
-                        mainContent.scrollTop = 0;
+                    const feedList = document.getElementById('feed-list');
+                    if (feedList) {
+                        feedList.scrollTop = 0;
                     }
                 }, 50);
             }
         } else {
             // No path info - reset scroll to top
             setTimeout(() => {
-                const mainContent = document.getElementById('main-content');
-                if (mainContent) {
-                    mainContent.scrollTop = 0;
+                const feedList = document.getElementById('feed-list');
+                if (feedList) {
+                    feedList.scrollTop = 0;
                 }
             }, 50);
         }

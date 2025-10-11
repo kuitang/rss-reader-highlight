@@ -433,7 +433,7 @@ def _old_responsive_styles():
             bottom: 0;
             width: 80%;
             max-width: 320px;
-            z-index: 60;
+            z-index: 1001;
             transition: left 0.3s ease;
             overflow-y: auto;
             border-right: 1px solid var(--border);
@@ -449,7 +449,7 @@ def _old_responsive_styles():
             position: fixed;
             inset: 0;
             background: rgba(0, 0, 0, 0.5);
-            z-index: 59;
+            z-index: 1000;
         }
 
         #sidebar-overlay.show {

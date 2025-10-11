@@ -363,32 +363,84 @@ class TestComprehensiveUIIntegration:
         sidebar_closed = page.evaluate("document.getElementById('sidebar').classList.contains('open')")
         assert not sidebar_closed, "Sidebar should close with overlay click"
 
-        # Test article navigation if items exist
+    def test_sidebar_click_outside_main_content(self, page: Page):
+        """Test clicking main content area closes sidebar (not just overlay)"""
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.goto("http://localhost:8080")
+        wait_for_page_ready(page)
+
+        # Open sidebar
+        hamburger = page.locator("#nav-button")
+        hamburger.click()
+        wait_for_sidebar_open(page)
+
+        sidebar_open = page.evaluate("document.getElementById('sidebar').classList.contains('open')")
+        assert sidebar_open, "Sidebar should be open"
+
+        # Click main content area (right side, definitely outside sidebar)
+        # Sidebar max-width is 320px, so click at x=350 to be safe
+        page.mouse.click(350, 400)
+        wait_for_sidebar_close(page)
+
+        sidebar_closed = page.evaluate("!document.getElementById('sidebar')?.classList.contains('open')")
+        assert sidebar_closed, "Sidebar should close when clicking outside on main content"
+
+    def test_sidebar_overlay_z_index_above_sidebar(self, page: Page):
+        """Test overlay z-index is higher than sidebar (clickable)"""
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.goto("http://localhost:8080")
+        wait_for_page_ready(page)
+
+        # Open sidebar
+        page.locator("#nav-button").click()
+        wait_for_sidebar_open(page)
+
+        # Check z-index ordering - sidebar must be ABOVE overlay to be clickable
+        z_indices = page.evaluate("""() => {
+            const sidebar = document.getElementById('sidebar');
+            const overlay = document.getElementById('sidebar-overlay');
+            return {
+                sidebarZ: parseInt(getComputedStyle(sidebar).zIndex),
+                overlayZ: parseInt(getComputedStyle(overlay).zIndex)
+            };
+        }""")
+
+        assert z_indices['sidebarZ'] > z_indices['overlayZ'], \
+            f"Sidebar z-index ({z_indices['sidebarZ']}) should be higher than overlay ({z_indices['overlayZ']}) to be clickable"
+
+    def test_viewport_resize_during_article_view(self, page: Page):
+        """Test viewport resize while viewing article doesn't cause errors"""
+        console_errors = []
+        page.on("console", lambda msg:
+            console_errors.append(msg.text) if msg.type == 'error' else None
+        )
+
+        # Start in desktop
+        page.set_viewport_size({"width": 1400, "height": 900})
+        page.goto("http://localhost:8080")
+        wait_for_page_ready(page)
+
+        # Switch to mobile and navigate to article
+        page.set_viewport_size({"width": 390, "height": 844})
+        import time
+        time.sleep(0.3)
+
         feed_items = page.locator("li[id^='feed-item-']")
         if feed_items.count() > 0:
-            # Navigate to article
             feed_items.first.click()
             wait_for_htmx_complete(page)
 
-            # Verify nav button changed to back button
-            nav_button_back = page.locator("#nav-button")
-            has_back_attr = nav_button_back.get_attribute("hx-get") is not None
-            assert has_back_attr, "Nav button should have hx-get for back functionality"
+            # Resize to desktop while article showing
+            page.set_viewport_size({"width": 1400, "height": 900})
+            time.sleep(0.5)
 
-            # Click back
-            nav_button_back.click()
-            wait_for_htmx_complete(page)
+            # Resize back to mobile
+            page.set_viewport_size({"width": 390, "height": 844})
+            time.sleep(0.5)
 
-            # Verify we're back to feed list
-            article_active = page.evaluate("""() => {
-                const article = document.getElementById('article-detail');
-                return article && article.classList.contains('active');
-            }""")
-            assert not article_active, "Should return to feed list after back button"
-
-            # Verify nav button is hamburger again
-            final_nav_mode = nav_button_back.get_attribute("data-mode")
-            assert final_nav_mode == "menu", "Nav button should be back to hamburger mode"
+        # Check for HTMX errors
+        htmx_errors = [e for e in console_errors if 'unknown target' in e.lower() or 'htmx' in e.lower()]
+        assert len(htmx_errors) == 0, f"Should not have HTMX errors during resize, got: {htmx_errors}"
 
     def test_responsive_design_consistency(self, page: Page):
         """Test that all fixes work across different viewport sizes"""

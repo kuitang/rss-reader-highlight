@@ -66,11 +66,28 @@ window.showArticle = function(itemId) {
             arrowIcon.setAttribute('icon', 'arrow-left');
             navButton.innerHTML = '';
             navButton.appendChild(arrowIcon);
-            navButton.setAttribute('hx-get', navButton.dataset.returnUrl || '/');
+
+            // Get scroll position from current URL (passed via hx-vals)
+            const urlParams = new URLSearchParams(window.location.search);
+            const scrollPos = urlParams.get('_scroll') || '0';
+
+            // Create back URL with scroll parameter
+            const currentPath = window.location.pathname;
+            let backUrl = navButton.dataset.returnUrl || currentPath;
+
+            // Remove existing _scroll parameter if any
+            backUrl = backUrl.split('?')[0];
+
+            // Build URL with scroll parameter
+            const separator = '?';
+            backUrl = `${backUrl}${separator}_scroll=${scrollPos}`;
+
+            navButton.setAttribute('hx-get', backUrl);
+            navButton.setAttribute('data-return-url', backUrl);
             navButton.setAttribute('hx-target', '#feed-list');
             navButton.setAttribute('hx-push-url', 'true');
             navButton.removeAttribute('onclick');
-            // Process the button so HTMX registers the new attributes
+            // MUST call htmx.process() when ADDING attributes (unlike hideArticle where we REMOVE them)
             htmx.process(navButton);
         }
 
@@ -132,6 +149,21 @@ document.addEventListener('click', function(event) {
     // Unified elements - single source of truth
     const searchBar = document.getElementById('search-bar');
     const iconBar = document.getElementById('icon-bar');
+    const sidebar = document.getElementById('sidebar');
+    const overlay = document.getElementById('sidebar-overlay');
+
+    // Close sidebar if clicked outside (mobile only)
+    if (window.innerWidth < 1024 && sidebar && sidebar.classList.contains('open')) {
+        const clickedInsideSidebar = sidebar.contains(event.target);
+        const clickedHamburger = event.target.closest('#nav-button');
+        const clickedSidebarLink = event.target.closest('#sidebar a, #sidebar button');
+
+        // Only close if clicked outside sidebar AND not on hamburger AND not on sidebar link
+        // (sidebar links have their own hx-on-click toggle handlers)
+        if (!clickedInsideSidebar && !clickedHamburger && !clickedSidebarLink) {
+            toggleSidebar();
+        }
+    }
 
     if (searchBar && searchBar.classList.contains('show')) {
         const clickedInsideSearch = searchBar.contains(event.target);
