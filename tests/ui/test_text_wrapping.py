@@ -64,11 +64,13 @@ class TestTextWrapping:
     
     def test_css_rules_applied(self):
         """Test that CSS rules for text wrapping and touch targets exist"""
-        # Verify that viewport_styles function contains the right CSS rules
-        from app.main import viewport_styles
-        
-        css_style = viewport_styles()
-        css_content = str(css_style)
+        # Verify that CSS rules are in the static CSS file
+        import os
+
+        # Read the static CSS file
+        css_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'static', 'css', 'main.css')
+        with open(css_path, 'r') as f:
+            css_content = f.read()
         
         # Check for text wrapping rules
         assert 'word-wrap: break-word' in css_content, "Should have word-wrap rule"

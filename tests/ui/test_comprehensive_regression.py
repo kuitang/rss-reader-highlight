@@ -4,6 +4,7 @@ import pytest
 from playwright.sync_api import Page, expect
 import time
 import re
+from tests.ui.conftest import wait_for_htmx_complete, wait_for_page_ready
 
 pytestmark = pytest.mark.needs_server
 
@@ -23,7 +24,7 @@ class TestComprehensiveRegression:
     
     def test_desktop_comprehensive_workflow(self, page: Page, test_server_url):
         """Test complete desktop workflow: feed selection, article reading, tab switching"""
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=5000)
         page.set_viewport_size({"width": 1200, "height": 800})
         
         # Wait for page load
@@ -31,10 +32,10 @@ class TestComprehensiveRegression:
         # Page loads successfully (title may be default FastHTML page now)
         
         # Verify desktop three-column layout is visible
-        expect(page.locator("#desktop-layout")).to_be_visible()
+        expect(page.locator("#main-layout")).to_be_visible()
         expect(page.locator("#sidebar")).to_be_visible()
-        expect(page.locator("#desktop-feeds-content")).to_be_visible()
-        expect(page.locator("#desktop-item-detail")).to_be_visible()
+        expect(page.locator("#feed-list")).to_be_visible()
+        expect(page.locator("#article-detail")).to_be_visible()
         
         # Test Feed Selection Cycle (3 iterations)
         for iteration in range(3):
@@ -49,26 +50,26 @@ class TestComprehensiveRegression:
                 wait_for_htmx_complete(page)
                 
                 # Scroll down in middle panel
-                middle_panel = page.locator("#desktop-feeds-content")
+                middle_panel = page.locator("#feed-list")
                 middle_panel.scroll_into_view_if_needed()
                 page.mouse.wheel(0, 500)
                 wait_for_htmx_complete(page, timeout=3000)
                 
                 # Click on an article
-                article_items = page.locator("#desktop-feeds-content li[id*='desktop-feed-item']").all()
+                article_items = page.locator("#feed-list li[id*='feed-item']").all()
                 if len(article_items) > 0:
                     article_items[0].click()
                     
                     # Verify article loads in right panel
                     wait_for_htmx_complete(page)
-                    expect(page.locator("#desktop-item-detail")).to_contain_text("From:")
+                    expect(page.locator("#article-detail")).to_contain_text("From:")
                     
                     # Verify URL updated
                     assert "/item/" in page.url
                     
                     # Toggle between All Posts and Unread tabs (use visible one for desktop)
-                    all_posts_tab = page.locator("#desktop-layout a:has-text('All Posts')").first
-                    unread_tab = page.locator("#desktop-layout a:has-text('Unread')").first
+                    all_posts_tab = page.locator("#main-layout a:has-text('All Posts')").first
+                    unread_tab = page.locator("#main-layout a:has-text('Unread')").first
                     
                     if all_posts_tab.is_visible():
                         all_posts_tab.click()
@@ -80,58 +81,59 @@ class TestComprehensiveRegression:
     
     def test_mobile_comprehensive_workflow(self, page: Page, test_server_url):
         """Test complete mobile workflow: navigation, feed selection, article reading"""
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=5000)
         page.set_viewport_size({"width": 390, "height": 844})
         
         # Wait for page load and verify mobile layout
-        expect(page.locator("#mobile-layout")).to_be_visible()
-        expect(page.locator("#desktop-layout")).to_be_hidden()
-        
+        expect(page.locator("#main-layout")).to_be_visible()
+
         # Test Mobile Navigation Cycle (3 iterations)
         for iteration in range(3):
             print(f"Mobile iteration {iteration + 1}")
             
             # Open hamburger menu
-            hamburger = page.locator("#mobile-nav-button")
+            hamburger = page.locator("#nav-button")
             if hamburger.is_visible():
                 hamburger.click()
                 
                 # Wait for sidebar to open
                 wait_for_htmx_complete(page)
-                expect(page.locator("#mobile-sidebar")).to_be_visible()
+                expect(page.locator("#sidebar")).to_be_visible()
                 
                 # Click on a feed
-                feed_links = page.locator("#mobile-sidebar a[href*='feed_id']").all()
+                feed_links = page.locator("#sidebar a[href*='feed_id']").all()
                 if len(feed_links) > iteration % len(feed_links):
                     feed_links[iteration % len(feed_links)].click()
                     
                     # Wait for sidebar to close and content to load
-                    page.wait_for_selector("li[id^='mobile-feed-item-']", state="visible", timeout=10000)
-                    expect(page.locator("#mobile-sidebar")).to_be_hidden()
+                    page.wait_for_selector("li[id^='feed-item-']", state="visible", timeout=5000)
+                    # Sidebar is hidden via CSS positioning (left: -390px), not display:none
+                    # Check that 'open' class is removed instead
+                    page.wait_for_function("() => !document.getElementById('sidebar').classList.contains('open')", timeout=2000)
                     
                     # Scroll down in feed list
-                    main_content = page.locator("#main-content")
+                    main_content = page.locator("#content-area")
                     main_content.scroll_into_view_if_needed()
                     page.mouse.wheel(0, 800)
                     # Wait for any HTMX updates after scroll
                     page.wait_for_selector("body:not(.htmx-request)", timeout=2000)
                     
                     # Click on an article
-                    article_items = page.locator("li[id*='mobile-feed-item']").all()
+                    article_items = page.locator("li[id*='feed-item']").all()
                     if len(article_items) > 0:
                         article_items[0].click()
                         
                         # Wait for article to load (full-screen mobile view)
-                        page.wait_for_selector("#main-content", state="visible", timeout=5000)
+                        page.wait_for_selector("#content-area", state="visible", timeout=5000)
                         
                         # Verify article content is visible
-                        expect(page.locator("#main-content")).to_contain_text("From:")
+                        expect(page.locator("#content-area")).to_contain_text("From:")
                         
                         # Verify URL updated to article
                         assert "/item/" in page.url
                         
                         # Click back arrow
-                        back_button = page.locator("#mobile-nav-button")
+                        back_button = page.locator("#nav-button")
                         if back_button.is_visible():
                             back_button.click()
                             
@@ -139,8 +141,8 @@ class TestComprehensiveRegression:
                             wait_for_htmx_complete(page)
                             
                             # Toggle between tabs (use visible one for mobile)
-                            all_posts_tab = page.locator("#mobile-layout a:has-text('All Posts')").first
-                            unread_tab = page.locator("#mobile-layout a:has-text('Unread')").first
+                            all_posts_tab = page.locator("#main-layout a:has-text('All Posts')").first
+                            unread_tab = page.locator("#main-layout a:has-text('Unread')").first
                             
                             if all_posts_tab.is_visible():
                                 all_posts_tab.click()
@@ -152,49 +154,46 @@ class TestComprehensiveRegression:
     
     def test_responsive_layout_switching(self, page: Page, test_server_url):
         """Test layout adaptation when switching between desktop and mobile viewports"""
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=5000)
         
         # Start with desktop
         page.set_viewport_size({"width": 1200, "height": 800})
-        expect(page.locator("#desktop-layout")).to_be_visible()
-        expect(page.locator("#mobile-layout")).to_be_hidden()
-        
+        expect(page.locator("#main-layout")).to_be_visible()
+
         # Click an article in desktop mode
-        article_items = page.locator("li[id*='desktop-feed-item']").all()
+        article_items = page.locator("li[id*='feed-item']").all()
         if len(article_items) > 0:
             article_items[0].click()
-            page.wait_for_selector("#desktop-item-detail", state="visible", timeout=5000)
-            expect(page.locator("#desktop-item-detail")).to_contain_text("From:")
+            page.wait_for_selector("#article-detail", state="visible", timeout=5000)
+            expect(page.locator("#article-detail")).to_contain_text("From:")
         
         # Switch to mobile viewport
         page.set_viewport_size({"width": 390, "height": 844})
         wait_for_htmx_complete(page)
-        
-        expect(page.locator("#mobile-layout")).to_be_visible()
-        expect(page.locator("#desktop-layout")).to_be_hidden()
-        
+
+        expect(page.locator("#main-layout")).to_be_visible()
+
         # Switch back to desktop
         page.set_viewport_size({"width": 1200, "height": 800})
         wait_for_htmx_complete(page)
-        
-        expect(page.locator("#desktop-layout")).to_be_visible()
-        expect(page.locator("#mobile-layout")).to_be_hidden()
+
+        expect(page.locator("#main-layout")).to_be_visible()
     
     def test_htmx_state_management(self, page: Page, test_server_url):
         """Test HTMX state updates and out-of-band swaps"""
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=5000)
         page.set_viewport_size({"width": 1200, "height": 800})
         
         # Wait for page load
         wait_for_htmx_complete(page)
         
         # Test blue indicator state changes
-        unread_items = page.locator("#desktop-feeds-content li[id*='feed-item'] .w-2.h-2.bg-blue-500")
+        unread_items = page.locator("#feed-list li[id*='feed-item'] .w-2.h-2.bg-blue-500")
         initial_count = unread_items.count()
         
         if initial_count > 0:
             # Click an unread article
-            first_unread_item = page.locator("#desktop-feeds-content li[id*='feed-item']:has(.w-2.h-2.bg-blue-500)").first
+            first_unread_item = page.locator("#feed-list li[id*='feed-item']:has(.w-2.h-2.bg-blue-500)").first
             first_unread_item.click()
             
             # Wait for HTMX update
@@ -206,7 +205,7 @@ class TestComprehensiveRegression:
     
     def test_rapid_interaction_stability(self, page: Page, test_server_url):
         """Test stability under rapid user interactions"""
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=5000)
         page.set_viewport_size({"width": 1200, "height": 800})
         
         # Wait for initial load
@@ -222,7 +221,7 @@ class TestComprehensiveRegression:
                 wait_for_htmx_complete(page)
             
             # Quick article clicks (desktop layout)
-            article_items = page.locator("li[id^='desktop-feed-item-']").all()
+            article_items = page.locator("li[id^='feed-item-']").all()
             if len(article_items) > 0:
                 article_items[0].click()
                 wait_for_htmx_complete(page)
@@ -242,7 +241,7 @@ class TestComprehensiveRegression:
     
     def test_feed_content_and_pagination(self, page: Page, test_server_url):
         """Test feed content loading and pagination behavior"""
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=5000)
         page.set_viewport_size({"width": 1200, "height": 800})
         
         # Wait for content load
@@ -253,8 +252,8 @@ class TestComprehensiveRegression:
         expect(feed_items.first).to_be_visible()
         
         # Test tab switching (desktop-specific)
-        all_posts_tab = page.locator("#desktop-feeds-content a:has-text('All Posts')")
-        unread_tab = page.locator("#desktop-feeds-content a:has-text('Unread')")
+        all_posts_tab = page.locator("#feed-list a:has-text('All Posts')")
+        unread_tab = page.locator("#feed-list a:has-text('Unread')")
         
         # Switch to All Posts
         if all_posts_tab.is_visible():
@@ -270,28 +269,28 @@ class TestComprehensiveRegression:
     
     def test_session_and_state_persistence(self, page: Page, test_server_url):
         """Test session management and state persistence across navigation"""
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=5000)
         
         # Wait for initial session setup
         wait_for_page_ready(page)
         
         # Navigate to different feeds and verify session persists
         # Handle both desktop and mobile layouts
-        mobile_nav_button = page.locator("button#mobile-nav-button")
+        mobile_nav_button = page.locator("#nav-button")
         is_mobile = mobile_nav_button.is_visible()
         
         if is_mobile:
             # Mobile: open sidebar and get mobile feed links
             mobile_nav_button.click()
             wait_for_htmx_complete(page)
-            feed_links = page.locator("#mobile-sidebar a[href*='feed_id']").all()
+            feed_links = page.locator("#sidebar a[href*='feed_id']").all()
         else:
             # Desktop: get sidebar feed links directly
             feed_links = page.locator("#sidebar a[href*='feed_id']").all()
         
         for i, feed_link in enumerate(feed_links[:2]):  # Test first 2 feeds
             # Reopen mobile sidebar before each feed click if mobile
-            if is_mobile and not page.locator("#mobile-sidebar").is_visible():
+            if is_mobile and not page.locator("#sidebar").is_visible():
                 mobile_nav_button.click()
                 wait_for_htmx_complete(page)
                 
@@ -305,9 +304,9 @@ class TestComprehensiveRegression:
             # Click an article to test state management
             # Use the correct selector based on viewport
             if is_mobile:
-                article_items = page.locator("li[id*='mobile-feed-item']").all()
+                article_items = page.locator("li[id*='feed-item']").all()
             else:
-                article_items = page.locator("li[id*='desktop-feed-item']").all()
+                article_items = page.locator("li[id*='feed-item']").all()
 
             if len(article_items) > 0:
                 article_items[0].click()
@@ -318,16 +317,16 @@ class TestComprehensiveRegression:
                 assert "/item/" in page.url
                 
                 # Go back to main page
-                page.goto(test_server_url, timeout=10000)
+                page.goto(test_server_url, timeout=5000)
                 wait_for_page_ready(page)
     
     def test_error_resilience_and_recovery(self, page: Page, test_server_url):
         """Test application resilience under various error conditions"""
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=5000)
         
         # Test invalid item URL (use very high number unlikely to exist)
         invalid_item_id = 999999
-        page.goto(f"{test_server_url}/item/{invalid_item_id}", timeout=10000)
+        page.goto(f"{test_server_url}/item/{invalid_item_id}", timeout=5000)
         wait_for_page_ready(page)
         
         # Should gracefully handle non-existent items
@@ -335,14 +334,14 @@ class TestComprehensiveRegression:
         
         # Test invalid feed ID (use very high number unlikely to exist)
         invalid_feed_id = 999999
-        page.goto(f"{test_server_url}/?feed_id={invalid_feed_id}", timeout=10000)
+        page.goto(f"{test_server_url}/?feed_id={invalid_feed_id}", timeout=5000)
         wait_for_page_ready(page)
         
         # Should gracefully handle invalid feed IDs
         # Page loads successfully (title may be default FastHTML page now)
         
         # Return to valid state
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=5000)
         wait_for_page_ready(page)
         # Page loads successfully (title may be default FastHTML page now)
 
@@ -352,57 +351,59 @@ class TestHTMXArchitectureValidation:
     
     def test_mobile_handlers_routing(self, page: Page, test_server_url):
         """Test MobileHandlers routing and content swapping"""
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=5000)
         page.set_viewport_size({"width": 390, "height": 844})
-        
+
         # Test mobile content handler
-        expect(page.locator("#main-content")).to_be_visible()
-        
+        expect(page.locator("#content-area")).to_be_visible()
+
         # Test mobile sidebar handler
-        hamburger = page.locator("#mobile-nav-button")
+        hamburger = page.locator("#nav-button")
         if hamburger.is_visible():
             hamburger.click()
-            expect(page.locator("#mobile-sidebar")).to_be_visible()
-            
-            # Close sidebar
-            close_button = page.locator("#mobile-sidebar button[hx-on-click*='setAttribute']")
-            close_button.click()
-            expect(page.locator("#mobile-sidebar")).to_be_hidden()
+            # Wait for sidebar to open
+            page.wait_for_function("() => document.getElementById('sidebar')?.classList.contains('left-0')", timeout=2000)
+
+            # Close sidebar by clicking overlay
+            overlay = page.locator("#sidebar-overlay")
+            overlay.click()
+            # Wait for sidebar to close
+            page.wait_for_function("() => document.getElementById('sidebar')?.classList.contains('-left-full')", timeout=2000)
     
     def test_desktop_handlers_routing(self, page: Page, test_server_url):
         """Test DesktopHandlers routing and column updates"""
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=5000)
         page.set_viewport_size({"width": 1200, "height": 800})
         
         # Test desktop feeds column handler
-        expect(page.locator("#desktop-feeds-content")).to_be_visible()
+        expect(page.locator("#feed-list")).to_be_visible()
         
         # Test desktop detail column handler
-        expect(page.locator("#desktop-item-detail")).to_be_visible()
+        expect(page.locator("#article-detail")).to_be_visible()
         
         # Test desktop sidebar column handler
         expect(page.locator("#sidebar")).to_be_visible()
         
         # Test column interaction
-        article_items = page.locator("li[id*='desktop-feed-item']").all()
+        article_items = page.locator("li[id*='feed-item']").all()
         if len(article_items) > 0:
             article_items[0].click()
             wait_for_htmx_complete(page)
             
             # Verify detail column updates while other columns remain
-            expect(page.locator("#desktop-item-detail")).to_contain_text("From:")
-            expect(page.locator("#desktop-feeds-content")).to_be_visible()
+            expect(page.locator("#article-detail")).to_contain_text("From:")
+            expect(page.locator("#feed-list")).to_be_visible()
             expect(page.locator("#sidebar")).to_be_visible()
     
     def test_unified_tab_container_behavior(self, page: Page, test_server_url):
         """Test the unified create_tab_container function for both mobile and desktop"""
         # Test desktop tab behavior
-        page.goto(test_server_url, timeout=10000)
+        page.goto(test_server_url, timeout=5000)
         page.set_viewport_size({"width": 1200, "height": 800})
         wait_for_page_ready(page)
         
         # Desktop tabs should use regular links (no HTMX)
-        all_posts_desktop = page.locator("#desktop-feeds-content a:has-text('All Posts')").first
+        all_posts_desktop = page.locator("#feed-list a:has-text('All Posts')").first
         if all_posts_desktop.is_visible():
             # Should have href but no hx-get for desktop
             expect(all_posts_desktop).to_have_attribute("href", "/?unread=0")
@@ -414,7 +415,7 @@ class TestHTMXArchitectureValidation:
         wait_for_page_ready(page)
         
         # Mobile tabs should use HTMX attributes
-        all_posts_mobile = page.locator("#mobile-persistent-header a:has-text('All Posts')").first
+        all_posts_mobile = page.locator("#chrome-container a:has-text('All Posts')").first
         if all_posts_mobile.is_visible():
             # Should have both href and hx-get for mobile
             expect(all_posts_mobile).to_have_attribute("href", "/?unread=0")

@@ -167,8 +167,8 @@ Parameters: ('{session_id}', '{session_id}', {item_id})"""),
         assert 'Item Not Found - Diagnostic Information' in html_string
         assert 'SQL Query Details' in html_string
         assert 'get_item_for_user' in html_string
-        # Check for HTML-encoded quotes in the output
-        assert f'Parameters: (&#x27;{session_id}&#x27;, &#x27;{session_id}&#x27;, {item_id})' in html_string
+        # Check for parameters in the output (FastHTML Pre elements render plain quotes)
+        assert f"Parameters: ('{session_id}', '{session_id}', {item_id})" in html_string
         assert 'Result: null' in html_string
         
         # Check CSS classes

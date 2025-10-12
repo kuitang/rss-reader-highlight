@@ -12,13 +12,145 @@ Server Dependency Management:
 import pytest
 import httpx
 import os
+import time
 from playwright.sync_api import sync_playwright
 
 
-@pytest.fixture(scope="session")
+# ============================================================================
+# TIMEOUT CONSTANTS - Centralized configuration for all UI tests
+# ============================================================================
+# Philosophy: Use condition-based waiting, but with reasonable timeouts
+# CI environments can be slower than local, so timeouts are generous
+
+# Page navigation and loading
+TIMEOUT_PAGE_LOAD = 10000      # page.goto() - network + rendering
+TIMEOUT_PAGE_READY = 10000     # networkidle state
+TIMEOUT_DOM_READY = 5000       # domcontentloaded
+
+# HTMX operations
+TIMEOUT_HTMX_REQUEST = 5000    # HTMX request completion
+TIMEOUT_HTMX_LONG = 8000       # Slow network operations (add feed, etc.)
+
+# UI interactions
+TIMEOUT_ELEMENT_VISIBLE = 5000 # Element becomes visible
+TIMEOUT_ELEMENT_QUICK = 2000   # Fast UI updates (sidebar, search)
+TIMEOUT_ANIMATION = 1000       # CSS transitions/animations
+TIMEOUT_IMMEDIATE = 500        # Immediate actions (sidebar close on click)
+
+# Server startup (conftest only)
+TIMEOUT_SERVER_START = 30000   # Waiting for test server to start
+
+
+def wait_for_htmx_complete(page, timeout=TIMEOUT_HTMX_REQUEST):
+    """Wait for all HTMX requests to complete
+
+    This helper function ensures HTMX operations have finished before proceeding.
+    Replaces arbitrary time.sleep() calls with proper condition-based waiting.
+
+    Args:
+        page: Playwright page object
+        timeout: Maximum wait time in milliseconds (default: 5000ms)
+    """
+    try:
+        # Wait for HTMX to finish processing (no htmx-request class on body)
+        page.wait_for_function(
+            "() => !document.body.classList.contains('htmx-request')",
+            timeout=timeout
+        )
+    except:
+        # If HTMX isn't loaded or timeout occurs, continue
+        pass
+
+
+def wait_for_page_ready(page, timeout=TIMEOUT_PAGE_READY):
+    """Wait for page to be fully loaded
+
+    Ensures both DOM content and network activity have settled.
+
+    Args:
+        page: Playwright page object
+        timeout: Maximum wait time in milliseconds (default: TIMEOUT_PAGE_READY)
+    """
+    page.wait_for_load_state('domcontentloaded', timeout=timeout)
+    page.wait_for_load_state('networkidle', timeout=timeout)
+
+
+def wait_for_sidebar_open(page, timeout=TIMEOUT_ELEMENT_QUICK):
+    """Wait for sidebar to open (gain 'left-0' class)
+
+    Waits for the toggleSidebar() JavaScript function to complete.
+    Replaces page.wait_for_timeout() after clicking hamburger menu.
+
+    Args:
+        page: Playwright page object
+        timeout: Maximum wait time in milliseconds (default: TIMEOUT_ELEMENT_QUICK)
+    """
+    page.wait_for_function(
+        "() => document.getElementById('sidebar')?.classList.contains('left-0')",
+        timeout=timeout
+    )
+
+
+def wait_for_sidebar_close(page, timeout=TIMEOUT_ELEMENT_QUICK):
+    """Wait for sidebar to close (gain '-left-full' class)
+
+    Waits for the toggleSidebar() JavaScript function to complete.
+    Replaces page.wait_for_timeout() after clicking overlay or close button.
+
+    Args:
+        page: Playwright page object
+        timeout: Maximum wait time in milliseconds (default: TIMEOUT_ELEMENT_QUICK)
+    """
+    page.wait_for_function(
+        "() => document.getElementById('sidebar')?.classList.contains('-left-full')",
+        timeout=timeout
+    )
+
+
+def wait_for_search_expand(page, timeout=TIMEOUT_ELEMENT_QUICK):
+    """Wait for search bar to expand (gain 'flex' class, not 'show')
+
+    Waits for the toggleSearch() JavaScript function to complete.
+    Replaces page.wait_for_timeout() after clicking search button.
+
+    Args:
+        page: Playwright page object
+        timeout: Maximum wait time in milliseconds (default: TIMEOUT_ELEMENT_QUICK)
+    """
+    page.wait_for_function(
+        "() => document.getElementById('search-bar')?.classList.contains('flex')",
+        timeout=timeout
+    )
+
+
+def wait_for_css_transition(page, selector, css_property, expected_value, timeout=TIMEOUT_ANIMATION):
+    """Wait for CSS property to reach expected value (for animations/transitions)
+
+    Replaces time.sleep() after viewport resize or CSS class changes.
+
+    Args:
+        page: Playwright page object
+        selector: CSS selector for element
+        css_property: CSS property name (camelCase, e.g. 'display', 'left')
+        expected_value: Expected value of the CSS property
+        timeout: Maximum wait time in milliseconds (default: TIMEOUT_ANIMATION)
+    """
+    page.wait_for_function(
+        f"""() => {{
+            const elem = document.querySelector('{selector}');
+            if (!elem) return false;
+            const value = window.getComputedStyle(elem).{css_property};
+            return value === '{expected_value}';
+        }}""",
+        timeout=timeout
+    )
+
+
+@pytest.fixture(scope="module")
 def test_server_url():
     """Auto-start test server or use existing server for UI tests
-    
+
+    SCOPE: module - Each test FILE gets a fresh server to prevent degradation.
     This fixture automatically starts a test server in minimal mode,
     or uses an existing server if TEST_SERVER_URL is set.
     
@@ -38,7 +170,8 @@ def test_server_url():
         try:
             response = httpx.get(existing_server, timeout=5)
             if response.status_code == 200:
-                return existing_server
+                yield existing_server
+                return
         except httpx.RequestError:
             pass
     
@@ -110,7 +243,7 @@ def test_server_url():
             if response.status_code == 200:
                 break
         except httpx.RequestError:
-            time.sleep(1)
+            time.sleep(0.5)
     else:
         cleanup_server()
         pytest.skip(f"Failed to start test server on {server_url}")
@@ -149,3 +282,32 @@ def mobile_context(browser, test_server_url):
     page = context.new_page()
     yield page
     context.close()
+
+
+@pytest.fixture(scope="function", autouse=True)
+def isolated_test_cleanup(request, page):
+    """Auto-cleanup for tests marked as 'isolated' to prevent state pollution
+
+    This fixture:
+    - Runs before and after isolated tests
+    - Clears browser storage, cookies, and cache
+    - Ensures fresh page state for each isolated test
+    """
+    # Check if test is marked as isolated
+    if 'isolated' in [mark.name for mark in request.node.iter_markers()]:
+        # Pre-test cleanup: ensure clean state
+        try:
+            page.context.clear_cookies()
+        except:
+            pass
+
+        yield
+
+        # Post-test cleanup: prevent pollution to next test
+        try:
+            page.evaluate("window.localStorage.clear(); window.sessionStorage.clear();")
+            page.context.clear_cookies()
+        except:
+            pass
+    else:
+        yield

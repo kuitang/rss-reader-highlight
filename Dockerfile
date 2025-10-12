@@ -26,8 +26,9 @@ COPY --from=builder /root/.local /root/.local
 
 WORKDIR /app
 
-# Copy only the app package
+# Copy the app package and static files
 COPY app/ ./app/
+COPY static/ ./static/
 COPY requirements.txt .
 
 # Create data directory

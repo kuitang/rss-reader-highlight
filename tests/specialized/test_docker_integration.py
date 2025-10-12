@@ -87,7 +87,9 @@ def test_docker_integration(docker_container):
         # Test main page
         response = client.get(f"{docker_url}/")
         print(f"✓ Main page: {response.status_code} ({len(response.text)} chars)")
-        assert "RSS Reader" in response.text
+        # Check for actual content - feed names or "All Feeds" title
+        assert "All Feeds" in response.text or "Bloomberg" in response.text, \
+            f"Expected feed content in page, got: {response.text[:500]}"
         
         # Test item endpoint (use a likely ID)
         response = client.get(f"{docker_url}/item/1")
@@ -130,6 +132,116 @@ def test_docker_integration(docker_container):
         browser.close()
     
     print("\n🎉 DOCKER INTEGRATION TESTS COMPLETED")
+
+def test_docker_static_files(docker_container):
+    """Test that static files (JS/CSS) are included in Docker image and accessible
+
+    REGRESSION TEST: This prevents the bug where Dockerfile didn't copy static/
+    directory, causing all JavaScript to return 404 in production/preview.
+    """
+    print("=== DOCKER STATIC FILES TEST ===")
+
+    docker_url = docker_container["url"]
+    print(f"Testing static files at {docker_url}")
+
+    with httpx.Client() as client:
+        # Test 1: JavaScript files exist and are accessible
+        print("\n--- TEST 1: JavaScript Files ---")
+        js_files = [
+            '/static/js/main.js',
+            '/static/js/htmx-config.js'
+        ]
+
+        for js_file in js_files:
+            response = client.get(f"{docker_url}{js_file}")
+            assert response.status_code == 200, \
+                f"❌ {js_file} returned {response.status_code} (expected 200). " \
+                f"Dockerfile may be missing 'COPY static/ ./static/'"
+
+            content_length = len(response.text)
+            assert content_length > 100, \
+                f"❌ {js_file} is too small ({content_length} bytes). File may be empty or corrupted."
+
+            print(f"✓ {js_file}: {response.status_code} ({content_length} bytes)")
+
+        # Test 2: Critical JavaScript functions are defined
+        print("\n--- TEST 2: Critical JavaScript Functions ---")
+        main_js = client.get(f"{docker_url}/static/js/main.js").text
+        htmx_config = client.get(f"{docker_url}/static/js/htmx-config.js").text
+
+        # Check for critical mobile functions
+        critical_functions = [
+            ('window.showArticle', main_js, 'main.js'),
+            ('window.hideArticle', main_js, 'main.js'),
+            ('window.toggleSidebar', main_js, 'main.js'),
+            ('htmx.on', htmx_config, 'htmx-config.js'),
+        ]
+
+        for func_name, content, file_name in critical_functions:
+            assert func_name in content, \
+                f"❌ {func_name} not found in {file_name}. File may be corrupted or wrong version."
+            print(f"✓ {func_name} found in {file_name}")
+
+        # Test 3: CSS files exist
+        print("\n--- TEST 3: CSS Files ---")
+        response = client.get(f"{docker_url}/static/css/main.css")
+        assert response.status_code == 200, \
+            f"❌ main.css returned {response.status_code}. Dockerfile may be missing static/ directory."
+
+        css_length = len(response.text)
+        assert css_length > 100, \
+            f"❌ main.css is too small ({css_length} bytes)"
+
+        print(f"✓ /static/css/main.css: {response.status_code} ({css_length} bytes)")
+
+    # Test 4: Mobile functionality works with JavaScript loaded
+    print("\n--- TEST 4: Mobile Article Click (with JS) ---")
+    with sync_playwright() as p:
+        browser = p.chromium.launch(headless=True)
+        context = browser.new_context(
+            viewport={'width': 390, 'height': 844},
+            user_agent='Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X)'
+        )
+        page = context.new_page()
+
+        page.goto(docker_url, wait_until="load", timeout=10000)
+        page.wait_for_load_state('networkidle', timeout=10000)
+
+        # Check that showArticle is defined
+        show_article_defined = page.evaluate("typeof window.showArticle === 'function'")
+        assert show_article_defined, \
+            "❌ window.showArticle is not defined! JavaScript files not loaded."
+        print("✓ window.showArticle is defined")
+
+        # Find and click first feed item
+        feed_items = page.locator("li[id^='feed-item-']")
+        count = feed_items.count()
+
+        if count > 0:
+            # Get initial state
+            article_hidden_before = page.evaluate(
+                "document.getElementById('article-detail')?.classList.contains('hidden')"
+            )
+
+            # Click article
+            feed_items.first.click()
+            page.wait_for_timeout(2000)  # Wait for HTMX + showArticle
+
+            # Check that article is now visible
+            article_classes = page.evaluate("document.getElementById('article-detail')?.className")
+            article_display = page.evaluate(
+                "window.getComputedStyle(document.getElementById('article-detail')).display"
+            )
+
+            assert 'block' in article_classes or article_display == 'block', \
+                f"❌ Article not visible after click! classList={article_classes}, display={article_display}. " \
+                f"JavaScript may not be working correctly."
+
+            print(f"✓ Mobile article click works (hidden before: {article_hidden_before}, visible after: True)")
+
+        browser.close()
+
+    print("\n🎉 DOCKER STATIC FILES TESTS COMPLETED")
 
 if __name__ == "__main__":
     test_docker_integration()

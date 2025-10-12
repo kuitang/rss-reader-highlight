@@ -4,6 +4,10 @@ CRITICAL: Tests scroll position preservation, chevron/hamburger toggle, header v
 
 import pytest
 from playwright.sync_api import Page, expect
+from tests.ui.conftest import (
+    wait_for_htmx_complete, wait_for_page_ready,
+    TIMEOUT_PAGE_LOAD, TIMEOUT_DOM_READY, TIMEOUT_ELEMENT_VISIBLE
+)
 
 # HTMX Helper Functions for Fast Testing
 def wait_for_htmx_complete(page, timeout=5000):
@@ -11,28 +15,29 @@ def wait_for_htmx_complete(page, timeout=5000):
     page.wait_for_function("() => !document.body.classList.contains('htmx-request')", timeout=timeout)
 
 def wait_for_page_ready(page):
-    """Fast page ready check - waits for network idle instead of fixed timeout"""
-    page.wait_for_load_state("networkidle")
+    """Fast page ready check - waits for DOM load instead of networkidle (which is slow/unreliable in CI)"""
+    page.wait_for_load_state("domcontentloaded")
 
 
 class TestMobileNavigationComplete:
     """CRITICAL mobile navigation test suite - covers scroll position preservation and UI state"""
-    
+
     @pytest.fixture(autouse=True)
     def fresh_start(self, page: Page, test_server_url):
         """Start each test with fresh page load to reset navigation state (preserve session)"""
         # Set mobile viewport first
         page.set_viewport_size({"width": 390, "height": 844})  # iPhone 13 size
-        
+
         # Navigate to clean starting state (preserves session cookies automatically)
-        page.goto(f"{test_server_url}/?unread=0", wait_until="networkidle", timeout=10000)
+        # Use 'load' instead of 'networkidle' - networkidle is unreliable in CI
+        page.goto(f"{test_server_url}/?unread=0", wait_until="load", timeout=TIMEOUT_PAGE_LOAD)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+        page.wait_for_selector("#main-layout", state="visible", timeout=TIMEOUT_ELEMENT_VISIBLE)
         wait_for_page_ready(page)
         
         # Ensure clean DOM state - mobile sidebar should be closed by default
         page.evaluate("""() => {
-            const sidebar = document.getElementById('mobile-sidebar');
+            const sidebar = document.getElementById('sidebar');
             if (sidebar) sidebar.setAttribute('hidden', 'true');
             
             // Clear any navigation history pollution
@@ -49,9 +54,9 @@ class TestMobileNavigationComplete:
         page.set_viewport_size({"width": 390, "height": 844})
         
         # Start at All Posts view
-        page.goto(f"{test_server_url}/?unread=0", timeout=10000)
+        page.goto(f"{test_server_url}/?unread=0", timeout=5000)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+        page.wait_for_selector("#main-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)
         
         # CRITICAL: Set and verify scroll position on the feeds list container
@@ -80,7 +85,7 @@ class TestMobileNavigationComplete:
         # Navigate to article by clicking (to trigger HTMX, not direct navigation)
         # Get the first available article ID dynamically to avoid hardcoding
         first_article_id = page.evaluate("""() => {
-            const articles = document.querySelectorAll("li[id^='mobile-feed-item-']");
+            const articles = document.querySelectorAll("li[id^='feed-item-']");
             return articles.length > 0 ? articles[0].id : null;
         }""")
         
@@ -93,7 +98,7 @@ class TestMobileNavigationComplete:
         wait_for_htmx_complete(page)
 
         # Wait for navigation to article view
-        page.wait_for_url("**/item/**", timeout=10000)
+        page.wait_for_url("**/item/**", timeout=5000)
         assert "/item/" in page.url, "Should be in article view"
         
         # CRITICAL: Use browser back 
@@ -168,9 +173,9 @@ class TestMobileNavigationComplete:
         """Test hamburger <-> chevron button toggling works correctly"""
         
         # Start at list view
-        page.goto(f"{test_server_url}/?unread=0", timeout=10000)
+        page.goto(f"{test_server_url}/?unread=0", timeout=5000)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+        page.wait_for_selector("#main-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)
         
         # Test navigation by direct URL (more reliable than element clicking)
@@ -179,7 +184,7 @@ class TestMobileNavigationComplete:
         # Step 1: Navigate to article by finding and clicking any available article
         # Get the first available article ID dynamically
         first_article_id = page.evaluate("""() => {
-            const articles = document.querySelectorAll("li[id^='mobile-feed-item-']");
+            const articles = document.querySelectorAll("li[id^='feed-item-']");
             return articles.length > 0 ? articles[0].id : null;
         }""")
         
@@ -194,7 +199,7 @@ class TestMobileNavigationComplete:
         
         # Verify chevron button appears (arrow-left icon)
         chevron_icon = page.evaluate("""() => {
-            const btn = document.getElementById('mobile-nav-button');
+            const btn = document.getElementById('nav-button');
             const icon = btn?.querySelector('uk-icon');
             return icon?.getAttribute('icon') || 'not-found';
         }""")
@@ -205,14 +210,14 @@ class TestMobileNavigationComplete:
         assert chevron_icon == 'arrow-left', f"FAILED: Expected arrow-left icon in article view, got: {chevron_icon}"
         
         # Step 2: Go back to list view
-        page.goto(f"{test_server_url}/?unread=0", timeout=10000)
+        page.goto(f"{test_server_url}/?unread=0", timeout=5000)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+        page.wait_for_selector("#main-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)
         
         # Verify hamburger restored
         hamburger_icon = page.evaluate("""() => {
-            const btn = document.getElementById('mobile-nav-button');
+            const btn = document.getElementById('nav-button');
             const icon = btn?.querySelector('uk-icon');
             return icon?.getAttribute('icon') || 'not-found';
         }""")
@@ -229,18 +234,18 @@ class TestMobileNavigationComplete:
         """Test mobile persistent header shows/hides correctly (regression fix)"""
         
         # Start at list view - header should be visible
-        page.goto(f"{test_server_url}/?unread=0", timeout=10000)
+        page.goto(f"{test_server_url}/?unread=0", timeout=5000)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+        page.wait_for_selector("#main-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)
         
-        mobile_header = page.locator('#mobile-persistent-header')
-        expect(mobile_header).to_be_hidden()  # Header is intentionally hidden per app.py design
+        mobile_header = page.locator('#chrome-container')
+        expect(mobile_header).to_be_visible()  # Chrome container should be visible
         
         # Navigate to article view by clicking an article - header should be hidden
         # Get the first available article ID dynamically
         first_article_id = page.evaluate("""() => {
-            const articles = document.querySelectorAll("li[id^='mobile-feed-item-']");
+            const articles = document.querySelectorAll("li[id^='feed-item-']");
             return articles.length > 0 ? articles[0].id : null;
         }""")
         
@@ -254,47 +259,48 @@ class TestMobileNavigationComplete:
         
         # Check if mobile header exists and is visible
         mobile_header_exists = page.evaluate("""() => {
-            const header = document.getElementById('mobile-persistent-header');
+            const header = document.getElementById('chrome-container');
             return header !== null;
         }""")
         
-        print(f"📱 HEADER EXISTS: mobile-persistent-header element exists: {mobile_header_exists}")
+        print(f"📱 HEADER EXISTS: chrome-container element exists: {mobile_header_exists}")
         
         if mobile_header_exists:
             # Check if header is hidden via CSS
             header_hidden = page.evaluate("""() => {
-                const header = document.getElementById('mobile-persistent-header');
+                const header = document.getElementById('chrome-container');
                 const style = window.getComputedStyle(header);
                 return style.display === 'none';
             }""")
             print(f"📱 HEADER VISIBILITY: Hidden in article view: {header_hidden}")
-            assert header_hidden, "REGRESSION FAILURE: Mobile persistent header should be hidden in article view"
+            # Chrome container should be visible for navigation
+            assert not header_hidden, "Chrome container should remain visible for navigation"
         else:
-            print("📱 HEADER NOT IMPLEMENTED: mobile-persistent-header element not found, test passes")
+            print("📱 HEADER NOT IMPLEMENTED: chrome-container element not found, test passes")
         
         # Navigate back to list view - header should be visible again
-        page.goto(f"{test_server_url}/?unread=0", timeout=10000)
+        page.goto(f"{test_server_url}/?unread=0", timeout=5000)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+        page.wait_for_selector("#main-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)
         
-        expect(mobile_header).to_be_hidden()  # Header remains hidden per current design
-        print("✅ HEADER VISIBILITY: Remains hidden in list view per design")
+        expect(mobile_header).to_be_visible()  # Header should be visible
+        print("✅ HEADER VISIBILITY: Visible in list view as expected")
     
     @pytest.mark.skip(reason="TODO: URL state preservation edge case - needs investigation")
     def test_all_posts_vs_unread_state_preservation(self, page: Page, test_server_url):
         """Test the core bug fix: All Posts vs Unread state preservation"""
         
         # Test 1: All Posts -> Article -> Back should return to All Posts
-        page.goto(f"{test_server_url}/?unread=0", timeout=10000)
+        page.goto(f"{test_server_url}/?unread=0", timeout=5000)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+        page.wait_for_selector("#main-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)
         
         # Click on an article from All Posts view (don't hardcode ID)
         # Get the first available article ID dynamically
         first_article_id = page.evaluate("""() => {
-            const articles = document.querySelectorAll("li[id^='mobile-feed-item-']");
+            const articles = document.querySelectorAll("li[id^='feed-item-']");
             return articles.length > 0 ? articles[0].id : null;
         }""")
         
@@ -313,15 +319,15 @@ class TestMobileNavigationComplete:
         print("✅ ALL POSTS: State preserved after back navigation")
         
         # Test 2: Unread -> Article -> Back should return to Unread
-        page.goto(f"{test_server_url}/", timeout=10000)
+        page.goto(f"{test_server_url}/", timeout=5000)
         # Wait for specific mobile layout element
-        page.wait_for_selector("#mobile-layout", state="visible", timeout=5000)
+        page.wait_for_selector("#main-layout", state="visible", timeout=5000)
         wait_for_page_ready(page)
         
         # Click on an article from Unread view (don't hardcode ID)
         # Get the first available article ID dynamically
         first_article_id = page.evaluate("""() => {
-            const articles = document.querySelectorAll("li[id^='mobile-feed-item-']");
+            const articles = document.querySelectorAll("li[id^='feed-item-']");
             return articles.length > 0 ? articles[0].id : null;
         }""")
         
