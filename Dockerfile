@@ -29,7 +29,7 @@ WORKDIR /app
 
 # Copy the app package and static files
 COPY app/ ./app/
-COPY static/ ./static/
+# This preview branch embeds its assets in the application layout.
 COPY requirements.txt .
 
 # Create data directory
