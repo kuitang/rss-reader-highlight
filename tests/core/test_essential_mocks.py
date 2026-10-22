@@ -192,6 +192,8 @@ class TestFeedParsingEdgeCases:
             original_db = models.DB_PATH
             models.DB_PATH = tmp_db
             models.init_db()
+            with models.get_db() as conn:
+                seeded_feed_count = conn.execute("SELECT COUNT(*) FROM feeds").fetchone()[0]
             
             parser = FeedParser()
             
@@ -237,7 +239,7 @@ class TestFeedParsingEdgeCases:
                     # Verify NO feed was created
                     with models.get_db() as conn:
                         feed_count = conn.execute("SELECT COUNT(*) FROM feeds").fetchone()[0]
-                        assert feed_count == 0, "No feed should be created for invalid RSS"
+                        assert feed_count == seeded_feed_count, "No feed should be created for invalid RSS"
             
             # Test 3: Feed without title should NOT be created
             with patch.object(parser.client, 'get') as mock_get:
@@ -266,7 +268,7 @@ class TestFeedParsingEdgeCases:
                     # Verify NO feed was created
                     with models.get_db() as conn:
                         feed_count = conn.execute("SELECT COUNT(*) FROM feeds").fetchone()[0]
-                        assert feed_count == 0, "No feed should be created without title"
+                        assert feed_count == seeded_feed_count, "No feed should be created without title"
             
             # Test 4: Only successful feeds should be created
             with patch.object(parser.client, 'get') as mock_get:
@@ -289,7 +291,7 @@ class TestFeedParsingEdgeCases:
                 # Since method is removed, no feed should be created
                 with models.get_db() as conn:
                     feed_count = conn.execute("SELECT COUNT(*) FROM feeds").fetchone()[0]
-                    assert feed_count == 0, "No feed should be created when method is removed"
+                    assert feed_count == seeded_feed_count, "No feed should be created when method is removed"
                     
         
         finally:

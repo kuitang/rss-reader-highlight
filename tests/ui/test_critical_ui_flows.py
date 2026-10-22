@@ -21,7 +21,7 @@ pytestmark = pytest.mark.needs_server
 # HTMX Helper Functions for Fast Testing
 def wait_for_htmx_complete(page, timeout=5000):
     """Wait for all HTMX requests to complete - much faster than fixed timeouts"""
-    page.wait_for_function("() => !document.body.classList.contains('htmx-request')", timeout=timeout)
+    page.wait_for_function("() => !document.querySelector('.htmx-request, .htmx-swapping, .htmx-settling') && !window.articleTransitioning", timeout=timeout)
 
 def wait_for_htmx_settle(page, timeout=5000):
     """Wait for HTMX to completely settle with no pending requests"""

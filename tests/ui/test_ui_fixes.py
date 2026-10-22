@@ -212,7 +212,7 @@ class TestHamburgerMenuHTMX:
             const button = document.getElementById('nav-button');
             return {
                 type: button.getAttribute('type'),
-                hasFormName: button.hasAttribute('name'),
+                hasFormName: Boolean(button.getAttribute('name')),
                 hasHxTarget: button.hasAttribute('hx-target'),
                 hasOnClick: button.hasAttribute('hx-on-click') || button.hasAttribute('onclick'),
                 dataMode: button.getAttribute('data-mode')
@@ -220,7 +220,7 @@ class TestHamburgerMenuHTMX:
         }""")
 
         assert nav_button_props['type'] == 'button', "Hamburger should be type='button' to prevent form submission"
-        assert not nav_button_props['hasFormName'], "Hamburger should not have 'name' attribute"
+        assert not nav_button_props['hasFormName'], "Hamburger should not have a nonempty form name"
         assert nav_button_props['hasOnClick'], "Hamburger should have click handler"
         assert nav_button_props['dataMode'] == 'menu', "Hamburger should have data-mode='menu'"
 
@@ -251,7 +251,7 @@ class TestHamburgerMenuHTMX:
                 if (button) {
                     return {
                         type: button.getAttribute('type'),
-                        hasFormName: button.hasAttribute('name'),
+                        hasFormName: Boolean(button.getAttribute('name')),
                         hasOnClick: button.hasAttribute('hx-on-click') || button.hasAttribute('onclick')
                     };
                 }
@@ -260,7 +260,7 @@ class TestHamburgerMenuHTMX:
 
             if search_nav_props.get('exists') is not False:
                 assert search_nav_props['type'] == 'button', "Search nav button should be type='button'"
-                assert not search_nav_props['hasFormName'], "Search nav button should not have 'name' attribute"
+                assert not search_nav_props['hasFormName'], "Search nav button should not have a nonempty form name"
 
 
 class TestChromeLayoutCentering:

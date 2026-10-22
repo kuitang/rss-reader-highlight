@@ -55,7 +55,7 @@ def wait_for_htmx_complete(page, timeout=TIMEOUT_HTMX_REQUEST):
     try:
         # Wait for HTMX to finish processing (no htmx-request class on body)
         page.wait_for_function(
-            "() => !document.body.classList.contains('htmx-request')",
+            "() => !document.querySelector('.htmx-request, .htmx-swapping, .htmx-settling') && !window.articleTransitioning",
             timeout=timeout
         )
     except:
