@@ -21,7 +21,7 @@ pytestmark = pytest.mark.needs_server
 # HTMX Helper Functions for Fast Testing
 def wait_for_htmx_complete(page, timeout=5000):
     """Wait for all HTMX requests to complete - much faster than fixed timeouts"""
-    page.wait_for_function("() => !document.body.classList.contains('htmx-request')", timeout=timeout)
+    page.wait_for_function("() => !document.querySelector('.htmx-request, .htmx-swapping, .htmx-settling') && !window.articleTransitioning", timeout=timeout)
 
 def wait_for_htmx_settle(page, timeout=5000):
     """Wait for HTMX to completely settle with no pending requests"""
@@ -613,25 +613,24 @@ class TestComplexNavigationFlows:
             ("li[id^='feed-item-']", "article detail"),  # Click desktop article
         ]
         
+        history_entries = 0
         for selector, description in navigation_sequence:
             element = page.locator(selector).first
             if element.is_visible():
+                previous_url = page.url
                 element.click()
                 wait_for_htmx_complete(page)
-                
-                # App should remain stable after each navigation - check desktop layout
                 expect(page.locator("#main-layout")).to_be_visible()
-        
-        # 2. Test browser back navigation
-        page.go_back()
-        wait_for_htmx_complete(page)
-        # Wait for either desktop or mobile layout to be visible
-        page.wait_for_selector("#main-layout, #main-layout, #sidebar", state="visible", timeout=5000)
+                if page.url != previous_url:
+                    history_entries += 1
 
-        page.go_back()
-        wait_for_htmx_complete(page)
-        # Wait for main content to be stable
-        page.wait_for_selector("#main-layout, #main-layout, #sidebar", state="visible", timeout=5000)
+        # Only traverse entries created above. Missing legacy selectors must
+        # never make this test navigate out of the app to about:blank.
+        assert history_entries > 0, "Expected at least one in-app navigation"
+        for _ in range(history_entries):
+            page.go_back()
+            wait_for_htmx_complete(page)
+            page.wait_for_selector("#main-layout, #sidebar", state="visible", timeout=5000)
 
         # Should eventually be stable - check for sidebar or mobile layout
         # Use .first to avoid strict mode violation when both elements exist

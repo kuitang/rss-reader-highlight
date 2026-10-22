@@ -27,27 +27,31 @@ def pytest_configure(config):
     )
 
 
+def pytest_sessionstart(session):
+    """The xdist controller owns the shared HTTP server for all workers.
+
+    Every worker uses port 8080, so independent worker startup/teardown races
+    would kill another worker's server while its test is making a request.
+    """
+    config = session.config
+    if not hasattr(config, "workerinput") and getattr(config.option, "numprocesses", 0):
+        os.environ['MINIMAL_MODE'] = 'true'
+        config._rss_test_server = start_test_server(minimal=True)
+        if config._rss_test_server is None:
+            pytest.exit("Failed to start the shared xdist test server", returncode=1)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    server = getattr(session.config, "_rss_test_server", None)
+    if server is not None:
+        stop_test_server(server)
+
+
 @pytest.fixture(scope="session", autouse=True)
 def setup_xdist_server():
-    """Setup server for pytest-xdist workers"""
-    worker_id = os.environ.get('PYTEST_XDIST_WORKER', None)
-    
-    if worker_id:
-        # This is an xdist worker - start minimal server 
-        print(f"🔧 Worker {worker_id}: Starting minimal server...")
-        os.environ['MINIMAL_MODE'] = 'true'
-        
-        server_process = start_test_server(minimal=True)
-        if server_process:
-            print(f"✅ Worker {worker_id}: Server started (PID: {server_process.pid})")
-            yield server_process
-            print(f"🧹 Worker {worker_id}: Stopping server...")
-            stop_test_server(server_process)
-        else:
-            pytest.fail(f"Worker {worker_id}: Failed to start server")
-    else:
-        # Not an xdist worker - no action needed
-        yield None
+    # The controller starts the server before scheduling worker tests and
+    # stops it after every worker has finished.
+    yield None
 
 
 @pytest.fixture(scope="session")

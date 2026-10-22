@@ -9,7 +9,7 @@ pytestmark = pytest.mark.needs_server
 
 def wait_for_htmx_complete(page, timeout=5000):
     """Wait for all HTMX requests to complete"""
-    page.wait_for_function("() => !document.body.classList.contains('htmx-request')", timeout=timeout)
+    page.wait_for_function("() => !document.querySelector('.htmx-request, .htmx-swapping, .htmx-settling') && !window.articleTransitioning", timeout=timeout)
 
 def wait_for_page_ready(page):
     """Wait for initial page load to stabilize"""

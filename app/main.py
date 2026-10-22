@@ -1193,7 +1193,7 @@ Step 3 - JOIN with user_feeds (session={session_id}): {diagnostics['step3_with_u
     req.scope['session_id'] = session_id
 
 # Lifespan event handler for background worker
-@contextlib.asynccontextmanager
+# FastHTML manages the async generator context itself.
 async def lifespan(app):
     """Handle app startup and shutdown with background worker"""
     if MINIMAL_MODE:

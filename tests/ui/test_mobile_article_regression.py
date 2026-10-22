@@ -12,7 +12,7 @@ from playwright.sync_api import Page, expect
 def wait_for_htmx_complete(page, timeout=5000):
     """Wait for HTMX requests to complete"""
     page.wait_for_function(
-        "() => !document.body.classList.contains('htmx-request')",
+        "() => !document.querySelector('.htmx-request, .htmx-swapping, .htmx-settling') && !window.articleTransitioning",
         timeout=timeout
     )
 

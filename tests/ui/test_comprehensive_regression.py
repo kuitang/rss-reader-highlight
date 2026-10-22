@@ -11,7 +11,7 @@ pytestmark = pytest.mark.needs_server
 # HTMX Helper Functions for Fast Testing
 def wait_for_htmx_complete(page, timeout=5000):
     """Wait for all HTMX requests to complete - much faster than fixed timeouts"""
-    page.wait_for_function("() => !document.body.classList.contains('htmx-request')", timeout=timeout)
+    page.wait_for_function("() => !document.querySelector('.htmx-request, .htmx-swapping, .htmx-settling') && !window.articleTransitioning", timeout=timeout)
 
 def wait_for_page_ready(page):
     """Fast page ready check - waits for network idle instead of fixed timeout"""
@@ -387,7 +387,7 @@ class TestHTMXArchitectureValidation:
         # Test column interaction
         article_items = page.locator("li[id*='feed-item']").all()
         if len(article_items) > 0:
-            article_items[0].click()
+            article_items[0].locator(":scope > div").first.click()
             wait_for_htmx_complete(page)
             
             # Verify detail column updates while other columns remain
