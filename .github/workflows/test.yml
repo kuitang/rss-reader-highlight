@@ -22,7 +22,7 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: "3.11"
+        python-version: "3.11.17"
 
     - name: Cache pip dependencies
       uses: actions/cache@v4
@@ -35,8 +35,20 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install --require-hashes -r requirements.lock
         pip install -e .
+        python - <<'PYLOCK'
+        from importlib.metadata import version
+        from pathlib import Path
+        from pip._vendor.packaging.requirements import Requirement
+        for line in Path('requirements.txt').read_text().splitlines():
+            line = line.split('#', 1)[0].strip()
+            if not line:
+                continue
+            req = Requirement(line)
+            if req.marker is None or req.marker.evaluate():
+                assert version(req.name) in req.specifier, f"Regenerate requirements.lock for {req}"
+        PYLOCK
 
     - name: Install Playwright browsers
       run: |
@@ -71,13 +83,25 @@ jobs:
     - name: Set up Python 3.11
       uses: actions/setup-python@v5
       with:
-        python-version: "3.11"
+        python-version: "3.11.17"
 
     - name: Install test dependencies
       run: |
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        pip install --require-hashes -r requirements.lock
         pip install -e .
+        python - <<'PYLOCK'
+        from importlib.metadata import version
+        from pathlib import Path
+        from pip._vendor.packaging.requirements import Requirement
+        for line in Path('requirements.txt').read_text().splitlines():
+            line = line.split('#', 1)[0].strip()
+            if not line:
+                continue
+            req = Requirement(line)
+            if req.marker is None or req.marker.evaluate():
+                assert version(req.name) in req.specifier, f"Regenerate requirements.lock for {req}"
+        PYLOCK
         python -m playwright install chromium
 
     - name: Run Docker integration tests
