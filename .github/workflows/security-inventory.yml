@@ -1,0 +1,43 @@
+name: Weekly deployed image inventory
+on:
+  schedule:
+    - cron: '27 5 * * 2'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  inventory:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ['rss-reader-highlight', 'pr-8-kuitang-rss-reader-highlight']
+    env:
+      FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: superfly/flyctl-actions/setup-flyctl@master
+      - name: Inventory exact deployed image without starting Machines
+        env:
+          APP: ${{ matrix.app }}
+        run: |
+          set -euo pipefail
+          mkdir -p security-evidence
+          flyctl machines list -a "$APP" --json > machines.json
+          jq '[.[] | {id, state, image_ref}]' machines.json > security-evidence/machines.json
+          flyctl auth docker
+          jq -r '.[].image_ref | "\(.registry)/\(.repository)@\(.digest)"' machines.json | sort -u > security-evidence/images.txt
+          while IFS= read -r IMAGE; do
+            test -n "$IMAGE" || continue
+            DIGEST="${IMAGE##*@sha256:}"
+            docker pull "$IMAGE"
+            docker inspect "$IMAGE" > "security-evidence/$DIGEST-image.json"
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/security-evidence:/reports" aquasec/trivy:0.76.1 image --scanners vuln --format json --output "/reports/$DIGEST-vulnerabilities.json" "$IMAGE"
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/security-evidence:/reports" aquasec/trivy:0.76.1 image --format cyclonedx --output "/reports/$DIGEST-sbom.json" "$IMAGE"
+          done < security-evidence/images.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: image-inventory-${{ matrix.app }}-${{ github.run_id }}
+          path: security-evidence/
+          retention-days: 30

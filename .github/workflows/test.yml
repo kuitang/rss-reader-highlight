@@ -1,6 +1,8 @@
 name: RSS Reader Test Suite
 
 on:
+  schedule:
+    - cron: '43 5 * * 2'
   push:
     branches: [ main, feat/* ]
   pull_request:
