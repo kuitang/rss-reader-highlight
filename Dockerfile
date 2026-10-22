@@ -35,6 +35,9 @@ COPY requirements.txt .
 # Create data directory
 RUN mkdir -p /data && chmod 755 /data
 
+# Package installers are build-only; keep the production runtime free of their vendored libraries.
+RUN /usr/local/bin/python -m pip uninstall -y pip setuptools wheel
+
 # Environment setup
 ENV PATH=/root/.local/bin:$PATH
 ENV PORT=8080
