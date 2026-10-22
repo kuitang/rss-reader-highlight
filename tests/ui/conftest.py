@@ -12,6 +12,7 @@ Server Dependency Management:
 import pytest
 import httpx
 import os
+import sys
 import time
 from playwright.sync_api import sync_playwright
 
@@ -203,12 +204,16 @@ def test_server_url():
     env = os.environ.copy()
     env.update({
         'MINIMAL_MODE': 'true',
-        'PORT': str(port)
+        'PORT': str(port),
+        'PRODUCTION': 'true'
     })
     
+    # A module can issue enough requests to fill an unread pipe and block
+    # the server. Keep output in a file so the server never waits on pytest.
+    server_log = tempfile.TemporaryFile(mode='w+')
     server_process = subprocess.Popen([
-        'python', '-m', 'app'
-    ], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=os.getcwd())
+        sys.executable, '-m', 'app'
+    ], env=env, stdout=server_log, stderr=subprocess.STDOUT, cwd=os.getcwd())
     
     # Register cleanup function
     def cleanup_server():
