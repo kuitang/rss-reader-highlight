@@ -387,7 +387,7 @@ class TestHTMXArchitectureValidation:
         # Test column interaction
         article_items = page.locator("li[id*='feed-item']").all()
         if len(article_items) > 0:
-            article_items[0].click()
+            article_items[0].locator(":scope > div").first.click()
             wait_for_htmx_complete(page)
             
             # Verify detail column updates while other columns remain

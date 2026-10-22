@@ -104,7 +104,7 @@ class TestDarkMode:
             initial_chrome_html = chrome.inner_html()
 
             # Click article
-            first_article.click()
+            first_article.locator(":scope > div").first.click()
             wait_for_htmx_complete(page)
 
             # CRITICAL: Chrome must still be visible after article click
