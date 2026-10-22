@@ -9,8 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python packages to user directory
-COPY requirements.lock .
-RUN pip install --user --no-cache-dir --require-hashes -r requirements.lock
+COPY requirements.txt .
+RUN pip install --user --no-cache-dir --require-hashes -r requirements.txt
 
 # Runtime stage - minimal image
 FROM python:3.11.17-slim-trixie
@@ -30,7 +30,7 @@ WORKDIR /app
 # Copy the app package and static files
 COPY app/ ./app/
 COPY static/ ./static/
-COPY requirements.lock .
+COPY requirements.txt .
 
 # Create data directory
 RUN mkdir -p /data && chmod 755 /data
