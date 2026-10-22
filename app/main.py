@@ -618,7 +618,7 @@ def before(req, sess):
 
 
 # Lifespan event handler for background worker
-@contextlib.asynccontextmanager
+# FastHTML manages the async generator context itself.
 async def lifespan(app):
     """Handle app startup and shutdown with background worker"""
     if MINIMAL_MODE:
