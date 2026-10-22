@@ -4,13 +4,12 @@ Application startup tests with real server instances on random ports.
 Tests both minimal and non-minimal database setup modes.
 
 This tests what the manual testing verified:
-- setup_default_feeds(minimal_mode=False) creates 13 feeds
+- setup_default_feeds(minimal_mode=False) creates 12 feeds (reddit all removed)
 - setup_default_feeds(minimal_mode=True) creates 2 feeds
 - Both modes start properly and serve HTTP responses
 """
 
 import pytest
-pytestmark = pytest.mark.skip(reason="TODO: Fix integration tests")
 import httpx
 import multiprocessing
 import uvicorn
@@ -21,6 +20,10 @@ import socket
 from contextlib import contextmanager
 from bs4 import BeautifulSoup
 import sys
+
+# Test constants
+EXPECTED_NORMAL_FEEDS = 12  # After removing reddit all
+EXPECTED_MINIMAL_FEEDS = 2  # Minimal mode feeds
 
 # Add the parent directory to path for imports
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -110,7 +113,7 @@ class TestApplicationStartup:
     """Test application startup with different database modes"""
     
     def test_normal_mode_startup_and_feeds(self):
-        """Test normal mode starts with full feed set (13 feeds after removing BizToc)"""
+        """Test normal mode starts with full feed set (12 feeds after removing reddit all)"""
         with app_server_context(minimal_mode=False) as (server_url, db_path):
             client = httpx.Client(timeout=10)
             
@@ -133,8 +136,8 @@ class TestApplicationStartup:
                     feed_id = href.split('feed_id=')[1].split('&')[0]
                     unique_feed_ids.add(feed_id)
             
-            # Should have 13 unique feeds (removed BizToc from the original 14)
-            assert len(unique_feed_ids) >= 13, f"Expected at least 13 unique feeds, got {len(unique_feed_ids)}"
+            # Should have 12 unique feeds (removed reddit all)
+            assert len(unique_feed_ids) >= EXPECTED_NORMAL_FEEDS, f"Expected at least {EXPECTED_NORMAL_FEEDS} unique feeds, got {len(unique_feed_ids)}"
             
             # Verify some expected feeds exist by checking link text
             feed_texts = [link.get_text().strip() for link in feed_links]
@@ -155,7 +158,7 @@ class TestApplicationStartup:
     
     def test_minimal_mode_startup_and_feeds(self):
         """Test minimal mode starts with minimal feed set (2 feeds)"""
-        with app_server_context(minimal_mode=False) as (server_url, db_path):
+        with app_server_context(minimal_mode=True) as (server_url, db_path):
             client = httpx.Client(timeout=10)
             
             # Test main page loads
@@ -178,7 +181,7 @@ class TestApplicationStartup:
                     unique_feed_ids.add(feed_id)
             
             # Should have exactly 2 unique feeds in minimal mode
-            assert len(unique_feed_ids) == 2, f"Expected exactly 2 unique feeds in minimal mode, got {len(unique_feed_ids)}: {unique_feed_ids}"
+            assert len(unique_feed_ids) == EXPECTED_MINIMAL_FEEDS, f"Expected exactly {EXPECTED_MINIMAL_FEEDS} unique feeds in minimal mode, got {len(unique_feed_ids)}: {unique_feed_ids}"
             
             # Verify the minimal feeds exist
             feed_texts = [link.get_text().strip() for link in feed_links]
@@ -219,7 +222,7 @@ class TestApplicationStartup:
         
         # Verify the counts are different and as expected
         assert minimal_count == 2, f"Minimal mode should have 2 unique feeds, got {minimal_count}"
-        assert normal_count >= 13, f"Normal mode should have at least 13 unique feeds, got {normal_count}"
+        assert normal_count >= EXPECTED_NORMAL_FEEDS, f"Normal mode should have at least {EXPECTED_NORMAL_FEEDS} unique feeds, got {normal_count}"
         assert normal_count > minimal_count, f"Normal mode ({normal_count}) should have more feeds than minimal mode ({minimal_count})"
     
     def test_database_isolation(self):
@@ -269,7 +272,7 @@ class TestApplicationStartup:
             
             # 2. Check that feeds were set up (no need to wait - they're created synchronously now)
             feed_links = soup.find_all('a', href=lambda h: h and 'feed_id' in h)
-            assert len(feed_links) >= 13, f"Expected at least 13 feeds, got {len(feed_links)}"
+            assert len(feed_links) >= EXPECTED_NORMAL_FEEDS, f"Expected at least {EXPECTED_NORMAL_FEEDS} feeds, got {len(feed_links)}"
             
             # 3. Should have feed items visible (or at least the structure for them)
             # Look for the feeds list container - should exist even if no articles yet
@@ -301,7 +304,7 @@ class TestApplicationStartup:
             
             # Should have same feeds (session persisted)
             assert len(feed_links_1) == len(feed_links_2), "Feed count should be consistent across requests"
-            assert len(feed_links_1) >= 13, "Should have expected number of feeds"
+            assert len(feed_links_1) >= EXPECTED_NORMAL_FEEDS, "Should have expected number of feeds"
     
     def test_form_parameter_mapping_via_http(self):
         """Test: Form submission → FastHTML parameter mapping → Server response
@@ -367,7 +370,7 @@ class TestApplicationStartup:
         
         # Verify expected behavior
         assert len(minimal_feeds) == 2, f"Minimal mode should have 2 unique feeds, got {len(minimal_feeds)}: {list(minimal_feeds.values())}"
-        assert len(normal_feeds) >= 13, f"Normal mode should have 13+ unique feeds, got {len(normal_feeds)}: {list(normal_feeds.values())[:5]}..."
+        assert len(normal_feeds) >= EXPECTED_NORMAL_FEEDS, f"Normal mode should have {EXPECTED_NORMAL_FEEDS}+ unique feeds, got {len(normal_feeds)}: {list(normal_feeds.values())[:5]}..."
         
         # Verify minimal feeds are subset of normal feeds (by comparing core feed names)
         # Clean up feed names by removing "updated X" suffix and extracting core names

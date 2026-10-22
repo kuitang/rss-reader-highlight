@@ -1,27 +1,17 @@
 name: Deploy to Production
 
 on:
-  workflow_run:
-    workflows: ["RSS Reader Test Suite"]
-    types: [completed]
   push:
     branches: [main]
 
 jobs:
   deploy:
     name: Deploy app to production
-    if: >-
-      github.event_name == 'push' ||
-      (github.event.workflow_run.event == 'schedule' &&
-       github.event.workflow_run.head_branch == 'main' &&
-       github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-latest
     concurrency: deploy-group
 
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
       - uses: superfly/flyctl-actions/setup-flyctl@master
       - run: flyctl deploy --remote-only
         env:

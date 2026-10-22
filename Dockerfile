@@ -29,13 +29,13 @@ WORKDIR /app
 
 # Copy the app package and static files
 COPY app/ ./app/
-COPY static/ ./static/
+# This preview branch embeds its assets in the application layout.
 COPY requirements.txt .
 
 # Create data directory
 RUN mkdir -p /data && chmod 755 /data
 
-# Package installers are build-only; keep the production runtime free of their vendored libraries.
+# Package installers are build-only; exclude their vendored libraries from runtime.
 RUN /usr/local/bin/python -m pip uninstall -y pip setuptools wheel
 
 # Environment setup
