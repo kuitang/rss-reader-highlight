@@ -125,7 +125,7 @@ class TestDatabaseConstraintScenarios:
             
             # Verify rollback - feed should not exist
             with get_db() as conn:
-                feed_count = conn.execute("SELECT COUNT(*) FROM feeds").fetchone()[0]
+                feed_count = conn.execute("SELECT COUNT(*) FROM feeds WHERE url = ?", ("https://rollback.test",)).fetchone()[0]
                 assert feed_count == 0, "Transaction should have been rolled back"
             
         finally:
@@ -210,7 +210,7 @@ class TestFeedParsingEdgeCases:
                 
                 # Verify NO feed was created in database
                 with models.get_db() as conn:
-                    feed_count = conn.execute("SELECT COUNT(*) FROM feeds").fetchone()[0]
+                    feed_count = conn.execute("SELECT COUNT(*) FROM feeds WHERE url = ?", ("https://404error.test",)).fetchone()[0]
                     assert feed_count == 0, "No feed should be created for 404 errors"
             
             # Test 2: Invalid RSS should NOT create feed
