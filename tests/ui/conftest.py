@@ -14,10 +14,11 @@ import httpx
 from test_helpers import wait_for_server_ready
 from tenacity import RetryError
 import os
+import sys
 from playwright.sync_api import sync_playwright
 
 
-@pytest.fixture(scope="session")
+@pytest.fixture(scope="module")
 def test_server_url():
     """Auto-start test server or use existing server for UI tests
     
@@ -40,7 +41,8 @@ def test_server_url():
         try:
             response = httpx.get(existing_server, timeout=5)
             if response.status_code == 200:
-                return existing_server
+                yield existing_server
+                return
         except httpx.RequestError:
             pass
     
@@ -72,12 +74,15 @@ def test_server_url():
     env = os.environ.copy()
     env.update({
         'MINIMAL_MODE': 'true',
-        'PORT': str(port)
+        'PORT': str(port),
+        'PRODUCTION': 'true'
     })
     
+    # Keep output drained without blocking the server on an unread pipe.
+    server_log = tempfile.TemporaryFile(mode='w+')
     server_process = subprocess.Popen([
-        'python', '-m', 'app'
-    ], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=os.getcwd())
+        sys.executable, '-m', 'app'
+    ], env=env, stdout=server_log, stderr=subprocess.STDOUT, cwd=os.getcwd())
     
     # Register cleanup function
     def cleanup_server():
@@ -90,6 +95,7 @@ def test_server_url():
                 server_process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 server_process.kill()
+                server_process.wait()
                 
             # Clean up the PID-specific database created by models.py in MINIMAL_MODE
             pid_specific_db = os.path.join('data', f'minimal.{server_pid}.db')
@@ -103,19 +109,20 @@ def test_server_url():
             except OSError:
                 pass
     
-    atexit.register(cleanup_server)
     
     # Wait for server to start using tenacity with exponential backoff
     try:
         wait_for_server_ready(server_url)
     except RetryError:
         cleanup_server()
-        pytest.skip(f"Failed to start test server on {server_url}")
+        server_log.seek(0)
+        pytest.fail(f"Failed to start test server on {server_url}: {server_log.read()}")
     
-    yield server_url
-    
-    # Cleanup
-    cleanup_server()
+    try:
+        yield server_url
+    finally:
+        cleanup_server()
+        server_log.close()
 
 
 @pytest.fixture(scope="module")  # One browser per test file/module

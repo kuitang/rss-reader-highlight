@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 def wait_for_htmx_complete(page: Page, timeout: int = MAX_WAIT_MS):
     """Wait for all HTMX requests to complete"""
     page.wait_for_function(
-        "() => !document.body.classList.contains('htmx-request')",
+        "() => !document.querySelector('.htmx-request, .htmx-swapping, .htmx-settling') && !window.articleTransitioning",
         timeout=timeout
     )
 
@@ -36,7 +36,7 @@ def wait_for_htmx_complete(page: Page, timeout: int = MAX_WAIT_MS):
 def wait_for_htmx_settle(page: Page, timeout: int = MAX_WAIT_MS):
     """Wait for HTMX to fully settle (no requests and no settling class)"""
     page.wait_for_function(
-        "() => !document.body.classList.contains('htmx-request') && !document.body.classList.contains('htmx-settling')",
+        "() => !document.querySelector('.htmx-request, .htmx-swapping, .htmx-settling') && !window.articleTransitioning",
         timeout=timeout
     )
 

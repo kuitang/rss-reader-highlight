@@ -18,133 +18,100 @@ class TestFeedIngestion:
     
     @pytest.fixture(autouse=True)
     def setup(self):
-        """Set up test fixtures"""
+        """Exercise real HTTP client/redirect/parser behavior with fixed upstream replies.
+
+        CI must validate ingestion independently of Reddit rate limits, upstream
+        outages, or changing discovery pages. Unknown requests fail closed.
+        """
         self.parser = FeedParser()
-    
-    # Reddit Special Case Tests (from test_reddit_special_case.py)
-    def test_reddit_rss_suffix_detection(self):
-        """Test that Reddit URLs get .rss suffix added correctly"""
-        reddit_urls = [
-            'https://reddit.com/r/OpenAI',
-            'https://www.reddit.com/r/ClaudeAI', 
-            'https://reddit.com/r/vibecoding/',
-            'https://www.reddit.com/r/MicroSaaS/',
-            'https://old.reddit.com/r/Python',
-            'https://reddit.com/r/programming'
-        ]
-        
-        print("\n=== Testing Reddit RSS Suffix Detection ===")
-        
-        for url in reddit_urls:
-            print(f"Testing: {url}")
-            
-            try:
-                # Test the internal method
-                reddit_feed_url = self.parser._try_reddit_rss_suffix(url)
-                
-                if reddit_feed_url:
-                    print(f"  ✓ Found RSS: {reddit_feed_url}")
-                    
-                    # Verify it's a working RSS feed
-                    fetch_result = self.parser.fetch_feed(reddit_feed_url)
-                    assert fetch_result['updated'], f"RSS feed should be fetchable: {reddit_feed_url}"
-                    assert fetch_result['status'] == 200, f"RSS feed should return 200: {reddit_feed_url}"
-                    
-                    # Verify it contains RSS content
-                    feed_data = fetch_result['data']
-                    assert hasattr(feed_data, 'entries'), f"Should have entries: {reddit_feed_url}"
-                    assert len(feed_data.entries) > 0, f"Should have at least one entry: {reddit_feed_url}"
-                else:
-                    print(f"  ✗ No RSS found")
-                    pytest.fail(f"Expected to find RSS feed for {url}")
-                    
-            except Exception as e:
-                print(f"  ✗ Exception: {str(e)}")
-                pytest.fail(f"Exception testing {url}: {str(e)}")
-    
-    # RSS Auto-discovery Tests (from test_rss_autodiscovery.py)
-    def test_rss_autodiscovery_success_cases(self):
-        """Test RSS autodiscovery for sites that should work"""
-        test_sites = [
-            {
-                'url': 'https://reddit.com/r/OpenAI', 
-                'expected_type': 'rss',
-                'description': 'Reddit subreddit - should auto-discover .rss',
-                'should_work': True  # Reddit special case should work
-            },
-            {
-                'url': 'https://www.reddit.com/r/ClaudeAI',
-                'expected_type': 'rss', 
-                'description': 'Reddit subreddit with www - should auto-discover .rss',
-                'should_work': True  # Reddit special case should work
-            },
-            {
-                'url': 'https://techcrunch.com',
-                'expected_type': 'rss', 
-                'description': 'TechCrunch - should have RSS feed',
-                'should_work': True  # Standard auto-discovery works
-            },
-            {
-                'url': 'https://stackoverflow.com/questions/tagged/python',
-                'expected_type': 'rss',
-                'description': 'Stack Overflow tag - should have RSS feed',
-                'should_work': True  # Standard auto-discovery works
-            }
-        ]
-        
-        print("\n=== Testing RSS Auto-discovery Success Cases ===")
-        
-        for site in test_sites:
-            if site['should_work']:
-                print(f"Testing: {site['url']} ({site['description']})")
-                
-                try:
-                    # Test autodiscovery (this would need to be implemented)
-                    discovered_url = self._test_autodiscovery(site['url'])
-                    
-                    if discovered_url:
-                        print(f"  ✓ Discovered: {discovered_url}")
-                        
-                        # Verify the discovered feed works
-                        fetch_result = self.parser.fetch_feed(discovered_url)
-                        assert fetch_result['updated'], f"Discovered feed should work: {discovered_url}"
-                        assert fetch_result['status'] == 200, f"Discovered feed should return 200: {discovered_url}"
-                    else:
-                        print(f"  ✗ No feed discovered")
-                        # Don't fail for now since autodiscovery isn't fully implemented
-                        
-                except Exception as e:
-                    print(f"  ✗ Exception: {str(e)}")
-                    # Don't fail for now since autodiscovery isn't fully implemented
-    
+        self.requests = []
+        rss = """<?xml version="1.0"?><rss version="2.0"><channel>
+            <title>Fixture RSS</title><description>Test feed</description>
+            <item><title>Fixture item</title><link>https://example.com/item</link>
+            <description>Fixture article</description></item>
+            </channel></rss>"""
+        atom = """<?xml version="1.0"?><feed xmlns="http://www.w3.org/2005/Atom">
+            <title>Fixture Atom</title><entry><title>Fixture entry</title>
+            <id>fixture-entry</id><link href="https://example.com/entry"/>
+            </entry></feed>"""
+
+        def respond(request):
+            self.requests.append(str(request.url))
+            assert request.method == 'GET'
+            host, path = request.url.host, request.url.path
+            if host in {'reddit.com', 'www.reddit.com', 'old.reddit.com'} and path.startswith('/r/'):
+                if path.endswith('/.rss'):
+                    return httpx.Response(200, text=rss, headers={'content-type': 'application/rss+xml'})
+                return httpx.Response(200, text='<html><head></head><body>Subreddit</body></html>')
+            if host == 'techcrunch.com':
+                if path == '/':
+                    return httpx.Response(200, text='<link rel="alternate" type="application/rss+xml" href="/feed/" title="TechCrunch">')
+                if path == '/feed/':
+                    return httpx.Response(200, text=rss, headers={'content-type': 'application/rss+xml'})
+            if host == 'stackoverflow.com':
+                if path == '/questions/tagged/python':
+                    return httpx.Response(200, text='<link rel="alternate" type="application/atom+xml" href="/feeds/tag/python" title="Python">')
+                if path == '/feeds/tag/python':
+                    return httpx.Response(200, text=atom, headers={'content-type': 'application/atom+xml'})
+            if host == 'github.com' and path == '/microsoft/vscode':
+                return httpx.Response(200, text='<html><head></head><body>No alternate feed</body></html>')
+            if host == 'feeds.bbci.co.uk' and path == '/news/rss.xml':
+                if request.url.scheme == 'http':
+                    return httpx.Response(302, headers={'location': 'https://feeds.bbci.co.uk/news/rss.xml'})
+                return httpx.Response(200, text=rss, headers={'content-type': 'application/rss+xml'})
+            raise AssertionError(f'Unexpected ingestion fixture request: {request.url}')
+
+        original = self.parser.client
+        # Preserve the production client's redirect policy and headers so a
+        # regression in FeedParser's configuration still breaks these tests.
+        self.parser.client = httpx.Client(
+            transport=httpx.MockTransport(respond),
+            follow_redirects=original.follow_redirects,
+            headers=original.headers,
+            timeout=original.timeout,
+        )
+        original.close()
+        yield
+        self.parser.client.close()
+
+    @pytest.mark.parametrize('url', [
+        'https://reddit.com/r/OpenAI',
+        'https://www.reddit.com/r/ClaudeAI',
+        'https://reddit.com/r/vibecoding/',
+        'https://www.reddit.com/r/MicroSaaS/',
+        'https://old.reddit.com/r/Python',
+        'https://reddit.com/r/programming',
+    ])
+    def test_reddit_rss_suffix_detection(self, url):
+        """All supported Reddit URL forms retain the expected /.rss suffix."""
+        expected = url.rstrip('/') + '/.rss'
+        assert self.parser._try_reddit_rss_suffix(url) == expected
+        result = self.parser.fetch_feed(expected)
+        assert result['updated'] and result['status'] == 200
+        assert len(result['data'].entries) == 1
+        assert self.requests == [expected, expected]
+
+    @pytest.mark.parametrize('url,expected,feed_type', [
+        ('https://reddit.com/r/OpenAI', 'https://reddit.com/r/OpenAI/.rss', 'rss'),
+        ('https://www.reddit.com/r/ClaudeAI', 'https://www.reddit.com/r/ClaudeAI/.rss', 'rss'),
+        ('https://techcrunch.com', 'https://techcrunch.com/feed/', 'rss'),
+        ('https://stackoverflow.com/questions/tagged/python', 'https://stackoverflow.com/feeds/tag/python', 'atom'),
+    ])
+    def test_rss_autodiscovery_success_cases(self, url, expected, feed_type):
+        """Use real HTML discovery and Reddit fallback, then parse the result."""
+        discovered = self.parser.discover_feeds(url)
+        assert len(discovered) == 1
+        assert discovered[0]['url'] == expected
+        assert discovered[0]['type'] == feed_type
+        result = self.parser.fetch_feed(expected)
+        assert result['updated'] and result['status'] == 200
+        assert len(result['data'].entries) == 1
+
     def test_rss_autodiscovery_failure_cases(self):
-        """Test RSS autodiscovery for sites that should fail gracefully"""
-        failure_sites = [
-            {
-                'url': 'https://github.com/microsoft/vscode',
-                'expected_type': 'atom',
-                'description': 'GitHub repo - should have Atom feed',
-                'should_work': False  # GitHub doesn't use auto-discovery
-            }
-        ]
-        
-        print("\n=== Testing RSS Auto-discovery Failure Cases ===")
-        
-        for site in failure_sites:
-            if not site['should_work']:
-                print(f"Testing: {site['url']} ({site['description']})")
-                
-                try:
-                    discovered_url = self._test_autodiscovery(site['url'])
-                    
-                    if not discovered_url:
-                        print(f"  ✓ No feed discovered (expected)")
-                    else:
-                        print(f"  ! Unexpectedly discovered: {discovered_url}")
-                        
-                except Exception as e:
-                    print(f"  ✓ Exception handled gracefully: {str(e)}")
-    
+        """Pages without alternate links return no feeds without inventing a URL."""
+        assert self.parser.discover_feeds('https://github.com/microsoft/vscode') == []
+        assert self.requests == ['https://github.com/microsoft/vscode']
+
     # Feed Format Parsing Tests
     def test_fetch_feed_success(self):
         """Test successful feed fetching with real FeedParser method"""
@@ -204,34 +171,14 @@ class TestFeedIngestion:
     
     # HTTP Redirect Handling Tests
     def test_http_redirect_handling(self):
-        """Test that HTTP redirects are handled properly"""
-        # Test cases that involve redirects (like BBC feed from critical flows)
-        redirect_test_cases = [
-            {
-                'original_url': 'http://feeds.bbci.co.uk/news/rss.xml',  # http -> https redirect
-                'expected_final_url': 'https://feeds.bbci.co.uk/news/rss.xml',
-                'description': 'BBC feed HTTP to HTTPS redirect'
-            }
-        ]
-        
-        print("\n=== Testing HTTP Redirect Handling ===")
-        
-        for case in redirect_test_cases:
-            print(f"Testing: {case['original_url']} -> {case['expected_final_url']}")
-            
-            try:
-                # Test that fetch_feed follows redirects properly
-                result = self.parser.fetch_feed(case['original_url'])
-                
-                if result['updated']:
-                    print(f"  ✓ Redirect followed successfully")
-                    assert result['status'] == 200, "Should get 200 after redirect"
-                else:
-                    print(f"  ✗ Redirect not followed properly")
-                    
-            except Exception as e:
-                print(f"  ✗ Exception during redirect test: {str(e)}")
-    
+        """The actual configured client follows BBC's HTTP to HTTPS redirect."""
+        original = 'http://feeds.bbci.co.uk/news/rss.xml'
+        final = 'https://feeds.bbci.co.uk/news/rss.xml'
+        result = self.parser.fetch_feed(original)
+        assert result['updated'] and result['status'] == 200
+        assert len(result['data'].entries) == 1
+        assert self.requests == [original, final]
+
     def test_fetch_feed_with_network_error(self):
         """Test handling of network errors with real FeedParser method"""
         # Mock httpx to raise network error
@@ -258,15 +205,3 @@ class TestFeedIngestion:
             # Should handle HTTP errors gracefully
             assert not result['updated']
             assert result['status'] == 404
-    
-    # Helper Methods
-    def _test_autodiscovery(self, url):
-        """Helper method to test RSS autodiscovery (placeholder for actual implementation)"""
-        # For Reddit URLs, use the existing Reddit special case logic
-        if 'reddit.com' in url:
-            return self.parser._try_reddit_rss_suffix(url)
-        
-        # For other URLs, this would implement actual autodiscovery
-        # For now, return None to indicate autodiscovery not implemented
-        return None
-
