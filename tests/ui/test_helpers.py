@@ -162,21 +162,11 @@ def wait_for_viewport_transition(page: Page, timeout: int = MAX_WAIT_MS):
         page: Playwright page object
         timeout: Maximum wait time
     """
-    # Wait for any media query transitions to complete
+    # An element may declare a transition while idle. Only active animations
+    # represent an unsettled viewport; use actual animation play state.
     page.wait_for_function(
-        """() => {
-            // Check if any elements are transitioning
-            const elements = document.querySelectorAll('*');
-            for (const el of elements) {
-                const style = window.getComputedStyle(el);
-                const transition = style.transition || style.webkitTransition || '';
-                if (transition && transition !== 'none' && transition !== 'all 0s ease 0s') {
-                    return false;
-                }
-            }
-            return true;
-        }""",
-        timeout=timeout
+        "() => document.getAnimations().every(a => a.playState !== 'running')",
+        timeout=timeout,
     )
 
     # Also ensure layout elements are in expected state
