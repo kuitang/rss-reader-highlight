@@ -45,7 +45,7 @@ jobs:
             docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/security-evidence:/reports" aquasec/trivy:0.76.1 image --scanners vuln --format json --output "/reports/$DIGEST-vulnerabilities.json" "$IMAGE"
             docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD/security-evidence:/reports" aquasec/trivy:0.76.1 image --format cyclonedx --output "/reports/$DIGEST-sbom.json" "$IMAGE"
           done < security-evidence/images.txt
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: image-inventory-${{ matrix.app }}-${{ github.run_id }}
