@@ -441,7 +441,6 @@ def setup_default_feeds(minimal_mode=False):
             ("https://www.reddit.com/r/ClaudeAI/.rss", "ClaudeAI"),
             ("https://www.reddit.com/r/MicroSaaS/.rss", "MicroSaaS"),
             ("https://www.reddit.com/r/OpenAI/.rss", "OpenAI"),
-            ("https://www.reddit.com/r/all/.rss", "Reddit All"),
             ("https://www.reddit.com/r/vibecoding/.rss", "VibeCoding"),
             ("https://feeds.content.dowjones.io/public/rss/RSSMarketsMain", "WSJ Markets"),
             ("https://techcrunch.com/feed/", "TechCrunch"),

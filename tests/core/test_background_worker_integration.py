@@ -166,7 +166,7 @@ class TestBackgroundWorkerIntegration:
         worker, queue_manager, db_path = isolated_worker_system
         
         # Setup old feeds (need updating)
-        old_time = datetime.now() - timedelta(minutes=5)
+        old_time = datetime.utcnow() - timedelta(minutes=5)
         feed_ids = []
         with get_db() as conn:
             for domain, data in mock_feeds_data.items():
