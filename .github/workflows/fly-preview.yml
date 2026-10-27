@@ -14,6 +14,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+      - name: Refresh preview build layers for this workflow attempt
+        if: github.event.action != 'closed'
+        run: |
+          printf '\n[build.args]\n  SECURITY_REBUILD = "%s-%s"\n' "$GITHUB_RUN_ID" "$GITHUB_RUN_ATTEMPT" >> fly.preview.toml
+
       - name: Deploy PR preview to Fly.io
         id: deploy
         uses: superfly/fly-pr-review-apps@1.2.1
