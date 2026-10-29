@@ -1,5 +1,5 @@
 # Build stage - install dependencies
-FROM python:3.11.18-slim-trixie as builder
+FROM python:3.15.0-slim-trixie as builder
 ARG SECURITY_REBUILD=local
 RUN printf '%s\n' "$SECURITY_REBUILD" > /tmp/security-rebuild
 
@@ -15,7 +15,7 @@ COPY requirements.txt .
 RUN pip install --user --no-cache-dir --require-hashes -r requirements.txt
 
 # Runtime stage - minimal image
-FROM python:3.11.18-slim-trixie
+FROM python:3.15.0-slim-trixie
 ARG SECURITY_REBUILD=local
 RUN printf '%s\n' "$SECURITY_REBUILD" > /tmp/security-rebuild
 RUN python -m pip install --no-cache-dir --upgrade "pip>=26.2.0" "setuptools>=83.0.0" "wheel>=0.46.2"
