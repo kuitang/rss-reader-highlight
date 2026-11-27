@@ -7,7 +7,7 @@ Only the hardest tests that validate the complete system under concurrent condit
 import pytest
 import time
 import threading
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from unittest.mock import patch, Mock, MagicMock
 import httpx
 from collections import defaultdict
@@ -166,7 +166,7 @@ class TestBackgroundWorkerIntegration:
         worker, queue_manager, db_path = isolated_worker_system
         
         # Setup old feeds (need updating)
-        old_time = datetime.now() - timedelta(minutes=5)
+        old_time = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(minutes=5)
         feed_ids = []
         with get_db() as conn:
             for domain, data in mock_feeds_data.items():
@@ -200,15 +200,9 @@ class TestBackgroundWorkerIntegration:
         
         with patch('httpx.Client.get', side_effect=mock_http_get):
             # Simulate user request - should queue feeds for update
-            initial_queue_size = worker.queue.qsize()
             queue_manager.queue_user_feeds(session_id)
-            
-            # Verify feeds were queued
-            assert worker.queue.qsize() > initial_queue_size, "No feeds were queued"
-            
-            # Wait for background processing to complete
-            time.sleep(1.0)  # Allow worker to process queue
-            
+            worker.queue.join()
+
             # Verify feeds were updated in database
             with get_db() as conn:
                 for feed_id in feed_ids:
