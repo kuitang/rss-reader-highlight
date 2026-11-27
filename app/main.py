@@ -1037,158 +1037,6 @@ def before(req, sess):
                     if "UNIQUE constraint failed" not in str(e):
                         raise
     
-    # INVARIANT: Every session MUST see items (no exceptions)
-    user_items = FeedItemModel.get_items_for_user(session_id, feed_id=None, unread_only=False, page=1)
-    
-    if len(user_items) == 0:
-        import traceback
-        import json
-        
-        # Gather ALL diagnostic SQL
-        with get_db() as conn:
-            diagnostics = {}
-            
-            # 1. Basic counts
-            diagnostics['feeds_count'] = conn.execute("SELECT COUNT(*) FROM feeds").fetchone()[0]
-            diagnostics['items_count'] = conn.execute("SELECT COUNT(*) FROM feed_items").fetchone()[0]
-            diagnostics['user_feeds_count'] = conn.execute(
-                "SELECT COUNT(*) FROM user_feeds WHERE session_id = ?", (session_id,)
-            ).fetchone()[0]
-            
-            # 2. Sample feeds
-            diagnostics['sample_feeds'] = [dict(row) for row in conn.execute(
-                "SELECT id, url, title FROM feeds LIMIT 5"
-            ).fetchall()]
-            
-            # 3. Sample items
-            diagnostics['sample_items'] = [dict(row) for row in conn.execute(
-                "SELECT id, feed_id, title FROM feed_items LIMIT 5"
-            ).fetchall()]
-            
-            # 4. User's subscriptions
-            diagnostics['user_subscriptions'] = [dict(row) for row in conn.execute(
-                "SELECT * FROM user_feeds WHERE session_id = ? LIMIT 5", (session_id,)
-            ).fetchall()]
-            
-            # 5. The EXACT query that's failing
-            failing_sql = """
-                SELECT fi.*, f.title as feed_title, 
-                       COALESCE(ui.is_read, 0) as is_read,
-                       COALESCE(ui.starred, 0) as starred,
-                       fo.name as folder_name
-                FROM feed_items fi
-                JOIN feeds f ON fi.feed_id = f.id
-                JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
-                LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
-                LEFT JOIN folders fo ON ui.folder_id = fo.id
-                ORDER BY fi.published DESC LIMIT 20
-            """
-            
-            diagnostics['failing_query_result'] = [dict(row) for row in conn.execute(
-                failing_sql, (session_id, session_id)
-            ).fetchall()]
-            
-            # 6. Check each JOIN step
-            diagnostics['step1_feed_items'] = conn.execute(
-                "SELECT COUNT(*) FROM feed_items"
-            ).fetchone()[0]
-            
-            diagnostics['step2_with_feeds'] = conn.execute(
-                "SELECT COUNT(*) FROM feed_items fi JOIN feeds f ON fi.feed_id = f.id"
-            ).fetchone()[0]
-            
-            diagnostics['step3_with_user_feeds'] = conn.execute(
-                "SELECT COUNT(*) FROM feed_items fi "
-                "JOIN feeds f ON fi.feed_id = f.id "
-                "JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?",
-                (session_id,)
-            ).fetchone()[0]
-        
-        # Create HTML error page
-        error_html = Html(
-            Head(
-                Title("500 - Invariant Violation"),
-                Style("""
-                    body { font-family: monospace; padding: 20px; background: #1a1a1a; color: #ff6b6b; }
-                    h1 { color: #ff0000; border-bottom: 3px solid #ff0000; padding-bottom: 10px; }
-                    h2 { color: #ff9999; margin-top: 30px; }
-                    pre { background: #2a2a2a; padding: 15px; border-left: 4px solid #ff6b6b; 
-                          overflow-x: auto; color: #e0e0e0; }
-                    details { margin: 20px 0; }
-                    summary { cursor: pointer; color: #ff9999; font-weight: bold; padding: 10px;
-                             background: #2a2a2a; }
-                    .error-box { background: #330000; border: 2px solid #ff0000; padding: 20px;
-                                margin: 20px 0; }
-                    .metric { display: inline-block; margin: 10px 20px 10px 0; }
-                    .metric-label { color: #888; }
-                    .metric-value { color: #fff; font-size: 1.2em; font-weight: bold; }
-                """)
-            ),
-            Body(
-                H1("🚨 INVARIANT VIOLATION: User MUST See Items"),
-                
-                Div(
-                    H2("Critical Failure"),
-                    Div(
-                        f"Session {session_id} sees 0 items but this should be impossible!",
-                        cls="error-box"
-                    ),
-                    
-                    H2("Database State"),
-                    Div(
-                        Div(Span("Total Feeds: ", cls="metric-label"), 
-                            Span(str(diagnostics['feeds_count']), cls="metric-value"), cls="metric"),
-                        Div(Span("Total Items: ", cls="metric-label"), 
-                            Span(str(diagnostics['items_count']), cls="metric-value"), cls="metric"),
-                        Div(Span("User Subscriptions: ", cls="metric-label"), 
-                            Span(str(diagnostics['user_feeds_count']), cls="metric-value"), cls="metric"),
-                    ),
-                    
-                    Details(
-                        Summary("Sample Feeds"),
-                        Pre(json.dumps(diagnostics['sample_feeds'], indent=2))
-                    ),
-                    
-                    Details(
-                        Summary("Sample Items"),
-                        Pre(json.dumps(diagnostics['sample_items'], indent=2))
-                    ),
-                    
-                    Details(
-                        Summary("User Subscriptions"),
-                        Pre(json.dumps(diagnostics['user_subscriptions'], indent=2))
-                    ),
-                    
-                    H2("SQL Join Breakdown"),
-                    Pre(f"""Step 1 - feed_items table: {diagnostics['step1_feed_items']} rows
-Step 2 - JOIN with feeds: {diagnostics['step2_with_feeds']} rows
-Step 3 - JOIN with user_feeds (session={session_id}): {diagnostics['step3_with_user_feeds']} rows"""),
-                    
-                    Details(
-                        Summary("Failing SQL Query"),
-                        Pre(failing_sql),
-                        Pre(f"Parameters: ('{session_id}', '{session_id}')"),
-                        Pre(f"Result: {json.dumps(diagnostics['failing_query_result'], indent=2)}")
-                    ),
-                    
-                    Details(
-                        Summary("Stack Trace"),
-                        Pre(''.join(traceback.format_stack()))
-                    )
-                )
-            )
-        )
-        
-        # Log to console as well
-        logger.error(f"INVARIANT VIOLATION: Session {session_id} sees 0 items!")
-        
-        # Return proper HTML response with 500 status code
-        # NOTE: We're in middleware, not a route handler, so we must return a raw HTTP response.
-        # Route handlers can return FastHTML objects directly (FastHTML auto-converts them),
-        # but middleware runs before FastHTML's response pipeline, so we need HTMLResponse.
-        # Use to_xml() to convert FastHTML object to actual HTML string.
-        return HTMLResponse(to_xml(error_html), status_code=500)
-    
     # Store in request scope for easy access
     req.scope['session_id'] = session_id
 
@@ -1220,6 +1068,7 @@ async def lifespan(app):
 
 # FastHTML app with session support and lifespan
 app, rt = fast_app(
+    title="RSS Reader",
     hdrs=Theme.blue.headers() + [
         Link(rel='stylesheet', href='/static/css/main.css', type='text/css'),
         Script(src='/static/js/htmx-config.js'),
@@ -1600,25 +1449,22 @@ def FeedsContent(session_id, feed_id=None, unread_only=False, page=1, data=None)
     else:
         feed_name = "All Feeds"
     
-    # Build URL parameters for pagination (excluding unread for tab navigation)
-    url_params = []
-    if feed_id:
-        url_params.append(f"feed_id={feed_id}")
-    
-    # Base URL for tab navigation (without unread parameter)
-    base_url = "/?" + "&".join(url_params) if url_params else "/"
-    
     def pagination_footer():
-        """Create pagination footer using MonsterUI pattern"""
+        """Create pagination controls while preserving the current filters."""
         if total_pages <= 1:
-            return ""  # No pagination needed
-        
-        # Navigation URLs
-        first_url = f"{base_url}{'&' if url_params else '?'}page=1" if base_url != "/" else "/?page=1"
-        prev_url = f"{base_url}{'&' if url_params else '?'}page={max(1, page-1)}" if base_url != "/" else f"/?page={max(1, page-1)}"
-        next_url = f"{base_url}{'&' if url_params else '?'}page={min(total_pages, page+1)}" if base_url != "/" else f"/?page={min(total_pages, page+1)}"
-        last_url = f"{base_url}{'&' if url_params else '?'}page={total_pages}" if base_url != "/" else f"/?page={total_pages}"
-        
+            return ""
+
+        params = []
+        if feed_id:
+            params.append(f"feed_id={feed_id}")
+        if not unread_only:
+            params.append("unread=0")
+        prefix = "/?" + "&".join([*params, "page="])
+        first_url = f"{prefix}1"
+        prev_url = f"{prefix}{max(1, page - 1)}"
+        next_url = f"{prefix}{min(total_pages, page + 1)}"
+        last_url = f"{prefix}{total_pages}"
+
         def _create_pagination_button(icon, url, target):
             """Helper to create a single pagination button"""
             return Button(
@@ -1923,75 +1769,8 @@ def show_item(item_id: int, htmx, sess, unread_view: bool = False, feed_id: int 
     item_data = prepare_item_data(session_id, item_id, feed_id, unread_view, page)
     
     if not item_data.item:
-        if htmx and getattr(htmx, 'request', None) and getattr(htmx, 'target', None):
-            import traceback
-            import json
-            import sqlite3
-            
-            # Execute the same query to get diagnostic results
-            diagnostic_result = None
-            try:
-                with get_db() as conn:
-                    diagnostic_result = conn.execute("""
-                        SELECT fi.*, f.title as feed_title, 
-                               COALESCE(ui.is_read, 0) as is_read,
-                               COALESCE(ui.starred, 0) as starred,
-                               fo.name as folder_name
-                        FROM feed_items fi
-                        JOIN feeds f ON fi.feed_id = f.id
-                        JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
-                        LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
-                        LEFT JOIN folders fo ON ui.folder_id = fo.id
-                        WHERE fi.id = ?
-                    """, (session_id, session_id, item_id)).fetchone()
-            except Exception as e:
-                diagnostic_result = f"Query failed: {str(e)}"
-            
-            return Div(
-                H2("Item Not Found - Diagnostic Information", cls='text-red-600 font-bold mb-4'),
-                
-                Details(
-                    Summary("SQL Query Details"),
-                    Pre(f"""Query: get_item_for_user(session_id='{session_id}', item_id={item_id})
+        return HTMLResponse("Item not found", status_code=404)
 
-Executed SQL:
-SELECT fi.*, f.title as feed_title, 
-       COALESCE(ui.is_read, 0) as is_read,
-       COALESCE(ui.starred, 0) as starred,
-       fo.name as folder_name
-FROM feed_items fi
-JOIN feeds f ON fi.feed_id = f.id
-JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
-LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
-LEFT JOIN folders fo ON ui.folder_id = fo.id
-WHERE fi.id = ?
-
-Parameters: ('{session_id}', '{session_id}', {item_id})"""),
-                    Pre(f"Result: {json.dumps(dict(diagnostic_result) if diagnostic_result and isinstance(diagnostic_result, sqlite3.Row) else diagnostic_result, indent=2, default=str)}")
-                ),
-                
-                Details(
-                    Summary("Request Context"),
-                    Pre(f"""Route: /item/{item_id}
-Session ID: {session_id}
-Feed ID: {feed_id}
-Unread View: {unread_view}
-HTMX Request: {bool(htmx)}
-HTMX Target: {getattr(htmx, 'target', None) if htmx else None}""")
-                ),
-                
-                Details(
-                    Summary("Stack Trace"),
-                    Pre(''.join(traceback.format_stack()))
-                ),
-                
-                cls='border border-red-300 bg-red-50 p-4 m-4 rounded'
-            )
-        else:
-            # Create empty PageData for not found case
-            page_data = PageData(session_id, feed_id, True, page)
-            return full_page_dual_layout(page_data)
-    
     # Mark as read
     item_data.mark_read_and_refresh()
     
@@ -2094,6 +1873,8 @@ def star_item(item_id: int, htmx, sess):
     session_id = sess.get('session_id')
     # Single optimized query: toggle star and get updated item
     item = UserItemModel.toggle_star_and_get_item(session_id, item_id)
+    if not item:
+        return HTMLResponse("Item not found", status_code=404)
     return ItemDetailView(item, show_back=bool(htmx))
 
 @rt('/api/item/{item_id}/read')
@@ -2107,90 +1888,7 @@ def toggle_read(item_id: int, htmx, sess):
     if item:
         return ItemDetailView(item, show_back=bool(htmx))
     
-    import traceback
-    import json
-    import sqlite3
-    
-    # Execute diagnostic queries to show results
-    step1_result = None
-    final_result = None
-    try:
-        with get_db() as conn:
-            # Step 1 query - check current read status
-            step1_result = conn.execute("""
-                SELECT COALESCE(ui.is_read, 0) as current_read
-                FROM feed_items fi
-                LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
-                WHERE fi.id = ?
-            """, (session_id, item_id)).fetchone()
-            
-            # Final query that would be used by get_item_for_user
-            final_result = conn.execute("""
-                SELECT fi.*, f.title as feed_title, 
-                       COALESCE(ui.is_read, 0) as is_read,
-                       COALESCE(ui.starred, 0) as starred,
-                       fo.name as folder_name
-                FROM feed_items fi
-                JOIN feeds f ON fi.feed_id = f.id
-                JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
-                LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
-                LEFT JOIN folders fo ON ui.folder_id = fo.id
-                WHERE fi.id = ?
-            """, (session_id, session_id, item_id)).fetchone()
-    except Exception as e:
-        step1_result = f"Query failed: {str(e)}"
-        final_result = f"Query failed: {str(e)}"
-    
-    return Div(
-        H2("Item Not Found - Read Toggle Diagnostic Information", cls='text-red-600 font-bold mb-4'),
-        
-        Details(
-            Summary("SQL Query Details"),
-            Pre(f"""Query: toggle_read_and_get_item(session_id='{session_id}', item_id={item_id})
-
-Step 1 - Check current read status:
-SELECT COALESCE(ui.is_read, 0) as current_read
-FROM feed_items fi
-LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
-WHERE fi.id = ?
-
-Parameters: ('{session_id}', {item_id})"""),
-            Pre(f"Step 1 Result: {json.dumps(dict(step1_result) if step1_result and isinstance(step1_result, sqlite3.Row) else step1_result, indent=2, default=str)}"),
-            Pre(f"""
-Step 2 - Update read status (if item exists):
-INSERT OR REPLACE INTO user_items (session_id, item_id, is_read, starred, folder_id)
-VALUES (?, ?, ?, 
-        COALESCE((SELECT starred FROM user_items WHERE session_id = ? AND item_id = ?), 0),
-        COALESCE((SELECT folder_id FROM user_items WHERE session_id = ? AND item_id = ?), NULL))
-
-Step 3 - Return updated item via get_item_for_user():
-SELECT fi.*, f.title as feed_title, 
-       COALESCE(ui.is_read, 0) as is_read,
-       COALESCE(ui.starred, 0) as starred,
-       fo.name as folder_name
-FROM feed_items fi
-JOIN feeds f ON fi.feed_id = f.id
-JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
-LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
-LEFT JOIN folders fo ON ui.folder_id = fo.id
-WHERE fi.id = ?"""),
-            Pre(f"Final Result: {json.dumps(dict(final_result) if final_result and isinstance(final_result, sqlite3.Row) else final_result, indent=2, default=str)}")
-        ),
-        
-        Details(
-            Summary("Request Context"),
-            Pre(f"""Route: /api/item/{item_id}/read
-Session ID: {session_id}
-HTMX Request: {bool(htmx)}""")
-        ),
-        
-        Details(
-            Summary("Stack Trace"),
-            Pre(''.join(traceback.format_stack()))
-        ),
-        
-        cls='border border-red-300 bg-red-50 p-4 m-4 rounded text-red-500'
-    )
+    return HTMLResponse("Item not found", status_code=404)
 
 @rt('/api/folder/add')
 def add_folder(htmx, sess):
