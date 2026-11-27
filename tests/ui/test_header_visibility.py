@@ -156,32 +156,7 @@ class TestLayoutAndResponsiveness:
         expect(summary).to_be_visible()
         expect(header).to_be_visible()
 
-        # Check that CSS rules are applied correctly by verifying computed styles
-        # Need to get the specific header in summary section
-        header_left = page.evaluate("() => getComputedStyle(document.querySelector('#summary #universal-header')).left")
-        header_right = page.evaluate("() => getComputedStyle(document.querySelector('#summary #universal-header')).right")
-
-        # On desktop (1400px width), the CSS should constrain the header
-        # Expected: left: 18rem (288px), right: 33.33% (≈466px)
-        if "1024px" in page.evaluate("() => window.getComputedStyle(document.documentElement).width") or True:
-            # Desktop viewport - check CSS constraints are applied
-            assert "18rem" in header_left or "288px" in header_left, \
-                f"Desktop header should have left constraint, got: {header_left}"
-
-            # The right constraint should also be applied
-            assert "33.33%" in header_right or header_right != "0px", \
-                f"Desktop header should have right constraint, got: {header_right}"
-
-        # Verify that the header is appropriately positioned
         header_box = header.bounding_box()
         summary_box = summary.bounding_box()
-
-        if header_box and summary_box:
-            # Header should start at least at the summary position or further right
-            assert header_box['x'] >= summary_box['x'] - 10, \
-                f"Header x ({header_box['x']}) should start near or after summary x ({summary_box['x']})"
-
-            # Header should not extend too far past the viewport on mobile-sized content
-            viewport_width = page.viewport_size['width']
-            assert header_box['x'] + header_box['width'] <= viewport_width + 50, \
-                f"Header should not overflow viewport significantly"
+        assert abs(header_box["x"] - summary_box["x"]) <= 2
+        assert header_box["x"] + header_box["width"] <= summary_box["x"] + summary_box["width"] + 1

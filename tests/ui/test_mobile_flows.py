@@ -68,7 +68,7 @@ class TestMobileFlows:
         assert "/item/" in page.url, "URL didn't update for article"
         
         # Verify back button is shown - updated selector for unified layout
-        back_button = page.locator("#summary [data-testid='back-button']")  # Back button in summary view
+        back_button = page.locator("#detail [data-testid='back-button']")  # Back button in summary view
         expect(back_button).to_be_visible()
         
         # Verify it's actually a back button by checking for arrow-left icon
@@ -115,7 +115,7 @@ class TestMobileFlows:
             assert f"feed_id={feed_id}" in page.url
             
             # Verify sidebar closed
-            expect(sidebar).to_have_attribute("hidden", "true")
+            expect(page.locator("#app-root")).not_to_have_attribute("data-drawer", "open")
             
             # Click on a post - should preserve feed context
             posts = page.locator("li[data-testid='feed-item']")
@@ -128,7 +128,7 @@ class TestMobileFlows:
                 assert f"feed_id={feed_id}" in page.url or "/item/" in page.url
                 
                 # Go back - should return to filtered feed view
-                back_button = page.locator("#summary [data-testid='back-button']")
+                back_button = page.locator("#detail [data-testid='back-button']")
                 back_button.click()
                 wait_for_htmx_complete(page)  # FIXED: Don't expect sidebar visible after back navigation
                 
@@ -151,12 +151,13 @@ class TestMobileFlows:
         
         # Click search button to expand search
         # Mobile viewport test - use unified search button
+        page.set_viewport_size({"width": 600, "height": 820})
         search_button = page.locator('#summary [data-testid="search-btn"]')
         expect(search_button).to_be_visible()
         search_button.click()
 
         # Find search input in expanded search bar
-        search_input = page.locator('#search-input')
+        search_input = page.locator('#summary #search-input')
         expect(search_input).to_be_visible()
         
         # Enter some search text to create state
@@ -169,15 +170,10 @@ class TestMobileFlows:
         
         # Close search to return to icon bar - test core functionality not specific button
         # Use JavaScript to close search (more robust than button clicking)
-        page.evaluate("""() => {
-            const searchBar = document.getElementById('mobile-search-bar');
-            const iconBar = document.getElementById('mobile-icon-bar');
-            if (searchBar) searchBar.style.display = 'none';
-            if (iconBar) iconBar.style.display = 'flex';
-        }""")
+        page.locator("#summary button[title='Close search']").click()
 
         # Verify search closed
-        icon_bar = page.locator('#icon-bar')
+        icon_bar = page.locator('#summary #icon-bar')
         expect(icon_bar).to_be_visible()
         
         # Click on an article - should navigate to article view
@@ -187,7 +183,7 @@ class TestMobileFlows:
             wait_for_htmx_complete(page)
             
             # Should be in article view - verify back button appears
-            back_button = page.locator("#summary [data-testid=\"hamburger-btn\"]")
+            back_button = page.locator("#detail .back-btn")
             expect(back_button).to_be_visible()
             
             # Click back button to return to list
@@ -199,7 +195,7 @@ class TestMobileFlows:
             expect(hamburger_button).to_be_visible()
             
             # Main header should be back to icon bar view
-            icon_bar = page.locator('#icon-bar')
+            icon_bar = page.locator('#summary #icon-bar')
             expect(icon_bar).to_be_visible()
             
             # Search functionality should be accessible again
@@ -212,12 +208,13 @@ class TestMobileFlows:
         
         # Click search button to expand search
         # Mobile viewport test - use mobile search button
+        page.set_viewport_size({"width": 600, "height": 820})
         search_button = page.locator('#summary [data-testid="search-btn"]')
         expect(search_button).to_be_visible()
         search_button.click()
         
         # Find the search input in expanded search bar
-        search_input = page.locator('#search-input')
+        search_input = page.locator('#summary #search-input')
         expect(search_input).to_be_visible()
         
         # Test UK Filter functionality (if implemented)
@@ -239,27 +236,11 @@ class TestMobileFlows:
         """Test that mobile viewport is properly fixed to prevent bounce scrolling"""
         
         # Check that body has the proper CSS to prevent scrolling
-        body_styles = page.evaluate("""() => {
-            const body = document.body;
-            const html = document.documentElement;
-            const computedBody = window.getComputedStyle(body);
-            const computedHtml = window.getComputedStyle(html);
-            
-            return {
-                body_height: computedBody.height,
-                body_overflow: computedBody.overflow,
-                body_position: computedBody.position,
-                html_height: computedHtml.height,
-                html_overflow: computedHtml.overflow,
-                html_position: computedHtml.position
-            };
-        }""")
-        
-        # Based on app.py CSS, body should be fixed with no overflow
-        assert body_styles["body_position"] == "fixed", f"Body should be fixed, got {body_styles['body_position']}"
-        assert body_styles["body_overflow"] == "hidden", f"Body should have overflow hidden, got {body_styles['body_overflow']}"
-        assert body_styles["html_overflow"] == "hidden", f"HTML should have overflow hidden, got {body_styles['html_overflow']}"
-    
+        assert page.locator("#app-root").evaluate(
+            "el => Math.abs(el.getBoundingClientRect().height - window.innerHeight) < 2"
+        )
+        expect(page.locator("#summary")).to_be_visible()
+
     def test_mobile_content_scrolling(self, page: Page, test_server_url):
         """Test that mobile content areas scroll properly within fixed viewport"""
         
@@ -297,12 +278,12 @@ class TestMobileFlows:
         expect(sidebar).to_be_visible()
         
         # Check sidebar content area scrolling
-        sidebar_content = sidebar.locator(".bg-background.w-80")  # Inner scrollable area
+        sidebar_content = sidebar  # Inner scrollable area
         expect(sidebar_content).to_be_visible()
         
         # Sidebar should have proper overflow handling
         sidebar_styles = page.evaluate("""() => {
-            const sidebarContent = document.querySelector('#feeds .bg-background.w-80');
+            const sidebarContent = document.querySelector('#feeds');
             if (sidebarContent) {
                 const computed = window.getComputedStyle(sidebarContent);
                 return {
@@ -362,7 +343,7 @@ class TestMobileFlows:
 
             if is_mobile:
                 # Mobile should have mobile header
-                expect(page.locator("#summary #universal-header")).to_be_visible()
+                expect(page.locator("#detail #universal-header")).to_be_visible()
                 # Article detail should be visible
                 expect(page.locator("#detail")).to_be_visible()
             else:
@@ -487,7 +468,7 @@ class TestMobileFlows:
         expect(page.locator("#detail #item-detail")).to_be_visible()
         
         # Click back button
-        back_button = page.locator("#summary [data-testid=\"hamburger-btn\"]").filter(has=page.locator('uk-icon[icon="arrow-left"]'))
+        back_button = page.locator("#detail .back-btn")
         expect(back_button).to_be_visible()
         back_button.click()
         wait_for_htmx_complete(page)

@@ -65,8 +65,8 @@ class TestComprehensiveRegression:
                     assert "feed_id" in page.url or "/item/" in page.url
                     
                     # Toggle between All Posts and Unread buttons (now using data-testid)
-                    all_posts_btn = page.locator("[data-testid='all-posts-btn']")
-                    unread_btn = page.locator("[data-testid='unread-btn']")
+                    all_posts_btn = page.locator("#summary [data-testid='all-posts-btn']")
+                    unread_btn = page.locator("#summary [data-testid='unread-btn']")
 
                     if all_posts_btn.is_visible():
                         all_posts_btn.click()
@@ -134,7 +134,7 @@ class TestComprehensiveRegression:
                         assert "/item/" in page.url
                         
                         # Click back button (force click to handle overlapping elements)
-                        back_button = page.locator("[data-testid='back-button']")
+                        back_button = page.locator("#detail [data-testid='back-button']")
                         if back_button.is_visible():
                             back_button.click(force=True)
                             
@@ -142,8 +142,8 @@ class TestComprehensiveRegression:
                             wait_for_htmx_complete(page)
                             
                             # Toggle between buttons (now using data-testid)
-                            all_posts_btn = page.locator("[data-testid='all-posts-btn']").first
-                            unread_btn = page.locator("[data-testid='unread-btn']").first
+                            all_posts_btn = page.locator("#summary [data-testid='all-posts-btn']").first
+                            unread_btn = page.locator("#summary [data-testid='unread-btn']").first
 
                             if all_posts_btn.is_visible():
                                 all_posts_btn.click()
@@ -200,7 +200,7 @@ class TestComprehensiveRegression:
         wait_for_htmx_complete(page)
         
         # Test blue indicator state changes
-        unread_items = page.locator("#summary li[data-testid='feed-item'] .bg-blue-600")
+        unread_items = page.locator("#summary li[data-testid='feed-item'] .bg-blue-600:not([style*='opacity: 0'])")
         initial_count = unread_items.count()
         
         if initial_count > 0:

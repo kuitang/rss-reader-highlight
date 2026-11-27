@@ -192,7 +192,7 @@ class TestMobileNavigationComplete:
         
         # Verify chevron button appears (arrow-left icon)
         chevron_icon = page.evaluate("""() => {
-            const btn = document.getElementById('mobile-nav-button');
+            const btn = document.querySelector('#detail .back-btn');
             const icon = btn?.querySelector('uk-icon');
             return icon?.getAttribute('icon') || 'not-found';
         }""")
@@ -210,7 +210,7 @@ class TestMobileNavigationComplete:
         
         # Verify hamburger restored
         hamburger_icon = page.evaluate("""() => {
-            const btn = document.getElementById('mobile-nav-button');
+            const btn = document.querySelector('#summary .hamburger-btn');
             const icon = btn?.querySelector('uk-icon');
             return icon?.getAttribute('icon') || 'not-found';
         }""")

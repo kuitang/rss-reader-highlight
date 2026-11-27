@@ -79,7 +79,7 @@ class TestWorkingRegression:
         print("=== Testing Article Selection ===")
         
         # Find articles with blue dots (unread indicators) 
-        unread_articles_before = page.locator("li").filter(has=page.locator(".bg-blue-600")).all()
+        unread_articles_before = page.locator("li").filter(has=page.locator(".bg-blue-600:not([style*='opacity: 0'])")).all()
         initial_unread_count = len(unread_articles_before)
         print(f"Initial unread articles: {initial_unread_count}")
         
@@ -87,14 +87,14 @@ class TestWorkingRegression:
         first_article = page.locator("li[data-testid='feed-item']").first
         expect(first_article).to_be_visible()
         
-        article_title_element = first_article.locator("strong").first
+        article_title_element = first_article.locator("[id^=title-container-] span").first
         article_title = article_title_element.text_content()
         print(f"Clicking article: {article_title[:50]}...")
         
         first_article.click()
         wait_for_htmx_complete(page)
         # Wait for article detail to load instead of arbitrary sleep
-        page.wait_for_selector("#desktop-item-detail", state="visible", timeout=constants.MAX_WAIT_MS)
+        page.wait_for_selector("#item-detail", state="visible", timeout=constants.MAX_WAIT_MS)
         
         page.screenshot(path="/tmp/regression_article_clicked.png")
         
@@ -103,7 +103,7 @@ class TestWorkingRegression:
         expect(article_detail).to_be_visible()
         
         # Verify the blue dot disappeared (article marked as read)
-        unread_articles_after = page.locator("li").filter(has=page.locator(".bg-blue-600")).all()
+        unread_articles_after = page.locator("li").filter(has=page.locator(".bg-blue-600:not([style*='opacity: 0'])")).all()
         final_unread_count = len(unread_articles_after)
         print(f"Final unread articles: {final_unread_count}")
         
@@ -116,7 +116,7 @@ class TestWorkingRegression:
         
         # Test Unread tab
         # Desktop viewport test - use desktop elements
-        unread_tab = page.locator("#icon-bar button[title='Unread']")
+        unread_tab = page.locator("#summary #icon-bar button[title='Unread']")
         if unread_tab.is_visible():
             unread_tab.click()
             wait_for_htmx_complete(page)
@@ -126,7 +126,7 @@ class TestWorkingRegression:
         
         # Test All Posts tab  
         # Desktop viewport test - use desktop elements
-        all_posts_tab = page.locator("#icon-bar button[title='All Posts']")
+        all_posts_tab = page.locator("#summary #icon-bar button[title='All Posts']")
         if all_posts_tab.is_visible():
             all_posts_tab.click()
             wait_for_htmx_complete(page)
@@ -274,7 +274,7 @@ class TestWorkingRegression:
         first_article.click()
         wait_for_htmx_complete(page)
         # Wait for detail panel to load
-        page.wait_for_selector("#desktop-item-detail, #mobile-item-detail", state="visible", timeout=constants.MAX_WAIT_MS)
+        page.wait_for_selector("#item-detail, #mobile-item-detail", state="visible", timeout=constants.MAX_WAIT_MS)
         
         # Analyze requests
         htmx_requests = [req for req in requests if 'hx-request' in req.get('headers', {})]
@@ -344,7 +344,7 @@ class TestWorkingRegression:
             page.wait_for_selector("li[data-testid='feed-item']", state="visible", timeout=constants.MAX_WAIT_MS)
             
             # Count unread articles
-            initial_unread = page.locator("li").filter(has=page.locator(".bg-blue-600")).all()
+            initial_unread = page.locator("li").filter(has=page.locator(".bg-blue-600:not([style*='opacity: 0'])")).all()
             initial_count = len(initial_unread)
             
             if initial_count > 0:
@@ -356,7 +356,7 @@ class TestWorkingRegression:
                 page.wait_for_selector("#detail", state="visible", timeout=constants.MAX_WAIT_MS)
                 
                 # Check unread count decreased
-                remaining_unread = page.locator("li").filter(has=page.locator(".bg-blue-600")).all()
+                remaining_unread = page.locator("li").filter(has=page.locator(".bg-blue-600:not([style*='opacity: 0'])")).all()
                 remaining_count = len(remaining_unread)
                 
                 assert remaining_count == initial_count - 1, \

@@ -36,7 +36,7 @@ class TestRegressionFixes:
             expect(header_after).to_be_visible()
 
             # Header text may change but element should persist
-            expect(header_after.text_content()).not_to_be_empty()
+            expect(header_after).not_to_have_text("")
 
         # Test in mobile viewport
         page.set_viewport_size(constants.MOBILE_VIEWPORT)

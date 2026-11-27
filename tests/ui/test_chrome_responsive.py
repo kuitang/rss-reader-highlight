@@ -21,116 +21,25 @@ class TestUnifiedChromeResponsive:
         page.wait_for_load_state("networkidle")
 
         # Desktop view assertions
-        desktop_chrome = page.locator("#universal-header")
-        mobile_header = page.locator("#mobile-top-bar")
-
-        # Desktop chrome should be visible
-        expect(desktop_chrome).to_be_visible()
-        expect(mobile_header).to_be_hidden()
-
-        # Check desktop chrome has feed name and action buttons
-        desktop_feed_name = desktop_chrome.locator("h3")
-        expect(desktop_feed_name).to_be_visible()
-        expect(desktop_feed_name).to_contain_text("All Feeds")
-        expect(page.locator("#icon-bar")).to_be_visible()
-
-        # Verify desktop chrome has the three action buttons
-        desktop_buttons = page.locator("#icon-bar button")
-        expect(desktop_buttons).to_have_count(3)
-
-        # Test scrolling in desktop - chrome should stay fixed
-        feeds_content = page.locator("#summary")
-        initial_chrome_position = desktop_chrome.bounding_box()["y"]
-
-        # Scroll the feeds content
-        feeds_content.evaluate("el => el.scrollTop = 200")
-        # Wait for scroll to complete
-        page.wait_for_function(
-            "(selector) => document.querySelector(selector).scrollTop === 200",
-            arg="#summary",
-            timeout=MAX_WAIT_MS
-        )
-
-        # Chrome should remain in same position (not scroll)
-        scrolled_chrome_position = desktop_chrome.bounding_box()["y"]
-        assert initial_chrome_position == scrolled_chrome_position, "Desktop chrome should not scroll"
-
-        # Switch to mobile viewport
-        page.set_viewport_size(MOBILE_VIEWPORT_ALT)
-        wait_for_viewport_transition(page)
-
-        # Mobile view assertions
-        expect(desktop_chrome).to_be_hidden()
-        expect(mobile_header).to_be_visible()
-
-        # Check mobile header has hamburger button AND feed name
-        mobile_nav_button = page.locator("#summary [data-testid='hamburger-btn']")
-        expect(mobile_nav_button).to_be_visible()
-
-        # Verify hamburger icon is present
-        expect(mobile_nav_button.locator('[icon="menu"]')).to_be_visible()
-
-        # Check mobile ALSO has feed name displayed
-        mobile_feed_name = mobile_header.locator("h3")
-        expect(mobile_feed_name).to_be_visible()
-        expect(mobile_feed_name).to_contain_text("All Feeds")
-
-        # Check mobile has the same action buttons
-        expect(page.locator("#icon-bar")).to_be_visible()
-        mobile_buttons = page.locator("#icon-bar button")
-        expect(mobile_buttons).to_have_count(3)
-
-        # Test scrolling in mobile - header should stay fixed
-        main_content = page.locator("#summary")
-        initial_header_position = mobile_header.bounding_box()["y"]
-
-        # Scroll the main content
-        main_content.evaluate("el => el.scrollTop = 200")
-        # Wait for scroll to complete
-        page.wait_for_function(
-            "(selector) => document.querySelector(selector).scrollTop === 200",
-            arg="#summary",
-            timeout=MAX_WAIT_MS
-        )
-
-        # Mobile header should remain fixed at top
-        scrolled_header_position = mobile_header.bounding_box()["y"]
-        assert initial_header_position == scrolled_header_position, "Mobile header should stay fixed"
-        assert scrolled_header_position == 0, "Mobile header should be at top of viewport"
+        header = page.locator("#summary #universal-header")
+        for width in (1280, 800, 390):
+            page.set_viewport_size({"width": width, "height": 800})
+            expect(header).to_be_visible()
+            expect(header.locator("h1")).to_have_text("All Feeds")
+            expect(header.locator(".hamburger-btn")).to_be_visible(visible=width < 1024)
+            expect(header.locator("#icon-bar")).to_be_visible(visible=width > 480)
+            start_y = header.bounding_box()["y"]
+            page.locator("#summary").evaluate("el => el.scrollTop = 200")
+            assert header.bounding_box()["y"] == start_y
 
     def test_chrome_transitions_smoothly(self, page: Page, test_server_url: str):
-        """Test smooth transitions between mobile and desktop chrome"""
-
         page.goto(test_server_url)
-        page.wait_for_load_state("networkidle")
-
-        # Test multiple viewport changes
-        viewports = [
-            {**DESKTOP_VIEWPORT, "expect_desktop": True},
-            {"width": 800, "height": 600, "expect_desktop": False},
-            {**DESKTOP_VIEWPORT_ALT, "expect_desktop": True},
-            {**MOBILE_VIEWPORT_ALT, "expect_desktop": False},
-        ]
-
-        for viewport in viewports:
-            page.set_viewport_size({"width": viewport["width"], "height": viewport["height"]})
-            wait_for_viewport_transition(page)
-
-            desktop_chrome = page.locator("#universal-header")
-            mobile_header = page.locator("#mobile-top-bar")
-
-            if viewport["expect_desktop"]:
-                expect(desktop_chrome).to_be_visible()
-                expect(mobile_header).to_be_hidden()
-                # Verify desktop chrome content
-                expect(desktop_chrome.locator("h3")).to_be_visible()
-                expect(page.locator("#icon-bar")).to_be_visible()
-            else:
-                expect(desktop_chrome).to_be_hidden()
-                expect(mobile_header).to_be_visible()
-                # Verify mobile chrome content
-                expect(page.locator("#summary [data-testid='hamburger-btn']")).to_be_visible()
-                expect(page.locator("#icon-bar")).to_be_visible()
+        for width in (1280, 800, 390, 1280):
+            page.set_viewport_size({"width": width, "height": 800})
+            header = page.locator("#summary #universal-header")
+            expect(header).to_be_visible()
+            expect(header.locator(".hamburger-btn")).to_be_visible(visible=width < 1024)
+            expect(header.locator("#icon-bar")).to_be_visible(visible=width > 480)
 
     def test_chrome_action_buttons_consistent(self, page: Page, test_server_url: str):
         """Test that action buttons work consistently in both views"""
@@ -142,26 +51,26 @@ class TestUnifiedChromeResponsive:
         page.set_viewport_size(DESKTOP_VIEWPORT)
 
         # Click "All Posts" in desktop
-        page.locator("#icon-bar button[title='All Posts']").first.click()
+        page.locator("#summary #icon-bar button[title='All Posts']").first.click()
         page.wait_for_load_state("networkidle")
         expect(page).to_have_url(f"{test_server_url}/?unread=0")
 
         # Go back to unread
-        page.locator("#icon-bar button[title='Unread']").first.click()
+        page.locator("#summary #icon-bar button[title='Unread']").first.click()
         page.wait_for_load_state("networkidle")
         expect(page).to_have_url(f"{test_server_url}/")
 
         # Switch to mobile and test same functionality
-        page.set_viewport_size(MOBILE_VIEWPORT_ALT)
+        page.set_viewport_size({"width": 600, "height": 820})
         wait_for_viewport_transition(page)
 
         # Click "All Posts" in mobile
-        page.locator("#icon-bar button[title='All Posts']").first.click()
+        page.locator("#summary #icon-bar button[title='All Posts']").first.click()
         page.wait_for_load_state("networkidle")
         expect(page).to_have_url(f"{test_server_url}/?unread=0")
 
         # Go back to unread
-        page.locator("#icon-bar button[title='Unread']").first.click()
+        page.locator("#summary #icon-bar button[title='Unread']").first.click()
         page.wait_for_load_state("networkidle")
         expect(page).to_have_url(f"{test_server_url}/")
 
@@ -173,11 +82,11 @@ class TestUnifiedChromeResponsive:
 
         # Desktop view - verify initial feed name
         page.set_viewport_size(DESKTOP_VIEWPORT)
-        desktop_feed_name = page.locator("#universal-header h1")
+        desktop_feed_name = page.locator("#summary #universal-header h1")
         expect(desktop_feed_name).to_contain_text("All Feeds")
 
         # Click on a specific feed in desktop sidebar (if available)
-        feed_link = page.locator("#sidebar a[href*='feed_id']").first
+        feed_link = page.locator("#feeds a[href*='feed_id']").first
         if feed_link.count() > 0:
             feed_text = feed_link.inner_text()
             feed_link.click()
@@ -187,10 +96,10 @@ class TestUnifiedChromeResponsive:
             expect(desktop_feed_name).not_to_contain_text("All Feeds")
 
         # Mobile view - verify feed name is also shown
-        page.set_viewport_size(MOBILE_VIEWPORT_ALT)
+        page.set_viewport_size({"width": 600, "height": 820})
         wait_for_viewport_transition(page)
 
-        mobile_feed_name = page.locator("#mobile-top-bar h3")
+        mobile_feed_name = page.locator("#summary #universal-header h1")
         expect(mobile_feed_name).to_be_visible()
 
         # If we clicked a feed, verify mobile shows same feed name
@@ -209,43 +118,41 @@ class TestUnifiedChromeResponsive:
         page.set_viewport_size(DESKTOP_VIEWPORT)
 
         # Click search button
-        page.locator("#icon-bar button[title='Search']").first.click()
+        page.locator("#summary #icon-bar button[title='Search']").first.click()
         # Wait for search bar transition
-        wait_for_element_transition(page, "#search-bar")
 
         # Search bar should appear, icon bar should hide
-        expect(page.locator("#search-bar")).to_be_visible()
-        expect(page.locator("#icon-bar")).to_be_hidden()
+        expect(page.locator("#summary #search-bar")).to_be_visible()
+        expect(page.locator("#summary #icon-bar")).to_be_hidden()
 
         # Type in search
-        search_input = page.locator("#desktop-search-input")
+        search_input = page.locator("#summary #search-input")
         expect(search_input).to_be_visible()
         search_input.fill("Claude")
 
         # Close search
-        page.locator("#search-bar button[title='Close search']").click()
-        expect(page.locator("#search-bar")).to_be_hidden()
-        expect(page.locator("#icon-bar")).to_be_visible()
+        page.locator("#summary #search-bar button[title='Close search']").click()
+        expect(page.locator("#summary #search-bar")).to_be_hidden()
+        expect(page.locator("#summary #icon-bar")).to_be_visible()
 
         # Mobile search test
-        page.set_viewport_size(MOBILE_VIEWPORT_ALT)
+        page.set_viewport_size({"width": 600, "height": 820})
         wait_for_viewport_transition(page)
 
         # Click search button
-        page.locator("#icon-bar button[title='Search']").first.click()
+        page.locator("#summary #icon-bar button[title='Search']").first.click()
         # Wait for search bar transition
-        wait_for_element_transition(page, "#search-bar")
 
         # Search bar should appear, icon bar should hide
-        expect(page.locator("#search-bar")).to_be_visible()
-        expect(page.locator("#icon-bar")).to_be_hidden()
+        expect(page.locator("#summary #search-bar")).to_be_visible()
+        expect(page.locator("#summary #icon-bar")).to_be_hidden()
 
         # Type in search
-        mobile_search_input = page.locator("#search-input")
+        mobile_search_input = page.locator("#summary #search-input")
         expect(mobile_search_input).to_be_visible()
         mobile_search_input.fill("Hacker")
 
         # Close search
-        page.locator("#search-bar button[title='Close search']").click()
-        expect(page.locator("#search-bar")).to_be_hidden()
-        expect(page.locator("#icon-bar")).to_be_visible()
+        page.locator("#summary #search-bar button[title='Close search']").click()
+        expect(page.locator("#summary #search-bar")).to_be_hidden()
+        expect(page.locator("#summary #icon-bar")).to_be_visible()

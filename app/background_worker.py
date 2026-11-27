@@ -10,7 +10,7 @@ import os
 import gc
 import psutil
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, Set, Optional, Any
 import httpx
 from urllib.parse import urlparse
@@ -609,7 +609,9 @@ class FeedQueueManager:
         
         try:
             last_updated = datetime.fromisoformat(feed['last_updated'])
-            return datetime.now() - last_updated > self.update_interval
+            if last_updated.tzinfo is None:
+                last_updated = last_updated.replace(tzinfo=timezone.utc)
+            return datetime.now(timezone.utc) - last_updated > self.update_interval
         except (ValueError, TypeError):
             # If we can't parse the date, assume it needs updating
             return True

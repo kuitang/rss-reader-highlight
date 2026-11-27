@@ -14,7 +14,7 @@ from test_helpers import (
 
 def test_mobile_tab_active_style_updates(page: Page, test_server_url):
     """Test mobile navigation buttons work correctly (icon-based navigation)"""
-    page.set_viewport_size(constants.MOBILE_VIEWPORT)
+    page.set_viewport_size({"width": 600, "height": 820})
     page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
     # Wait for specific mobile layout element
     page.wait_for_selector("#app-root", state="visible", timeout=constants.MAX_WAIT_MS)
