@@ -619,6 +619,7 @@ async def lifespan(app):
 app, rt = fast_app(
     title="RSS Reader",
     hdrs=Theme.blue.headers() + [
+        Link(rel="icon", href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20rx%3D%224%22%20fill%3D%22%23f80%22/%3E%3Ccircle%20cx%3D%226%22%20cy%3D%2218%22%20r%3D%222%22%20fill%3D%22white%22/%3E%3Cpath%20d%3D%22M4%2011a9%209%200%200%201%209%209M4%205a15%2015%200%200%201%2015%2015%22%20fill%3D%22none%22%20stroke%3D%22white%22%20stroke-width%3D%223%22/%3E%3C/svg%3E"),
         Script("""
         htmx.logAll();
         htmx.config.includeIndicatorStyles = false;
