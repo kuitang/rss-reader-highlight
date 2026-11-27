@@ -585,34 +585,6 @@ def before(req, sess):
                     if "UNIQUE constraint failed" not in str(e):
                         raise
     
-    # INVARIANT: Every session MUST see items (no exceptions)
-    user_items = FeedItemModel.get_items_for_user(session_id, feed_id=None, unread_only=False, page=1)
-
-    if len(user_items) == 0:
-        # Log the error without exposing SQL details
-        logger.error(f"INVARIANT VIOLATION: Session {session_id} sees 0 items!")
-
-        # Return user-friendly error without SQL diagnostics
-        error_html = Html(
-            Head(
-                Title("500 - Server Error"),
-                Style("""
-                    body { font-family: system-ui, sans-serif; padding: 40px; text-align: center; }
-                    h1 { color: #dc2626; margin-bottom: 20px; }
-                    p { color: #666; margin: 20px 0; }
-                    a { color: #2563eb; text-decoration: none; }
-                    a:hover { text-decoration: underline; }
-                """)
-            ),
-            Body(
-                H1("Something went wrong"),
-                P("We're having trouble loading your feeds. Please try refreshing the page."),
-                P(A("Return to Home", href="/"))
-            )
-        )
-
-        return HTMLResponse(to_xml(error_html), status_code=500)
-    
     # Store in request scope for easy access
     req.scope['session_id'] = session_id
 
@@ -1629,90 +1601,7 @@ def toggle_read(item_id: int, htmx, sess):
     if item:
         return ItemDetailView(item)
     
-    import traceback
-    import json
-    import sqlite3
-    
-    # Execute diagnostic queries to show results
-    step1_result = None
-    final_result = None
-    try:
-        with get_db() as conn:
-            # Step 1 query - check current read status
-            step1_result = conn.execute("""
-                SELECT COALESCE(ui.is_read, 0) as current_read
-                FROM feed_items fi
-                LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
-                WHERE fi.id = ?
-            """, (session_id, item_id)).fetchone()
-            
-            # Final query that would be used by get_item_for_user
-            final_result = conn.execute("""
-                SELECT fi.*, f.title as feed_title, 
-                       COALESCE(ui.is_read, 0) as is_read,
-                       COALESCE(ui.starred, 0) as starred,
-                       fo.name as folder_name
-                FROM feed_items fi
-                JOIN feeds f ON fi.feed_id = f.id
-                JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
-                LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
-                LEFT JOIN folders fo ON ui.folder_id = fo.id
-                WHERE fi.id = ?
-            """, (session_id, session_id, item_id)).fetchone()
-    except Exception as e:
-        step1_result = f"Query failed: {str(e)}"
-        final_result = f"Query failed: {str(e)}"
-    
-    return Div(
-        H2("Item Not Found - Read Toggle Diagnostic Information", cls='text-red-600 font-bold mb-4'),
-        
-        Details(
-            Summary("SQL Query Details"),
-            Pre(f"""Query: toggle_read_and_get_item(session_id='{session_id}', item_id={item_id})
-
-Step 1 - Check current read status:
-SELECT COALESCE(ui.is_read, 0) as current_read
-FROM feed_items fi
-LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
-WHERE fi.id = ?
-
-Parameters: ('{session_id}', {item_id})"""),
-            Pre(f"Step 1 Result: {json.dumps(dict(step1_result) if step1_result and isinstance(step1_result, sqlite3.Row) else step1_result, indent=2, default=str)}"),
-            Pre(f"""
-Step 2 - Update read status (if item exists):
-INSERT OR REPLACE INTO user_items (session_id, item_id, is_read, starred, folder_id)
-VALUES (?, ?, ?, 
-        COALESCE((SELECT starred FROM user_items WHERE session_id = ? AND item_id = ?), 0),
-        COALESCE((SELECT folder_id FROM user_items WHERE session_id = ? AND item_id = ?), NULL))
-
-Step 3 - Return updated item via get_item_for_user():
-SELECT fi.*, f.title as feed_title, 
-       COALESCE(ui.is_read, 0) as is_read,
-       COALESCE(ui.starred, 0) as starred,
-       fo.name as folder_name
-FROM feed_items fi
-JOIN feeds f ON fi.feed_id = f.id
-JOIN user_feeds uf ON f.id = uf.feed_id AND uf.session_id = ?
-LEFT JOIN user_items ui ON fi.id = ui.item_id AND ui.session_id = ?
-LEFT JOIN folders fo ON ui.folder_id = fo.id
-WHERE fi.id = ?"""),
-            Pre(f"Final Result: {json.dumps(dict(final_result) if final_result and isinstance(final_result, sqlite3.Row) else final_result, indent=2, default=str)}")
-        ),
-        
-        Details(
-            Summary("Request Context"),
-            Pre(f"""Route: /api/item/{item_id}/read
-Session ID: {session_id}
-HTMX Request: {bool(htmx)}""")
-        ),
-        
-        Details(
-            Summary("Stack Trace"),
-            Pre(''.join(traceback.format_stack()))
-        ),
-        
-        cls='border border-red-300 bg-red-50 p-4 m-4 rounded text-red-500'
-    )
+    return HTMLResponse("Item not found", status_code=404)
 
 @rt('/api/folder/add')
 def add_folder(htmx, sess):
