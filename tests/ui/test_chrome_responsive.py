@@ -117,6 +117,8 @@ class TestUnifiedChromeResponsive:
     def test_chrome_action_buttons_consistent(self, page: Page, test_server_url: str):
         """Test that action buttons work consistently in both views"""
 
+        page_errors = []
+        page.on("pageerror", lambda error: page_errors.append(str(error)))
         page.goto(test_server_url)
         page.wait_for_load_state("networkidle")
 
@@ -146,6 +148,7 @@ class TestUnifiedChromeResponsive:
         page.locator("#icon-bar button[title='Unread']").click()
         page.wait_for_load_state("networkidle")
         expect(page).to_have_url(f"{test_server_url}/")
+        assert not page_errors, page_errors
 
     def test_feed_name_changes_both_views(self, page: Page, test_server_url: str):
         """Test that feed name updates correctly when switching feeds"""
