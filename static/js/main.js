@@ -312,7 +312,7 @@ htmx.on('htmx:afterSettle', function(evt) {
     const target = evt.detail.target;
 
     // Refresh Lucide icons if needed
-    if (target && lucide) {
+    if (target && typeof lucide !== 'undefined') {
         lucide.createIcons();
     }
 
