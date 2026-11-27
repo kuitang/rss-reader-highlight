@@ -1420,7 +1420,7 @@ def show_item(item_id: int, htmx, sess, unread_view: bool = False, feed_id: int 
         hx_swap="innerHTML",
         cls="back-btn absolute top-0 left-0 p-3 rounded border hover:bg-secondary min-h-[44px] min-w-[44px] z-10",
         data_testid="back-button",
-        hx_swap_oob="true"
+        hx_swap_oob="outerHTML:#detail .back-btn"
     )
 
     # If item was unread, return detail view + surgical container update + back button
