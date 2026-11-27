@@ -1267,7 +1267,7 @@ app, rt = fast_app(
         }
         """)
     ],
-    live=True,
+    live=os.getenv("PRODUCTION", "false").lower() != "true",
     debug=True,
     before=[timing_middleware, before],
     after=after_middleware,
