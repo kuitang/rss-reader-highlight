@@ -85,15 +85,11 @@ def server_manager():
 def start_test_server(minimal: bool = True, timeout: int = 20) -> Optional[subprocess.Popen]:
     """Start the test server and wait for it to be ready"""
     env = os.environ.copy()
+    env['PRODUCTION'] = 'true'
     if minimal:
         env['MINIMAL_MODE'] = 'true'
     
     try:
-        # Kill any existing servers
-        subprocess.run(['pkill', '-f', 'python -m app'],
-                      capture_output=True, check=False)
-        time.sleep(1)
-        
         # Start new server
         server_process = subprocess.Popen([
             sys.executable, '-m', 'app'

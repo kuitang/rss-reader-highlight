@@ -1,4 +1,5 @@
 """Test item not found diagnostic pages by testing the diagnostic HTML generation directly"""
+import html
 import pytest
 import tempfile
 import os
@@ -8,7 +9,6 @@ from unittest.mock import Mock
 
 # Import the functions we need to test
 from app.models import init_db, get_db, FeedModel, SessionModel, FeedItemModel, UserItemModel
-from app.main import prepare_item_data
 
 
 class TestItemNotFoundDiagnostics:
@@ -46,9 +46,9 @@ class TestItemNotFoundDiagnostics:
         session_id = 'test-session-id'
         item_id = 999999  # Non-existent item
         
-        # Test prepare_item_data returns None for non-existent item
-        item_data = prepare_item_data(session_id, item_id, None, False)
-        assert item_data.item is None
+        # Test FeedItemModel.get_item_for_user returns None for non-existent item
+        item = FeedItemModel.get_item_for_user(session_id, item_id)
+        assert item is None
         
         # Test that we can execute the diagnostic query from the route
         diagnostic_result = None
@@ -167,8 +167,8 @@ Parameters: ('{session_id}', '{session_id}', {item_id})"""),
         assert 'Item Not Found - Diagnostic Information' in html_string
         assert 'SQL Query Details' in html_string
         assert 'get_item_for_user' in html_string
-        # Check for parameters in the output (FastHTML Pre elements render plain quotes)
-        assert f"Parameters: ('{session_id}', '{session_id}', {item_id})" in html_string
+        # Compare rendered text across equivalent literal/entity quote encodings
+        assert f"Parameters: ('{session_id}', '{session_id}', {item_id})" in html.unescape(html_string)
         assert 'Result: null' in html_string
         
         # Check CSS classes

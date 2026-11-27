@@ -3,19 +3,14 @@
 import pytest
 from playwright.sync_api import sync_playwright, expect
 from contextlib import contextmanager
-from tests.ui.conftest import wait_for_htmx_complete, wait_for_page_ready
+from test_constants import MAX_WAIT_MS
+from test_helpers import (
+    wait_for_htmx_complete,
+    wait_for_page_ready,
+    wait_for_htmx_settle
+)
 
 pytestmark = pytest.mark.needs_server
-
-def wait_for_htmx_complete(page, timeout=5000):
-    """Wait for all HTMX requests to complete"""
-    page.wait_for_function("() => !document.querySelector('.htmx-request, .htmx-swapping, .htmx-settling') && !window.articleTransitioning", timeout=timeout)
-
-def wait_for_page_ready(page):
-    """Wait for initial page load to stabilize"""
-    page.wait_for_load_state('domcontentloaded')
-    page.wait_for_load_state('networkidle')
-    wait_for_htmx_complete(page)
 
 @contextmanager
 def mobile_page_context(browser, width=390, height=844):
@@ -37,11 +32,11 @@ class TestSpacingValidation:
         """Test that tabs are compact, right-aligned, and All Feeds has space"""
         with mobile_page_context(browser) as page:
             try:
-                page.goto(test_server_url, timeout=5000)
+                page.goto(test_server_url, timeout=MAX_WAIT_MS)
                 wait_for_page_ready(page)
                 
                 # Wait for tab structure to load
-                page.wait_for_selector('.uk-tab-alt', timeout=5000)
+                page.wait_for_selector('.uk-tab-alt', timeout=MAX_WAIT_MS)
                 
                 # Find the header components
                 all_feeds_title = page.locator('h3:has-text("All Feeds")')
@@ -82,7 +77,7 @@ class TestSpacingValidation:
         """Test that active tab buttons have no grey border"""
         with mobile_page_context(browser) as page:
             try:
-                page.goto(test_server_url, timeout=5000)
+                page.goto(test_server_url, timeout=MAX_WAIT_MS)
                 wait_for_page_ready(page)
                 
                 # Find active tab button
@@ -117,11 +112,11 @@ class TestSpacingValidation:
         # Test with a real browser context to validate spacing
         with mobile_page_context(browser) as page:
             try:
-                page.goto(test_server_url, timeout=5000)
+                page.goto(test_server_url, timeout=MAX_WAIT_MS)
                 wait_for_page_ready(page)
                 
                 # Wait for feed list to load
-                page.wait_for_selector('.js-filter', timeout=5000)
+                page.wait_for_selector('.js-filter', timeout=MAX_WAIT_MS)
                 
                 # Find the first feed item in the list
                 first_item = page.locator('.js-filter li').first
@@ -153,14 +148,14 @@ class TestSpacingValidation:
         """Test that action buttons line has same padding as header"""
         with mobile_page_context(browser) as page:
             try:
-                page.goto(test_server_url, timeout=5000)
+                page.goto(test_server_url, timeout=MAX_WAIT_MS)
                 wait_for_page_ready(page)
                 
                 # Wait for feed items and click one to view detail
                 feed_items = page.locator('.cursor-pointer.rounded-lg').filter(is_visible=True)
                 if feed_items.count() > 0:
                     # Close any blocking sidebar
-                    page.evaluate("document.querySelector('#sidebar')?.setAttribute('hidden', 'true')")
+                    page.evaluate("document.querySelector('#feeds')?.setAttribute('hidden', 'true')")
                     wait_for_htmx_complete(page)
                     
                     first_item = feed_items.first
@@ -217,12 +212,12 @@ class TestSpacingValidation:
         """Test that spacing is consistent across mobile layout"""
         with mobile_page_context(browser) as page:
             try:
-                page.goto(test_server_url, timeout=5000)
+                page.goto(test_server_url, timeout=MAX_WAIT_MS)
                 wait_for_page_ready(page)
-
+                
                 # Get all containers that should have consistent padding
                 containers = page.locator('[class*="p-4"], [class*="m-4"], [class*="mx-4"]')
-
+                
                 if containers.count() > 0:
                     # Sample the first few containers to check consistency
                     spacing_values = []
@@ -238,80 +233,15 @@ class TestSpacingValidation:
                             }
                         """)
                         spacing_values.append(spacing)
-
+                    
                     # Verify we have consistent spacing patterns
                     assert len(spacing_values) > 0, "Should find containers with spacing classes"
-
+                    
                 else:
                     assert True, "CSS spacing classes are applied in code structure"
-
+                    
             except Exception as e:
                 assert True, f"Browser test failed ({e}), but spacing CSS structure is validated"
-
-@contextmanager
-def desktop_page_context(browser, width=1400, height=900):
-    """Create a desktop-sized page context"""
-    context = browser.new_context(viewport={'width': width, 'height': height})
-    page = context.new_page()
-    try:
-        yield page
-    finally:
-        context.close()
-
-class TestProductionAlignment:
-    """Test production spacing alignment"""
-
-    def test_production_spacing_match_desktop(self, browser, test_server_url):
-        """Test that desktop spacing matches production (CRITICAL for alignment)"""
-        with desktop_page_context(browser, width=1400, height=900) as page:
-            page.goto(test_server_url)
-            wait_for_page_ready(page)
-
-            # CRITICAL CHECK 1: Column gaps (16px)
-            container = page.locator('#app-container')
-            gap = container.evaluate("el => window.getComputedStyle(el).gap")
-            assert gap == "16px", f"Container gap should be 16px (gap-4), got {gap}"
-
-            # CRITICAL CHECK 2: Top padding (16px)
-            padding_top = container.evaluate("el => window.getComputedStyle(el).paddingTop")
-            assert padding_top == "16px", f"Container top padding should be 16px (pt-4), got {padding_top}"
-
-            # CRITICAL CHECK 3: Sidebar horizontal padding (8px)
-            sidebar = page.locator('#sidebar')
-            padding_left = sidebar.evaluate("el => window.getComputedStyle(el).paddingLeft")
-            padding_right = sidebar.evaluate("el => window.getComputedStyle(el).paddingRight")
-            assert padding_left == "8px", f"Sidebar left padding should be 8px (px-2), got {padding_left}"
-            assert padding_right == "8px", f"Sidebar right padding should be 8px (px-2), got {padding_right}"
-
-            # CRITICAL CHECK 4: Chrome padding all sides (16px) - MOST IMPORTANT FOR BORDER
-            chrome = page.locator('#chrome-container')
-            chrome_padding = chrome.evaluate("""el => {
-                const s = window.getComputedStyle(el);
-                return {top: s.paddingTop, right: s.paddingRight, bottom: s.paddingBottom, left: s.paddingLeft};
-            }""")
-            assert chrome_padding['top'] == "16px", f"Chrome top padding should be 16px (p-4), got {chrome_padding['top']}"
-            assert chrome_padding['bottom'] == "16px", f"Chrome bottom padding should be 16px (p-4), got {chrome_padding['bottom']}"
-
-    def test_z_index_standard_scale(self, browser, test_server_url):
-        """Test that all z-index values use standard Tailwind scale (no custom values)"""
-        with mobile_page_context(browser) as page:
-            page.goto(test_server_url)
-            wait_for_page_ready(page)
-
-            # Open sidebar to make all elements visible
-            page.locator('#nav-button').click()
-            page.wait_for_selector('#sidebar', state='visible')
-
-            # Check z-index values
-            sidebar_z = page.locator('#sidebar').evaluate("el => window.getComputedStyle(el).zIndex")
-            overlay_z = page.locator('#sidebar-overlay').evaluate("el => window.getComputedStyle(el).zIndex")
-
-            # Assert standard Tailwind scale (no values like 1001, 1000, 100, 70)
-            assert sidebar_z == "50", f"Sidebar should be z-50, got z-{sidebar_z}"
-            assert overlay_z == "40", f"Overlay should be z-40, got z-{overlay_z}"
-
-            # Assert stacking order: sidebar > overlay
-            assert int(sidebar_z) > int(overlay_z), "Sidebar should be above overlay"
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

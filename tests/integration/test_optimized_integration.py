@@ -4,7 +4,6 @@ Database setup and startup tests have been moved to test_application_startup.py.
 These tests focus on UI workflows that broke during development and can run with minimal or full database."""
 
 import pytest
-pytestmark = pytest.mark.skip(reason="TODO: Fix integration tests")
 import httpx
 import time
 import os
@@ -114,7 +113,7 @@ class TestCriticalHTTPWorkflows:
         This was the core issue: 'No posts available' despite feeds existing.
         Works with both minimal mode (seed database) and normal mode (full database).
         """
-        with test_server() as server_url:
+        with test_server(minimal_mode=True) as server_url:
             client = httpx.Client(timeout=30)
             
             try:
@@ -151,7 +150,7 @@ class TestCriticalHTTPWorkflows:
         
         Session persistence was critical for user experience.
         """
-        with test_server() as server_url:
+        with test_server(minimal_mode=True) as server_url:
             client = httpx.Client(timeout=30)
             
             try:
@@ -176,7 +175,7 @@ class TestCriticalHTTPWorkflows:
         
         This was our biggest debugging challenge - form parameters not mapping.
         """
-        with test_server() as server_url:
+        with test_server(minimal_mode=True) as server_url:
             client = httpx.Client(timeout=30)
             
             try:
@@ -208,25 +207,29 @@ class TestCriticalHTTPWorkflows:
         
         Complex URL parameter handling that we implemented.
         """
-        with test_server() as server_url:
+        with test_server(minimal_mode=True) as server_url:
             client = httpx.Client(timeout=30)
             
             try:
-                # Test pagination on feed 5 (26 articles = 2 pages) 
+                # Test pagination on feed 5 (ClaudeAI - 26 items in minimal mode = 2 pages)
                 resp = client.get(f"{server_url}/?feed_id=5&page=2&unread=0")
                 assert resp.status_code == 200
-                
+
                 soup = parse_html(resp.text)
-                # Should NOT have "No posts available" (indicates parameter processing worked)
+
+                # Should show ClaudeAI in header (minimal mode feed 5)
+                assert 'ClaudeAI' in soup.get_text()
+
+                # Should NOT have "No posts available" (minimal mode has pre-populated articles)
                 assert 'No posts available' not in soup.get_text()
-                
-                # Should have articles on page 2 (verifies pagination worked)
+
+                # Should have articles on page 2 (minimal mode: 26 items = page 1: 20 items, page 2: 6 items)
                 articles = soup.find_all('li', id=lambda x: x and 'feed-item-' in x)
-                assert len(articles) > 0, f"Should have articles on page 2 of feed 5, got {len(articles)}"
-                
-                # Should have pagination buttons (since feed 5 has 26 articles = 2 pages)
-                page_elements = soup.find_all('button', attrs={'hx-get': lambda x: x and 'page=' in x})
-                assert len(page_elements) > 0, f"Should have pagination buttons with 26 articles per feed, got {len(page_elements)}"
+                assert len(articles) > 0, f"Should have articles on page 2 of ClaudeAI (minimal mode), got {len(articles)}"
+
+                # Should have pagination buttons (since 26 articles = 2 pages)
+                page_elements = soup.find_all('button', attrs={'hx-target': '#summary'})
+                assert len(page_elements) >= 2, f"Should have pagination buttons for 2-page feed, got {len(page_elements)}"
                 
             finally:
                 client.close()
@@ -236,7 +239,7 @@ class TestCriticalHTTPWorkflows:
         
         Article reading state was key functionality.
         """
-        with test_server() as server_url:
+        with test_server(minimal_mode=True) as server_url:
             client = httpx.Client(timeout=30)
             
             try:
@@ -269,7 +272,7 @@ class TestCriticalHTTPWorkflows:
         
         'Untitled Feed updated Unknown' indicates silent failures.
         """
-        with test_server() as server_url:
+        with test_server(minimal_mode=True) as server_url:
             client = httpx.Client(timeout=30)
             
             try:

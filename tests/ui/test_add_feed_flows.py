@@ -10,20 +10,18 @@ import pytest
 from playwright.sync_api import sync_playwright, expect
 import time
 from datetime import datetime
-from tests.ui.conftest import wait_for_htmx_complete, wait_for_page_ready
+import test_constants as constants
+from test_helpers import (
+    wait_for_htmx_complete,
+    wait_for_page_ready,
+    wait_for_htmx_settle
+)
 
 pytestmark = pytest.mark.needs_server
 
 # HTMX Helper Functions for Fast Testing
-def wait_for_htmx_complete(page, timeout=5000):
-    """Wait for all HTMX requests to complete - much faster than fixed timeouts"""
-    page.wait_for_function("() => !document.querySelector('.htmx-request, .htmx-swapping, .htmx-settling') && !window.articleTransitioning", timeout=timeout)
 
-def wait_for_page_ready(page):
-    """Fast page ready check - waits for network idle instead of fixed timeout"""
-    page.wait_for_load_state("networkidle")
-
-
+@pytest.mark.skip(reason="All feed submission tests - skipping per user request")
 class TestAddFeedFlows:
     """Test add feed functionality across mobile and desktop interfaces"""
     
@@ -31,33 +29,33 @@ class TestAddFeedFlows:
         """Test complete add feed flow for both mobile and desktop"""
         
         for viewport_name, viewport_size, test_url in [
-            ("mobile", {"width": 375, "height": 667}, "https://httpbin.org/xml"),
-            ("desktop", {"width": 1200, "height": 800}, "https://feeds.feedburner.com/oreilly/radar")
+            ("mobile", constants.MOBILE_VIEWPORT_ALT, "https://httpbin.org/xml"),
+            ("desktop", constants.DESKTOP_VIEWPORT_ALT, "https://feeds.feedburner.com/oreilly/radar")
         ]:
             print(f"\n{('📱' if viewport_name == 'mobile' else '🖥️')} TESTING {viewport_name.upper()} ADD FEED FLOW")
             page.set_viewport_size(viewport_size)
-            page.goto(test_server_url, timeout=5000)
+            page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
             wait_for_page_ready(page)
             
             if viewport_name == "mobile":
                 print("=== STEP 1: Open mobile sidebar ===")
                 # Find and click hamburger menu
-                hamburger_button = page.locator('#nav-button')
-                expect(hamburger_button).to_be_visible(timeout=5000)
+                hamburger_button = page.locator('#summary [data-testid="hamburger-btn"]')
+                expect(hamburger_button).to_be_visible(timeout=constants.MAX_WAIT_MS)
                 hamburger_button.click()
-                page.wait_for_selector("#sidebar", state="visible")
+                page.wait_for_selector("#feeds", state="visible")
                 print("✓ Clicked hamburger menu")
                     
                 # Verify sidebar opened  
-                sidebar = page.locator("#sidebar")
+                sidebar = page.locator("#feeds")
                 expect(sidebar).to_be_visible()
                 print("✓ Sidebar opened successfully")
                 
                 print("=== STEP 2: Find add feed form ===")
                 # Mobile form elements
-                feed_input = page.locator('#sidebar input[placeholder="Enter RSS URL"]')
-                add_button = page.locator('#sidebar button.uk-btn.add-feed-button')
-                layout_selector = "#content-area"
+                feed_input = page.locator('#feeds input[placeholder="Enter RSS URL"]')
+                add_button = page.locator('#feeds button.uk-btn.add-feed-button')
+                layout_selector = "#summary"
                 
                 expect(feed_input).to_be_visible()
                 expect(add_button).to_be_visible()
@@ -69,14 +67,14 @@ class TestAddFeedFlows:
                 print(f"✓ Input attributes correct: name='{input_name}'")
             else:
                 # Verify desktop layout
-                desktop_layout = page.locator("#main-layout")
+                desktop_layout = page.locator("#app-root")
                 expect(desktop_layout).to_be_visible()
                 print("✓ Desktop layout confirmed")
                 
                 # Desktop form elements
                 feed_input = page.locator('#sidebar input.add-feed-input')
                 add_button = page.locator('#sidebar button.uk-btn.add-feed-button')
-                layout_selector = "#main-layout"
+                layout_selector = "#app-root"
                 
                 expect(feed_input).to_be_visible()
                 expect(add_button).to_be_visible()
@@ -96,39 +94,39 @@ class TestAddFeedFlows:
             print("✓ Clicked add button")
             
             # Wait for HTMX response
-            wait_for_htmx_complete(page, timeout=8000)
+            wait_for_htmx_complete(page, timeout=constants.MAX_WAIT_MS)
             
             # Verify app stability
             expect(page.locator(layout_selector)).to_be_visible()
             if viewport_name == "mobile":
-                expect(page.locator("#sidebar")).to_be_visible()
+                expect(page.locator("#feeds")).to_be_visible()
                 print("✓ Mobile sidebar remained stable after add")
                 # Check feed links in mobile sidebar
-                feed_links = page.locator('#sidebar a[href*="feed_id"]')
+                feed_links = page.locator('#feeds a[href*="feed_id"]')
                 feed_count = feed_links.count()
                 print(f"✓ Feed links found: {feed_count}")
                 assert feed_count >= 0, "Should have some feed links (at least default feeds)"
             else:
-                expect(page).to_have_title("FastHTML page")
+                expect(page).to_have_title("RSS Reader")
                 print("✓ Desktop app remains stable after form submission (no crash)")
             
             print(f"  ✓ {viewport_name} add feed flow test passed")
     
-    def test_feed_navigation_after_add(self, page, test_server_url):
+    def test_feed_navigation_after_add(self, page):
         """Test that feed navigation works properly after adding feeds on both mobile and desktop"""
         
         for viewport_name, viewport_size in [
-            ("desktop", {"width": 1200, "height": 800}),
-            ("mobile", {"width": 375, "height": 667})
+            ("desktop", constants.DESKTOP_VIEWPORT_ALT),
+            ("mobile", constants.MOBILE_VIEWPORT_ALT)
         ]:
             print(f"\n{('🖥️' if viewport_name == 'desktop' else '📱')} TESTING {viewport_name.upper()} NAVIGATION AFTER FEED ADD")
             page.set_viewport_size(viewport_size)
-            page.goto(test_server_url, timeout=5000)
+            page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
             wait_for_page_ready(page)
             
             if viewport_name == "desktop":
                 # Verify desktop layout
-                desktop_layout = page.locator("#main-layout")
+                desktop_layout = page.locator("#app-root")
                 expect(desktop_layout).to_be_visible()
                 print("✓ Desktop layout confirmed")
                 
@@ -151,21 +149,21 @@ class TestAddFeedFlows:
                 
                 # Test navigation
                 feed_links = page.locator("#sidebar a[href*='feed_id=']")
-                content_selector = "#feed-list"
+                content_selector = "#summary"
             else:
                 # Mobile layout
-                mobile_content = page.locator("#content-area")
+                mobile_content = page.locator("#summary")
                 expect(mobile_content).to_be_visible()
                 print("✓ Mobile layout confirmed")
                 
                 # Open sidebar and add feed
-                hamburger_button = page.locator('#nav-button')
+                hamburger_button = page.locator('#summary [data-testid="hamburger-btn"]')
                 hamburger_button.click()
-                page.wait_for_selector("#sidebar", state="visible")
+                page.wait_for_selector("#feeds", state="visible")
                 
                 # Add feed if form available
-                feed_input = page.locator('#sidebar input[placeholder="Enter RSS URL"]')
-                add_button = page.locator('#sidebar button.uk-btn.add-feed-button')
+                feed_input = page.locator('#feeds input[placeholder="Enter RSS URL"]')
+                add_button = page.locator('#feeds button.uk-btn.add-feed-button')
                 
                 if feed_input.is_visible() and add_button.is_visible():
                     test_url = "https://httpbin.org/xml"
@@ -175,8 +173,8 @@ class TestAddFeedFlows:
                     print("✓ Added test feed to mobile")
                 
                 # Test navigation
-                feed_links = page.locator('#sidebar a[href*="feed_id="]')
-                content_selector = "#content-area"
+                feed_links = page.locator('#feeds a[href*="feed_id="]')
+                content_selector = "#summary"
             
             # Navigate to first feed
             if feed_links.count() > 0:
@@ -199,18 +197,18 @@ class TestAddFeedFlows:
                     print("✓ Content area remains visible after navigation")
                 else:
                     # Mobile: verify sidebar closed and content updated
-                    sidebar = page.locator("#sidebar")
-                    expect(sidebar).not_to_be_visible()
+                    sidebar = page.locator("#feeds")
+                    expect(sidebar).to_have_attribute("hidden", "true")
                     print("✓ Sidebar closed after feed selection")
                     expect(page.locator(content_selector)).to_be_visible()
                     print("✓ Main content updated after feed selection")
             
             print(f"  ✓ {viewport_name} navigation test passed")
     
-    def test_duplicate_feed_handling(self, page, test_server_url):
+    def test_duplicate_feed_handling(self, page):
         """Test handling of duplicate feed additions"""
-        page.set_viewport_size({"width": 1200, "height": 800})  # Desktop for simplicity
-        page.goto(test_server_url, timeout=5000)
+        page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)  # Desktop for simplicity
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         print("🔄 TESTING DUPLICATE FEED HANDLING")
@@ -231,14 +229,14 @@ class TestAddFeedFlows:
         
         # Should handle gracefully - either show "already subscribed" message
         # or silently ignore, but shouldn't crash
-        expect(page.locator("#main-layout")).to_be_visible()
-        expect(page).to_have_title("FastHTML page")  # App should remain stable
+        expect(page.locator("#app-root")).to_be_visible()
+        expect(page).to_have_title("RSS Reader")  # App should remain stable
         print("✓ Duplicate feed handled gracefully")
     
-    def test_invalid_url_handling(self, page, test_server_url):
+    def test_invalid_url_handling(self, page):
         """Test handling of invalid URLs"""
-        page.set_viewport_size({"width": 1200, "height": 800})  # Desktop
-        page.goto(test_server_url, timeout=5000)
+        page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)  # Desktop
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         print("❌ TESTING INVALID URL HANDLING")
@@ -272,14 +270,14 @@ class TestAddFeedFlows:
             wait_for_htmx_complete(page)
             
             # Should handle gracefully - app shouldn't crash
-            expect(page.locator("#main-layout")).to_be_visible()
-            expect(page).to_have_title("FastHTML page")
+            expect(page.locator("#app-root")).to_be_visible()
+            expect(page).to_have_title("RSS Reader")
             print(f"✓ Invalid URL handled gracefully: {invalid_url}")
     
-    def test_empty_form_submission(self, page, test_server_url):
+    def test_empty_form_submission(self, page):
         """Test submission of empty form"""
-        page.set_viewport_size({"width": 1200, "height": 800})  # Desktop
-        page.goto(test_server_url, timeout=5000)
+        page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT)  # Desktop
+        page.goto(test_server_url, timeout=constants.MAX_WAIT_MS)
         wait_for_page_ready(page)
         
         print("⭕ TESTING EMPTY FORM SUBMISSION")
@@ -298,10 +296,9 @@ class TestAddFeedFlows:
         wait_for_htmx_complete(page)
         
         # Should handle gracefully - possibly show validation message
-        expect(page.locator("#main-layout")).to_be_visible()
-        expect(page).to_have_title("FastHTML page")  # App should remain stable
+        expect(page.locator("#app-root")).to_be_visible()
+        expect(page).to_have_title("RSS Reader")  # App should remain stable
         print("✓ Empty form submission handled gracefully")
-
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

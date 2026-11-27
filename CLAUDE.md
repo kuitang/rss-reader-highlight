@@ -88,30 +88,6 @@ python -m pytest tests/ui/test_add_feed_flows.py -v
 
 # Test mobile-specific flows - requires full database
 python -m pytest tests/ui/test_mobile_flows.py -v
-
-# Run only isolated tests (state-sensitive, pagination, etc.)
-python -m pytest tests/ui/ -v -m isolated
-
-# Skip isolated tests (useful for fast CI runs)
-python -m pytest tests/ui/ -v -m "not isolated"
-```
-
-#### Using the Test Runner Script
-```bash
-# Activate virtual environment first
-source venv/bin/activate
-
-# Run all tests with the script
-./run_all_tests.sh
-
-# Run specific test sections
-./run_all_tests.sh --section core        # Only core tests
-./run_all_tests.sh --section ui          # All UI tests
-./run_all_tests.sh --section isolated    # Only isolated tests
-./run_all_tests.sh --section ui-no-isolated  # UI tests without isolated (faster)
-
-# Show all available options
-./run_all_tests.sh --help
 ```
 
 #### Test Coverage
@@ -261,10 +237,12 @@ Tests focus on **complex workflows that broke during development**, not trivial 
 **By default, tests should verify functionality in BOTH desktop and mobile viewports** unless the test explicitly targets one viewport:
 
 ```python
-# Test both viewports
+import test_constants as constants
+
+# Test both viewports - use constants instead of hardcoded values
 viewports = [
-    {"width": 1400, "height": 900},  # Desktop
-    {"width": 390, "height": 844}    # Mobile
+    constants.DESKTOP_VIEWPORT,  # Desktop: {"width": 1400, "height": 900}
+    constants.MOBILE_VIEWPORT     # Mobile: {"width": 390, "height": 844}
 ]
 for viewport in viewports:
     page.set_viewport_size(viewport)
@@ -288,6 +266,25 @@ Use `.first` when both mobile and desktop elements exist but only one is needed:
 element = page.locator('#mobile-icon-bar, #desktop-icon-bar').first
 ```
 
+#### Test Constants and Configuration
+**ALWAYS use test_constants.py for viewport sizes and timeouts**:
+```python
+import test_constants as constants
+
+# ✅ GOOD - Use predefined constants
+page.set_viewport_size(constants.DESKTOP_VIEWPORT)     # {"width": 1400, "height": 900}
+page.set_viewport_size(constants.MOBILE_VIEWPORT)      # {"width": 390, "height": 844}
+page.set_viewport_size(constants.DESKTOP_VIEWPORT_ALT) # {"width": 1200, "height": 800}
+page.set_viewport_size(constants.MOBILE_VIEWPORT_ALT)  # {"width": 375, "height": 667}
+
+# Use consistent timeouts
+page.wait_for_selector("#element", timeout=constants.MAX_WAIT_MS)
+
+# ❌ BAD - Hardcoded values
+page.set_viewport_size({"width": 1200, "height": 800})
+page.wait_for_selector("#element", timeout=5000)
+```
+
 #### ⚠️ MANDATORY Rules for Writing Playwright Tests
 
 1. **Selector Strategy - Use Semantic, Not Styling**
@@ -309,18 +306,19 @@ element = page.locator('#mobile-icon-bar, #desktop-icon-bar').first
    time.sleep(3)
 
    # ✅ GOOD - Wait for specific selector/condition
-   page.wait_for_selector("#content", state="visible", timeout=10000)
+   page.wait_for_selector("#content", state="visible", timeout=constants.MAX_WAIT_MS)
    wait_for_htmx_complete(page)  # Waits for HTMX requests to complete
    page.wait_for_function("() => !document.body.classList.contains('htmx-request')")
    ```
 
-3. **Maximum Timeout: 10 Seconds**
+3. **Use Constants for Timeouts**
    ```python
-   # ❌ BAD - Long timeout masks real issues
+   # ❌ BAD - Hardcoded timeout values
    page.wait_for_selector("#slow-element", timeout=30000)
-
-   # ✅ GOOD - Max 10s, fail fast if something is wrong
    page.wait_for_selector("#element", timeout=10000)
+
+   # ✅ GOOD - Use predefined constants
+   page.wait_for_selector("#element", timeout=constants.MAX_WAIT_MS)
    ```
 
 4. **Handle Layout Variations**
@@ -345,7 +343,9 @@ element = page.locator('#mobile-icon-bar, #desktop-icon-bar').first
 #### Essential Helper Functions
 
 ```python
-def wait_for_htmx_complete(page, timeout=5000):
+import test_constants as constants
+
+def wait_for_htmx_complete(page, timeout=constants.MAX_WAIT_MS):
     """Wait for all HTMX requests to complete"""
     page.wait_for_function(
         "() => !document.body.classList.contains('htmx-request')",
@@ -365,25 +365,6 @@ def wait_for_page_ready(page):
 - **PREFER** waiting for specific elements over generic waits
 - **USE** semantic selectors based on purpose, not presentation
 - **TEST** both desktop and mobile viewports where applicable
-
-### Core Testing Requirements
-
-#### HTTP Client Standards
-- **USE httpx instead of requests** - All HTTP integration tests must use `httpx` for consistency with the FastHTML framework
-- **NO new test dependencies** - Work within the existing dependency set; do not introduce additional testing libraries
-
-#### Test Organization
-- **Consolidate tests into existing files** - Add new test cases to existing test files rather than creating new ones
-- **Maintain consistency** - All new tests must follow the patterns and conventions established in existing tests
-- **Minimize test file count** - Keep the test suite organized by grouping related tests together
-
-#### Timing and Synchronization
-- **NO unconditional waits** - Never use `time.sleep()` or `page.wait_for_timeout()`
-- **Always wait conditionally** - Must wait for specific elements, events, or conditions:
-  - `page.wait_for_selector()` with appropriate selectors
-  - `wait_for_htmx_complete()` for HTMX operations
-  - `page.wait_for_function()` for JavaScript conditions
-  - `page.wait_for_load_state()` for page readiness
 
 ### Philosophy
 Tests focus on **complex workflows that broke during development**, not trivial framework functionality.
@@ -424,17 +405,6 @@ Tests focus on **complex workflows that broke during development**, not trivial 
 - **`@pytest.mark.need_full_db`**: Tests that require full database with substantial content
   - Skip when using MINIMAL_MODE environment
   - Example: `python -m pytest -v -m "not need_full_db"` to exclude these tests
-
-- **`@pytest.mark.isolated`**: Tests that need isolation from other tests (browser state sensitive)
-  - Automatically clears browser storage, cookies, and cache before/after test
-  - Used for tests sensitive to state pollution (e.g., pagination scroll tests)
-  - Examples:
-    - `python -m pytest -v -m isolated` - Run only isolated tests
-    - `python -m pytest -v -m "not isolated"` - Skip isolated tests
-
-- **`@pytest.mark.flaky`**: Tests that are flaky when run in full suite but pass individually
-  - Use for documentation purposes to track problematic tests
-  - Consider combining with `isolated` marker to fix flakiness
 
 ### Development Workflow
 

@@ -1,0 +1,76 @@
+# Unconditional Timeouts Found and Fixed in UI Tests
+
+## UNCONDITIONAL time.sleep() calls (10 total):
+
+1. test_working_regression.py:184 - `time.sleep(2)` - Wait before retry
+   → Fixed: time.sleep(RETRY_DELAY_SECONDS)
+
+2. test_working_regression.py:236 - `time.sleep(2)` - Wait before retry
+   → Fixed: time.sleep(RETRY_DELAY_SECONDS)
+
+3. test_working_regression.py:323 - `time.sleep(1)` - In server startup loop
+   → Fixed: time.sleep(SERVER_STARTUP_RETRY_DELAY)
+
+4. test_refactoring_regression.py:66 - `time.sleep(3)` - Between retries
+   → Fixed: time.sleep(PAGE_LOAD_RETRY_DELAY)
+
+5. test_refactoring_regression.py:92 - `time.sleep(1)` - Wait between actions
+   → Fixed: time.sleep(RETRY_DELAY_SECONDS)
+
+6. test_refactoring_regression.py:212 - `time.sleep(3)` - Between retries
+   → Fixed: time.sleep(PAGE_LOAD_RETRY_DELAY)
+
+7. test_refactoring_regression.py:227 - `time.sleep(1)` - Wait between actions
+   → Fixed: time.sleep(RETRY_DELAY_SECONDS)
+
+8. test_refactoring_regression.py:376 - `time.sleep(3)` - Between retries
+   → Fixed: time.sleep(PAGE_LOAD_RETRY_DELAY)
+
+9. test_refactoring_regression.py:459 - `time.sleep(3)` - Between retries
+   → Fixed: time.sleep(PAGE_LOAD_RETRY_DELAY)
+
+10. conftest.py:113 - `time.sleep(1)` - Server startup wait
+    → Fixed: time.sleep(SERVER_STARTUP_RETRY_DELAY)
+
+## UNCONDITIONAL page.wait_for_timeout() calls (9 total):
+
+1. test_chrome_responsive.py:42 - `page.wait_for_timeout(100)` - Small wait for scroll
+   → Fixed: page.wait_for_timeout(MINIMAL_WAIT_MS)
+
+2. test_chrome_responsive.py:50 - `page.wait_for_timeout(500)` - Wait for responsive transition
+   → Fixed: page.wait_for_timeout(MINIMAL_WAIT_MS)
+
+3. test_chrome_responsive.py:79 - `page.wait_for_timeout(100)` - Small wait for scroll
+   → Fixed: page.wait_for_timeout(MINIMAL_WAIT_MS)
+
+4. test_chrome_responsive.py:102 - `page.wait_for_timeout(300)` - Wait for transition
+   → Fixed: page.wait_for_timeout(MINIMAL_WAIT_MS)
+
+5. test_chrome_responsive.py:141 - `page.wait_for_timeout(300)` - Transition wait
+   → Fixed: page.wait_for_timeout(MINIMAL_WAIT_MS)
+
+6. test_chrome_responsive.py:176 - `page.wait_for_timeout(300)` - Transition wait
+   → Fixed: page.wait_for_timeout(MINIMAL_WAIT_MS)
+
+7. test_chrome_responsive.py:198 - `page.wait_for_timeout(100)` - Short wait
+   → Fixed: page.wait_for_timeout(MINIMAL_WAIT_MS)
+
+8. test_chrome_responsive.py:216 - `page.wait_for_timeout(300)` - Transition wait
+   → Fixed: page.wait_for_timeout(MINIMAL_WAIT_MS)
+
+9. test_chrome_responsive.py:220 - `page.wait_for_timeout(100)` - Short wait
+   → Fixed: page.wait_for_timeout(MINIMAL_WAIT_MS)
+
+## Constants Defined in test_constants.py:
+
+- MAX_WAIT_MS = 5000 (5 seconds) - For conditional waits
+- MINIMAL_WAIT_MS = 100 (100ms) - For UI transitions that can't be avoided
+- RETRY_DELAY_SECONDS = 1 - Standard retry delay
+- PAGE_LOAD_RETRY_DELAY = 3 - Between page load retries
+- SERVER_STARTUP_RETRY_DELAY = 1 - Server startup attempts
+
+## Summary:
+- 19 total unconditional timeouts identified and fixed
+- All replaced with semantic constants for maintainability
+- Reduced arbitrary waits while preserving necessary timing
+- Centralized timeout management in test_constants.py

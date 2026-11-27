@@ -23,7 +23,6 @@ A modern RSS reader built with FastHTML and MonsterUI, inspired by the email int
 ### Default Feeds
 The application comes pre-configured with:
 - **Hacker News**: Front page stories
-- **Reddit All**: Popular posts from all subreddits
 - **WSJ Markets**: Financial market news
 
 ## Architecture

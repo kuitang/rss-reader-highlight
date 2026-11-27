@@ -5,26 +5,6 @@
 echo "🧪 RSS Reader Test Suite"
 echo "========================"
 
-# Show help if requested
-if [ "$1" = "--help" ] || [ "$1" = "-h" ]; then
-    echo "Usage: ./run_all_tests.sh [--section SECTION]"
-    echo ""
-    echo "Sections:"
-    echo "  core           - Core logic tests (no server needed)"
-    echo "  integration    - Integration tests"
-    echo "  ui             - All UI tests (includes isolated)"
-    echo "  ui-no-isolated - UI tests excluding isolated tests (faster, for CI)"
-    echo "  isolated       - Only isolated/state-sensitive tests"
-    echo "  specialized    - Network/Docker integration tests"
-    echo "  (none)         - Run all test suites"
-    echo ""
-    echo "Examples:"
-    echo "  ./run_all_tests.sh                      # Run all tests"
-    echo "  ./run_all_tests.sh --section core       # Run only core tests"
-    echo "  ./run_all_tests.sh --section isolated   # Run only isolated tests"
-    exit 0
-fi
-
 # Parse command line arguments
 TEST_SECTION=""
 if [ "$1" = "--section" ] && [ -n "$2" ]; then
@@ -99,16 +79,6 @@ run_ui_tests() {
     python -m pytest tests/ui/ $PYTEST_ARGS -v
 }
 
-run_isolated_tests() {
-    echo "🔒 Running isolated tests (state-sensitive)..."
-    python -m pytest tests/ui/ $PYTEST_ARGS -v -m isolated
-}
-
-run_ui_tests_skip_isolated() {
-    echo "🌐 Running UI tests (skipping isolated tests)..."
-    python -m pytest tests/ui/ $PYTEST_ARGS -v -m "not isolated"
-}
-
 run_specialized_tests() {
     echo "⚙️  Running specialized tests..."
     python -m pytest tests/specialized/ $PYTEST_ARGS -v
@@ -125,12 +95,6 @@ case "$TEST_SECTION" in
     "ui")
         run_ui_tests
         ;;
-    "ui-no-isolated")
-        run_ui_tests_skip_isolated
-        ;;
-    "isolated")
-        run_isolated_tests
-        ;;
     "specialized")
         run_specialized_tests
         ;;
@@ -139,7 +103,7 @@ case "$TEST_SECTION" in
         ;;
     *)
         echo "Unknown section: $TEST_SECTION"
-        echo "Valid sections: core, integration, ui, ui-no-isolated, isolated, specialized"
+        echo "Valid sections: core, integration, ui, specialized"
         exit 1
         ;;
 esac
