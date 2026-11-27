@@ -1,5 +1,5 @@
 python-fasthtml==0.14.14
-monsterui==1.0.26
+monsterui==1.0.47
 feedparser==6.0.11
 httpx==0.28.1
 pytest==9.0.3
