@@ -10,6 +10,7 @@ env:
 
 jobs:
   preview_app:
+    if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
 
     steps:

@@ -6,7 +6,7 @@ RUN printf '%s\n' "$SECURITY_REBUILD" > /tmp/security-rebuild
 WORKDIR /build
 
 # Install build dependencies if needed
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-recommends \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
@@ -21,7 +21,7 @@ RUN printf '%s\n' "$SECURITY_REBUILD" > /tmp/security-rebuild
 RUN python -m pip install --no-cache-dir --upgrade "pip>=26.2.0" "setuptools>=83.0.0" "wheel>=0.46.2"
 
 # Install only runtime dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get -y upgrade && apt-get install -y --no-install-recommends \
     sqlite3 \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
